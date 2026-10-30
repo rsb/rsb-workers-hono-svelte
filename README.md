@@ -1,0 +1,38 @@
+# rsb-workers-hono-svelte
+
+A lab for the `workers-hono-svelte` profile: a todo app on Cloudflare
+Workers, built by hand, slice by slice, to find what the profile should
+produce. The spec is [prd/todo.md](prd/todo.md), and the lab record is
+in [logbook/](logbook/README.md).
+
+## Run
+
+Needs Node 26.13.0 and pnpm 12.5.1 (enforced by `engines`).
+
+```sh
+pnpm install
+pnpm dev               # start the API and web Workers locally
+pnpm check             # verify binding types, type-check every package
+pnpm test:unit         # run the unit tests
+pnpm test:integration  # run the integration tests (API, in the Workers runtime)
+pnpm test:e2e          # run the end-to-end tests (Playwright, both Workers)
+```
+
+There is no bundled test run. Each tier runs on its own, and
+`pnpm test` fails with a message naming the three.
+
+Until slice 1 lands, the API has no source: `pnpm dev` does not start,
+the test tiers pass with no tests, and `test:e2e` prints a placeholder.
+
+## Layout
+
+```
+apps/todo/
+  contract/  shared schemas, types and limits (valibot), imported by api and web
+  api/       Hono API Worker, not public: reached only through web's service binding
+  web/       SvelteKit BFF Worker, form actions to the API
+prd/         what to build
+logbook/     handoffs, drafts, findings and profile notes; not part of the app
+```
+
+Agent instructions are in [AGENTS.md](AGENTS.md).

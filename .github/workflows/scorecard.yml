@@ -1,0 +1,30 @@
+# scorecard is the one required check. Minimal on purpose: the lab
+# starts with as few checks as possible, and every stage added later
+# is a recorded change in the logbook.
+name: scorecard
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  scorecard:
+    name: scorecard
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+      - run: pnpm install --frozen-lockfile
+      - name: Install Playwright browsers
+        run: pnpm --filter @todo/web exec playwright install --with-deps chromium
+      - run: pnpm check
+      - run: pnpm test:unit
+      - run: pnpm test:integration
+      - run: pnpm test:e2e
