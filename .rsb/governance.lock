@@ -1,0 +1,28 @@
+# Governance lock for rsb-workers-hono-svelte. Written by hand at init:
+# present and hashed, not validated.
+#
+# The profile nodes below (chain and mounts) are planned and not yet in
+# agent-registry. Only the rules exist there today.
+
+registry_rev = "eb8199f7dbc2eab856b2ab2d93f38b94069f64cc"
+
+[root]
+chain = ["base", "service", "pnpm-monorepo", "cloudflare", "rsb-workers-hono-svelte"]
+
+[[mounts]]
+path  = "apps/todo/api"
+chain = ["hono-api", "hono-api-workers"]
+
+[[mounts]]
+path  = "apps/todo/web"
+chain = ["svelte-bff", "svelte-bff-workers"]
+
+[[mounts]]
+path  = "apps/todo/contract"
+chain = ["api-contract"]
+
+[rules]
+ids = ["rl-0009", "rl-0011", "rl-0012"]
+
+[files]
+"AGENTS.md" = "sha256:23c738f4f2fc7fda690e25b1f446c339035e40bad967058b29045103ce5bf5dd"
