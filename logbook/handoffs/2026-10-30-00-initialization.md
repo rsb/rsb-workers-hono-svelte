@@ -5,6 +5,15 @@ First record of the paired lab session that shapes, by hand, what the
 file is the shared understanding the owner and Claude reached before any
 code, and the only input the next session starts from.
 
+## Purpose
+
+The result informs the owner's design discussion about the software
+factory (rsb-workflow) on 2026-10-31. `logbook/profile-notes.md` is as
+much the deliverable as the code: for every choice that could become a
+registry entity, one entry recording its kind, statement, realizing
+lines and whether a machine could check it. Keep it current at every
+stage, not at the end.
+
 ## How we work
 
 - **Paired, not dictated.** Owner and Claude work as two developers at one
@@ -30,6 +39,9 @@ code, and the only input the next session starts from.
   `logbook/handoffs/` (what we did, where we are, next steps) and a PR
   that reflects the shared understanding. After merge the owner clears
   Claude's context; the next session begins by reading the latest handoff.
+  Handoffs are named `YYYY-MM-DD-NN-<stage>.md`: the date, a two-digit
+  sequence across the whole series, the stage name. A correction to a
+  merged handoff goes in by its own small PR before the context is cleared.
 - **Commits.** Conventional commits, no Co-Authored-By or any
   attribution. Claude never pushes.
 - **Not factory work.** No tickets, no agent-box, no Gauge, no spec ids.
@@ -241,6 +253,13 @@ source (no build step to drift); package names `@todo/{api,web,contract}`
   API with `Accept: application/vnd.github.raw`).
 - Playwright's chromium is already in `~/.cache/ms-playwright`.
 - `gh` and `git push` are the owner's to run.
+- Inside Claude's sandbox, `git status` lists `.bash_profile`, `.bashrc`,
+  `.claude/`, `.gitconfig`, `.gitmodules`, `.idea`, `.mcp.json`,
+  `.profile`, `.ripgreprc`, `.vscode`, `.zprofile` and `.zshrc` as
+  untracked. Except `.claude/` (real, the owner's local config, to be
+  ignored at init), these are sandbox placeholder mounts, not files: the
+  owner's shell shows the tree clean. Never commit or ignore them; stage
+  files by explicit path.
 - `main` starts with an empty root commit; this handoff arrives by PR
   from `handoff/00-initialization`.
 
