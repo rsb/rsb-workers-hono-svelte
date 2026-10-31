@@ -13,7 +13,7 @@ export default defineConfig({
     },
     {
       command: "pnpm dev",
-      url: "http://localhost:5173",
+      url: "http://localhost:5173/health",
       reuseExistingServer: false,
     },
   ],
