@@ -7,11 +7,11 @@
     "pnpm": "12.5.1"
   },
   "scripts": {
-    "dev": "pnpm --parallel --filter \"./apps/todo/*\" dev",
+    "dev": "pnpm --parallel --filter \"./apps/*\" dev",
     "check": "pnpm -r check",
     "test:unit": "pnpm -r --if-present test:unit",
     "test:integration": "pnpm -r --if-present test:integration",
-    "test:e2e": "pnpm --filter @todo/web test:e2e",
+    "test:e2e": "pnpm --filter @todo/bff test:e2e",
     "test": "echo \"no bundled test run: use pnpm test:unit, pnpm test:integration or pnpm test:e2e\" >&2; exit 1"
   }
 }

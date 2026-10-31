@@ -181,11 +181,20 @@ importers:
 
   .: {}
 
-  apps/todo/api:
+  apps/api:
     dependencies:
-      '@todo/contract':
+      '@todo/business':
         specifier: workspace:*
-        version: link:../contract
+        version: link:../../packages/business
+      '@todo/contract-api':
+        specifier: workspace:*
+        version: link:../../packages/contract/api
+      '@todo/data-memory':
+        specifier: workspace:*
+        version: link:../../packages/data/memory
+      '@todo/operations':
+        specifier: workspace:*
+        version: link:../../packages/operations
       hono:
         specifier: 4.13.14
         version: 4.13.14
@@ -206,24 +215,11 @@ importers:
         specifier: 'catalog:'
         version: 4.156.0(@cloudflare/workers-types@5.20261029.1)(@types/node@26.6.6)
 
-  apps/todo/contract:
+  apps/bff:
     dependencies:
-      valibot:
-        specifier: 'catalog:'
-        version: 1.5.0(typescript@6.0.3)
-    devDependencies:
-      typescript:
-        specifier: 'catalog:'
-        version: 6.0.3
-      vitest:
-        specifier: 'catalog:'
-        version: 5.0.5(@types/node@26.6.6)(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2))
-
-  apps/todo/web:
-    dependencies:
-      '@todo/contract':
+      '@todo/contract-api':
         specifier: workspace:*
-        version: link:../contract
+        version: link:../../packages/contract/api
       valibot:
         specifier: 'catalog:'
         version: 1.5.0(typescript@6.0.3)
@@ -261,6 +257,51 @@ importers:
       wrangler:
         specifier: 'catalog:'
         version: 4.156.0(@cloudflare/workers-types@5.20261029.1)(@types/node@26.6.6)
+
+  packages/business:
+    devDependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.5(@types/node@26.6.6)(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2))
+
+  packages/contract/api:
+    dependencies:
+      valibot:
+        specifier: 'catalog:'
+        version: 1.5.0(typescript@6.0.3)
+    devDependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.5(@types/node@26.6.6)(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2))
+
+  packages/data/memory:
+    dependencies:
+      '@todo/business':
+        specifier: workspace:*
+        version: link:../../business
+    devDependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+
+  packages/operations:
+    dependencies:
+      '@todo/business':
+        specifier: workspace:*
+        version: link:../business
+    devDependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.5(@types/node@26.6.6)(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2))
 
 packages:
 

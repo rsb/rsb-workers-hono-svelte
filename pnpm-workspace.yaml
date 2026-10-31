@@ -1,6 +1,8 @@
 packages:
-  - apps/*/*
+  - apps/*
   - packages/*
+  - packages/contract/*
+  - packages/data/*
 
 engineStrict: true
 saveExact: true
