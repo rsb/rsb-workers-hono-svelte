@@ -2,16 +2,20 @@
   "name": "@todo/web",
   "private": true,
   "type": "module",
+  "imports": {
+    "#lib/*": "./src/lib/*"
+  },
   "scripts": {
     "dev": "vite dev",
     "build": "vite build",
     "check": "wrangler types --check && svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "test:unit": "vitest run -c vitest.unit.config.ts",
-    "test:e2e": "echo \"no e2e scenarios yet: becomes playwright test at slice 1\"",
+    "test:e2e": "playwright test",
     "types": "wrangler types"
   },
   "dependencies": {
-    "@todo/contract": "workspace:*"
+    "@todo/contract": "workspace:*",
+    "valibot": "catalog:"
   },
   "devDependencies": {
     "@playwright/test": "1.64.1",

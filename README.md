@@ -15,14 +15,14 @@ pnpm dev               # start the API and web Workers locally
 pnpm check             # verify binding types, type-check every package
 pnpm test:unit         # run the unit tests
 pnpm test:integration  # run the integration tests (API, in the Workers runtime)
-pnpm test:e2e          # run the end-to-end tests (Playwright, both Workers)
+pnpm test:e2e          # run the end-to-end tests (Playwright starts both Workers)
 ```
 
 There is no bundled test run. Each tier runs on its own, and
 `pnpm test` fails with a message naming the three.
 
-Until slice 1 lands, the API has no source: `pnpm dev` does not start,
-the test tiers pass with no tests, and `test:e2e` prints a placeholder.
+With `pnpm dev` running, http://localhost:5173/health shows whether
+the web reaches the API through the binding.
 
 ## Layout
 
