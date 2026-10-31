@@ -183,9 +183,6 @@ importers:
 
   apps/todo/api:
     dependencies:
-      '@hono/valibot-validator':
-        specifier: 0.6.2
-        version: 0.6.2(hono@4.13.14)(valibot@1.5.0(typescript@6.0.3))
       '@todo/contract':
         specifier: workspace:*
         version: link:../contract
@@ -480,12 +477,6 @@ packages:
     engines: {node: '>=18'}
     cpu: [x64]
     os: [win32]
-
-  '@hono/valibot-validator@0.6.2':
-    resolution: {integrity: sha512-glBQW4okjgX4iabeaQXqwa79aGuZovxHMZTuWyCnoWyWH6v0z06OKnwvnHygZaIEeOgtXB29aCzIqQTUhU5yvg==}
-    peerDependencies:
-      hono: '>=3.9.0'
-      valibot: ^1.0.0 || ^1.0.0-beta.4 || ^1.0.0-rc
 
   '@img/colour@1.1.0':
     resolution: {integrity: sha512-Td76q7j57o/tLVdgS746cYARfSyxk8iEfRxewL9h4OMzYhbW4TAcppl0mT4eyqXddh6L/jwoM75mo7ixa/pCeQ==}
@@ -1463,11 +1454,6 @@ snapshots:
 
   '@esbuild/win32-x64@0.28.2':
     optional: true
-
-  '@hono/valibot-validator@0.6.2(hono@4.13.14)(valibot@1.5.0(typescript@6.0.3))':
-    dependencies:
-      hono: 4.13.14
-      valibot: 1.5.0(typescript@6.0.3)
 
   '@img/colour@1.1.0': {}
 

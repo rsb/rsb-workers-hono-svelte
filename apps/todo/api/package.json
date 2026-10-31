@@ -10,7 +10,6 @@
     "types": "wrangler types"
   },
   "dependencies": {
-    "@hono/valibot-validator": "0.6.2",
     "@todo/contract": "workspace:*",
     "hono": "4.13.14",
     "valibot": "catalog:"
