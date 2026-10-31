@@ -35,12 +35,13 @@ throughout, except for config, which has nothing to hold yet
 (chapter 3).
 
 A1–A9 change where the code lives and how the api's architecture
-reaches past the api. The code does not follow them yet. Paragraphs
-marked **Target.** describe what they ask for. Two refactors get the
-code there:
-- **Refactor A, the move:** apps and packages take the layout of
-  chapter 0. Behaviour does not change, and tests change only their
-  import paths.
+reaches past the api. Since refactor A the code has their layout,
+but not yet the rest. Paragraphs marked **Target.** describe what they
+ask for. Three refactors get the code there:
+- **Refactor A, the move:** done (`a6676cd`). Apps and packages took
+  the layout of chapter 0. Behaviour did not change, and tests changed
+  only their import paths
+  ([report](reports/2026-10-31-05-refactor-a-move.md)).
 - **Refactor B, the BFF:** the BFF takes the api's architecture
   (chapter 12), with the contract's endpoints (chapter 11) and the
   api client in data (chapter 8).
@@ -51,19 +52,19 @@ code there:
 Chapter 0 and chapters 11–12 are new. They are numbered so that
 references to chapters 1–10 elsewhere in the logbook stay correct.
 
-Paths are under `apps/todo/api/src/`. After refactor A they are under
-`apps/api/src/`, and business, operations and data are packages
-(chapter 0).
+Paths are under `apps/api/src/`. Business, operations and data are
+packages under `packages/` (chapter 0).
 
 ```
-index.ts            the story
-construct.ts        builds everything, once per isolate
-http.ts             our HTTP module: drives Hono
-app/
-├─ handlers/        entry points
-├─ operations/      the work
-├─ business/        types, rules, Result
-└─ data/            one package per real thing
+apps/api/src/
+├─ index.ts            the story
+├─ construct.ts        builds everything, once per isolate
+├─ http.ts             our HTTP module: drives Hono
+└─ app/handlers/       entry points
+packages/
+├─ operations/         the work
+├─ business/           types, rules, Result
+└─ data/               one package per real thing
 ```
 
 ## 0. Where the api lives
@@ -111,9 +112,11 @@ packages/
       └─ api/             client for the api, used by the bff-api
 ```
 
-Today this is `apps/todo/{api,web,contract}`. Refactor A moves:
+Refactor A (`a6676cd`) moved the code from `apps/todo/{api,web,contract}`
+into this layout. Everything in the tree exists except
+`contract/bff-api` and `data/internal/api`:
 
-| Today | Target |
+| Before | Now |
 |---|---|
 | `apps/todo/api` | `apps/api` |
 | `apps/todo/web` | `apps/bff` |
