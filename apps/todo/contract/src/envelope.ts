@@ -1,13 +1,11 @@
 import * as v from "valibot";
 
+/** Every kind except `validation`: these carry no `field`. */
+export const OtherKind = v.picklist(["not_found", "limit", "too_large", "internal"]);
+export type OtherKind = v.InferOutput<typeof OtherKind>;
+
 /** Every kind an API error can have (PRD, Envelope). */
-export const ErrorKind = v.picklist([
-  "validation",
-  "not_found",
-  "limit",
-  "too_large",
-  "internal",
-]);
+export const ErrorKind = v.picklist(["validation", ...OtherKind.options]);
 export type ErrorKind = v.InferOutput<typeof ErrorKind>;
 
 /** `field` is present when the kind is `validation`, and only then. */
@@ -18,7 +16,7 @@ export const ApiError = v.variant("kind", [
     field: v.string(),
   }),
   v.strictObject({
-    kind: v.picklist(["not_found", "limit", "too_large", "internal"]),
+    kind: OtherKind,
     message: v.string(),
   }),
 ]);
@@ -37,3 +35,9 @@ export const success = <T extends v.GenericSchema>(data: T) =>
 /** Either envelope, for a reply's data schema. */
 export const envelope = <T extends v.GenericSchema>(data: T) =>
   v.variant("ok", [success(data), Failure]);
+
+/** The success envelope around a reply's data type. */
+export type Success<T> = { ok: true; data: T };
+
+/** Either envelope, for a reply's data type. */
+export type Envelope<T> = Success<T> | Failure;
