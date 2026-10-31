@@ -99,8 +99,9 @@ Routing is required for all implementations. If supported by the framework, use 
 These are fixed for the lab. A deviation below cites one of them; a
 deviation that cannot is dropped.
 - **C-fixed** The fixed inputs of handoff 00: the envelope, the stack
-  and shape, an in-memory store behind a port, the API reachable only
-  through the BFF's service binding, local only.
+  and shape, a store behind a port (in memory until stage 06, then D1,
+  see Database), the API reachable only through the BFF's service
+  binding, local only.
 - **C-catalogue** The pattern catalogue (Purpose): where the lab
   compares two ways of doing one thing, both are built.
 - **C-secure** Security and reliability are high priorities in the
@@ -112,8 +113,9 @@ One per line, each with its constraint.
 1. Every API response uses the envelope (C-fixed).
 2. The API is not public, so it has no CORS and no URL of its own
    (C-fixed).
-3. Todos persist in the API's in-memory store, not localStorage. They
-   survive a reload but not a restart of the API Worker. The keys
+3. Todos persist in the API's D1 database, run locally by wrangler,
+   not localStorage. They survive a reload and a restart of the API
+   Worker. The keys
    `id`, `title`, `completed` are kept; the `todos-[framework]` name
    does not apply (C-fixed).
 4. Routes are real paths, `/`, `/active` and `/completed`, not hash
@@ -130,7 +132,8 @@ One per line, each with its constraint.
 8. A request body over 8 KiB is rejected with `too_large` (413)
    (C-secure).
 9. The store holds at most 500 todos. Adding one more is rejected with
-   `limit` (409) (C-secure).
+   `limit` (409) (C-secure). The check and the insert are one atomic
+   step in every store (Database).
 10. DOM selectors (`#main`, `#footer`, `.destroy`, `<strong>`,
     `.editing`, `.completed`, `selected`) are not required. The
     behaviour each names is kept, and e2e finds elements by role,
@@ -193,16 +196,26 @@ own beyond the limits above.
 
 ## Shape
 These are constraints, not rules.
-- `apps/todo/` holds `api` (Hono on Cloudflare Workers), `web`
-  (SvelteKit, Svelte 5, Cloudflare adapter, the BFF) and `contract`
-  (the shapes and limits both share). `packages/` is for libraries
-  shared across apps; the todo adds none.
+- `apps/` holds the Workers: `api` (Hono on Cloudflare Workers) and
+  `bff` (SvelteKit, Svelte 5, Cloudflare adapter). `packages/` holds
+  what they build on: `contract/api` (the shapes and limits both
+  share), `business`, `operations` and `data/*`, one per store.
 - The BFF is the only public Worker. The API is reached only through a
   service binding.
 - Local only. `pnpm dev` at the root runs both Workers with the binding
   between them.
 - Errors on the request path are returned values, never thrown.
-- The store is in memory, behind a port.
+- The store is behind a port. D1 is the store the API runs on.
+
+## Database
+- D1, local only, through a `DB` binding on the API Worker. The BFF
+  never reaches it.
+- SQL is written by hand, with `prepare` and `bind` only: no ORM, no
+  query builder, and no value is ever put into SQL text.
+- The schema is a set of numbered migration files, applied by
+  wrangler.
+- A multi-step write that must not interleave is atomic in every
+  store. Each data package says how it achieves this.
 
 ## Slices
 Each slice crosses contract, API and web and is tested at all three
@@ -346,8 +359,13 @@ BFF.
 ## Out of scope
 - Deploying, staging, production, a public site.
 - Sign-in and users.
-- A database, until the owner decides one replaces the store.
-- Concurrency and transactions. An agent that introduces either is a
-  finding, not a feature.
+- Concurrency control beyond what each store's transactions settle
+  (locks held across requests, retries, optimistic versions). An agent
+  that introduces it is a finding, not a feature.
 - Request paths other than form actions (deviation 12): a later
   iteration.
+
+## Amendments
+- 2026-10-31, stage 06: a D1 database replaces the in-memory store;
+  transactions come into scope
+  (`logbook/drafts/2026-10-31-06-database-decision.md`).

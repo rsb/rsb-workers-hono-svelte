@@ -96,6 +96,23 @@ the api's construct in miniature. Today the client is plain functions
 that take the binding, so there is nothing to build. Construct
 arrives when the client has state (a base URL, a logger), not before.
 
+**Target (A10, refactor B).** When the bff-api gets its construct, it
+follows the api's (api story, chapter 4):
+- Everything the bff-api builds lives in its one construct, in
+  `$lib/server/`. No shared construct package, and no builders inside
+  `data/internal/api` or the operations packages.
+- One exported builder per level, composed into a default chain:
+  infra (the `API` binding, a logger) → data (the api client) →
+  operations, when the BFF has any (chapter 6) → handlers (the load
+  and action functions).
+- Tests enter at any level: a fake binding at the infra level, which
+  replaces today's habit of passing the binding to every function
+  (P29), or a stubbed client one level up.
+- **[Kit]** still owns the route table, so there is no routes level.
+  The open question is how a `+page.server.ts` reaches the built
+  handlers: a module-level `construct()` in `$lib/server`, or Kit's
+  `init` hook (chapter 1).
+
 ## 5. Entry points
 
 **[Kit]** owns the files: `load` and form actions live in
