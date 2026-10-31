@@ -27,6 +27,8 @@ The decisions behind this story are:
   - A7: a client for another of our systems is data (chapter 8).
   - A8: each boundary translates once (chapter 5).
   - A9: names, and what `internal` means (chapter 0).
+  - A10: everything stays in construct, as granular builders composed
+    into one default chain; tests may enter at any level (chapter 4).
 
 After slice 2 (Add and list), the code follows chapters 1–10
 throughout, except for config, which has nothing to hold yet
@@ -42,6 +44,9 @@ code there:
 - **Refactor B, the BFF:** the BFF takes the api's architecture
   (chapter 12), with the contract's endpoints (chapter 11) and the
   api client in data (chapter 8).
+- **Refactor C, construct:** the api's construct splits into granular
+  builders (A10, chapter 4). Behaviour does not change. It could run
+  before B; the order is the owner's call.
 
 Chapter 0 and chapters 11–12 are new. They are numbered so that
 references to chapters 1–10 elsewhere in the logbook stay correct.
@@ -240,10 +245,66 @@ entry points and routes included, from a fully loaded config. It
 copies config values into whatever needs them. Nothing else sees
 config.
 
-Only `index.ts` imports construct, which keeps the import graph
-acyclic.
+Only `index.ts` and tests import construct, which keeps the import
+graph acyclic (A10).
 
-In the code (`construct.ts`), construct:
+### Everything stays in construct (A10)
+
+Building the app's dependencies is construct's whole job, and all of
+it lives in one place: the app's construct. No other package carries
+wiring:
+- No shared `packages/construct`. Today one app builds operations, so
+  there is nothing to share. A shared builder would also have to pick
+  a store, and so depend on every data package.
+- No builders in the packages they build. `packages/operations` holds
+  operations and their ports, never a `todoOperations(deps)` that
+  wires them.
+
+When a second app needs the same graph, the question is reopened with
+a real case in hand.
+
+### Granular builders, composed
+
+Construct is not one function. It is one builder per level, each
+taking the level below as its argument and each exported:
+
+```ts
+constructInfra(): Infra                     // the store, the id source; later, from config
+constructOperations(infra): Operations      // each operation with the ports it declares
+constructRoutes(operations): Route[]        // each handler with the operation it runs
+constructApi(routes): Api                   // plus the failure handlers, typed by http.ts
+construct(overrides?: Partial<Infra>): Api  // the default chain, which index.ts calls
+```
+
+`construct()` is
+`constructApi(constructRoutes(constructOperations({ ...constructInfra(), ...overrides })))`.
+
+Any caller can enter at any level and replace one piece, which is
+what makes construct usable for more than production:
+- a seeded store: `construct({ store })`, so a test reaches the todo
+  limit without 100 POSTs;
+- a fixed id: `construct({ newId: () => "id-1" })`, so a test asserts
+  the whole reply;
+- one stubbed operation:
+  `constructRoutes({ ...constructOperations(infra), listTodos: failing })`,
+  so a test reaches `onError` through real routing.
+
+The existing integration tests still go through the Worker's default
+export, so the production path stays covered.
+
+**One file while it reads at a glance.** The modularity is in the
+exported functions, not in files. `construct.ts` reads top to bottom
+as the app's whole dependency graph. It becomes a `construct/`
+directory when it stops reading at a glance, most likely when config
+arrives or a second domain does. The split is then likely by domain
+(`construct/todos.ts`), since a new domain adds a builder at every
+level.
+
+**Target.** The code still has one `construct()` that does all levels
+inline. Refactor C, after refactor B, splits it into the builders
+above. Behaviour does not change.
+
+In the code today (`construct.ts`), construct:
 - builds one memory store and one id source (`crypto.randomUUID`);
 - builds each operation with the dependencies it declares
   (`addTodo({ store, newId })`, `listTodos({ store })`);
@@ -494,6 +555,7 @@ The import rules differ in two zones:
   - `index.ts` imports config, construct and the HTTP module.
   - construct imports config and anything it builds, plus the HTTP
     module's types (D3).
+  - tests may import construct, at any of its levels (A10).
   - the HTTP module imports contract and nothing else of ours.
   - config imports nothing of ours.
   - nothing imports `index.ts`.
