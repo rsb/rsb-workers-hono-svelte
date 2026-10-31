@@ -2,7 +2,7 @@ import { Failure } from "@todo/contract";
 import { Context } from "hono";
 import * as v from "valibot";
 import { describe, expect, it, vi } from "vitest";
-import { onError } from "../../../src/handlers/error.ts";
+import { onError } from "../../../../../src/app/handlers/errors/errors.ts";
 
 describe("onError", () => {
   it("returns internal without the cause", async () => {
