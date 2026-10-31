@@ -1,0 +1,20 @@
+{
+  "name": "@todo/operations",
+  "private": true,
+  "description": "Operations, each declaring the ports it needs. Imports business only.",
+  "type": "module",
+  "exports": {
+    "./*": "./src/*"
+  },
+  "scripts": {
+    "check": "tsc -p tsconfig.json",
+    "test:unit": "vitest run -c vitest.unit.config.ts"
+  },
+  "dependencies": {
+    "@todo/business": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

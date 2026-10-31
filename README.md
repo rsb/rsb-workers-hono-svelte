@@ -22,17 +22,21 @@ There is no bundled test run. Each tier runs on its own, and
 `pnpm test` fails with a message naming the three.
 
 With `pnpm dev` running, http://localhost:5173/health shows whether
-the web reaches the API through the binding.
+the BFF reaches the API through the binding.
 
 ## Layout
 
 ```
-apps/todo/
-  contract/  shared schemas, types and limits (valibot), imported by api and web
-  api/       Hono API Worker, not public: reached only through web's service binding
-  web/       SvelteKit BFF Worker, form actions to the API
-prd/         what to build
-logbook/     handoffs, drafts, findings and profile notes; not part of the app
+apps/
+  api/              Hono API Worker, not public: reached only through the BFF's service binding
+  bff/              SvelteKit BFF Worker, form actions to the API
+packages/
+  contract/api/     the api's contract: schemas, types and limits (valibot)
+  business/         business types, rules and Result
+  operations/       operations, each with the ports it needs
+  data/memory/      the isolate's memory as a todo store
+prd/                what to build
+logbook/            handoffs, drafts, findings and profile notes; not part of the app
 ```
 
 Agent instructions are in [AGENTS.md](AGENTS.md).

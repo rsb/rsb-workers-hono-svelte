@@ -16,3 +16,6 @@ playwright-report/
 
 # owner's local Claude Code config
 .claude/
+
+# pnpm store created when installing inside the sandbox
+.pnpm-store/

@@ -1,0 +1,20 @@
+{
+  "name": "@todo/contract-api",
+  "private": true,
+  "description": "The api's contract. Published by apps/api, consumed by apps/bff.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "check": "tsc -p tsconfig.json",
+    "test:unit": "vitest run -c vitest.unit.config.ts"
+  },
+  "dependencies": {
+    "valibot": "catalog:"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

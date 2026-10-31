@@ -1,0 +1,8 @@
+{
+  "extends": ["../../tsconfig.base.json", "$app/tsconfig"],
+  "compilerOptions": {
+    "types": ["$app/types", "./worker-configuration.d.ts"]
+  },
+  "include": ["src", "test", "*"],
+  "exclude": ["src/service-worker"]
+}

@@ -10,15 +10,15 @@ registry_rev = "eb8199f7dbc2eab856b2ab2d93f38b94069f64cc"
 chain = ["base", "service", "pnpm-monorepo", "cloudflare", "rsb-workers-hono-svelte"]
 
 [[mounts]]
-path  = "apps/todo/api"
+path  = "apps/api"
 chain = ["hono-api", "hono-api-workers"]
 
 [[mounts]]
-path  = "apps/todo/web"
+path  = "apps/bff"
 chain = ["svelte-bff", "svelte-bff-workers"]
 
 [[mounts]]
-path  = "apps/todo/contract"
+path  = "packages/contract/api"
 chain = ["api-contract"]
 
 [rules]

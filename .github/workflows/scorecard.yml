@@ -23,7 +23,7 @@ jobs:
           node-version-file: .node-version
       - run: pnpm install --frozen-lockfile
       - name: Install Playwright browsers
-        run: pnpm --filter @todo/web exec playwright install --with-deps chromium
+        run: pnpm --filter @todo/bff exec playwright install --with-deps chromium
       - run: pnpm check
       - run: pnpm test:unit
       - run: pnpm test:integration
