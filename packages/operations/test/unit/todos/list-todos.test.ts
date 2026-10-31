@@ -1,7 +1,7 @@
 import { expect, it } from "vitest";
 import { listTodos } from "../../../src/todos/list-todos.ts";
 
-it("lists what the store lists", () => {
+it("lists what the store lists", async () => {
   const todos = [{ id: "id-1", title: "buy milk", completed: false }];
-  expect(listTodos({ store: { list: () => todos } })()).toEqual(todos);
+  expect(await listTodos({ store: { list: async () => todos } })()).toEqual(todos);
 });

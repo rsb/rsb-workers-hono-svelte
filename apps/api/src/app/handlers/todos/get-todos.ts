@@ -4,5 +4,5 @@ import { success } from "../present.ts";
 import { presentTodo } from "./present.ts";
 
 /** `GET /todos`: nothing to validate, and listing cannot fail. */
-export const getTodos = (listTodos: ListTodos) => (c: Context) =>
-  success(c, listTodos().map(presentTodo));
+export const getTodos = (listTodos: ListTodos) => async (c: Context) =>
+  success(c, (await listTodos()).map(presentTodo));

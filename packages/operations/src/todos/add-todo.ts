@@ -1,20 +1,22 @@
 import { type Result, err, ok } from "@todo/business/result.ts";
 import { TODO_LIMIT, type Todo, newTodo } from "@todo/business/todos/todo.ts";
 
-/** What adding needs from a store. Synchronous, so the cap check and the add cannot interleave. */
+/**
+ * What adding needs from a store: one intent, "add this todo unless the list
+ * already holds `limit`". The check and the add are one atomic step behind
+ * the port, so no other add can land between them (deviation 9).
+ */
 export type AddStore = {
-  count(): number;
-  add(todo: Todo): void;
+  addUnlessFull(todo: Todo, limit: number): Promise<"added" | "full">;
 };
 
-export type AddTodo = (title: string) => Result<Todo, { kind: "full" }>;
+export type AddTodo = (title: string) => Promise<Result<Todo, { kind: "full" }>>;
 
 /** Adds a todo with a valid title to the end of the list, unless the list is full. */
 export const addTodo =
   (deps: { store: AddStore; newId: () => string }): AddTodo =>
-  (title) => {
-    if (deps.store.count() >= TODO_LIMIT) return err({ kind: "full" });
+  async (title) => {
     const todo = newTodo(deps.newId(), title);
-    deps.store.add(todo);
-    return ok(todo);
+    const added = await deps.store.addUnlessFull(todo, TODO_LIMIT);
+    return added === "full" ? err({ kind: "full" }) : ok(todo);
   };

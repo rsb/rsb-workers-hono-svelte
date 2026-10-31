@@ -10,7 +10,7 @@ export const postTodos = (addTodo: AddTodo) => async (c: Context) => {
   const input = await readJson(c, AddTodoBody);
   if (!input.ok) return failure(c, "validation", input.error.message, input.error.field);
 
-  const added = addTodo(input.value.title);
+  const added = await addTodo(input.value.title);
   if (!added.ok) return failure(c, "limit", "the list is full");
 
   return success(c, presentTodo(added.value), 201);

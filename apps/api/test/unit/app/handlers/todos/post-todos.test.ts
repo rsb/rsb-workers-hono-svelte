@@ -10,7 +10,7 @@ const post = (body: string) =>
   new Context(new Request("https://todo-api/todos", { method: "POST", body }));
 
 /** A fake operation for the cases that must not reach it. */
-const unreached: AddTodo = () => {
+const unreached: AddTodo = async () => {
   throw new Error("addTodo was reached");
 };
 
@@ -49,7 +49,7 @@ describe("postTodos", () => {
   });
 
   it("answers limit when the list is full", async () => {
-    const response = await postTodos(() => err({ kind: "full" }))(post('{"title":"buy milk"}'));
+    const response = await postTodos(async () => err({ kind: "full" }))(post('{"title":"buy milk"}'));
 
     expect(await failed(response)).toEqual({
       status: 409,
@@ -58,7 +58,7 @@ describe("postTodos", () => {
   });
 
   it("adds the trimmed title and presents the todo", async () => {
-    const add: AddTodo = (title) => ok({ id: "id-1", title, completed: false });
+    const add: AddTodo = async (title) => ok({ id: "id-1", title, completed: false });
     const response = await postTodos(add)(post('{"title":"  buy milk  "}'));
 
     expect(response.status).toBe(201);
