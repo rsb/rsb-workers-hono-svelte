@@ -6,8 +6,10 @@ features need them. Each ends with what is still open.
 
 The decisions behind this story are R1–R9 in
 [drafts/2026-10-30-02-slice-1-decisions.md](drafts/2026-10-30-02-slice-1-decisions.md).
-The code does not follow it yet. The refactor that brings the code in
-line is the next step.
+The code follows it only in part. Handlers sit in the hierarchy zone
+(`src/app/handlers/`, S1–S2 in the same draft). Construct, our HTTP
+module and the story in `index.ts` wait until slice 2 gives them
+something to build.
 
 ## 1. Startup
 
@@ -70,9 +72,10 @@ acyclic.
 
 ## 5. Entry points
 
-Entry points (handlers) pick up where the per-request half of
-startup leaves off. Each one meets the expectation of the api route
-aimed at it, and follows one template with four duties:
+Entry points live in the `handlers` layer. They pick up where the
+per-request half of startup leaves off. Each one meets the expectation
+of the api route aimed at it, and follows one template with four
+duties:
 
 1. **Validate:** turn unsafe input into validated, well-defined shapes.
 2. **Operate:** run the operations it exists for.
@@ -149,7 +152,7 @@ rules apply, as with Go's `cmd/`.
 - **Across layers**, the allowed edges are:
 
   ```
-  entries → operations → business
+  handlers → operations → business
   data → business
   ```
 

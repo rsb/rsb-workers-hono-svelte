@@ -254,3 +254,59 @@ that uses them, constructor functions, errors as values.
     belongs in it.
 12. C2, C4 (`Result`'s place, now a layering question) and C5 not
     reviewed.
+
+## Refactor, session 03 (2026-10-31)
+
+The owner asked for the code to follow the api story, using only the
+parts health has. There is no config, no operation, no business and no
+input to validate, so none of those is created.
+
+### S1 Layout: handlers in the hierarchy zone (applies R7, R8)
+
+**Decision.**
+- The hierarchy zone is `api/src/app/`. Its first layer is
+  `app/handlers/` (level 1).
+- A directory is a package. The files directly in it are the package,
+  and its children are its subdirectories. This settles open
+  questions 1 and 2 for now, without privacy.
+- Presentation (`respond.ts`, renamed `present.ts`) sits in the parent,
+  `handlers/`, because every handler shares it. This places
+  presentation for open question 5: it lives inside the handlers
+  layer, not as a layer of its own.
+- Each handler is a child package that imports only its ancestor's
+  `present.ts`:
+  - `health/` holds `getHealth`.
+  - `errors/` holds `notFound`, `tooLarge` and `onError`. These answer
+    a request that no real handler answers. They share the failure
+    envelope and have no dependencies, so they change together. Each is
+    one line, so they share one file. A handler that grows real logic
+    becomes a child of `errors/`.
+- No handler has the four-duty template yet. Health only presents, and
+  the errors handlers present an error kind.
+
+**Changed in the code.**
+- `src/handlers/health.ts` moved to `src/app/handlers/health/health.ts`.
+- `src/handlers/{not-found,too-large,error}.ts` were merged into
+  `src/app/handlers/errors/errors.ts`.
+- `src/respond.ts` moved to `src/app/handlers/present.ts`.
+- `src/routes/health.ts` was removed, which ends the cousin import
+  `routes/health → handlers/health`. `app.ts` binds `GET /health` itself
+  until construct takes the route table over (S3).
+- The unit test moved to `test/unit/app/handlers/errors/errors.test.ts`
+  to mirror the source.
+- `app.ts` still imports the handlers (general importing specific). S3
+  ends that.
+
+### S2 The entry-point layer is named `handlers` (changes R8)
+
+**Decision.** The layer R8 called `entries` is `handlers`. "Entry
+point" stays the name of the role (R5, story chapter 5). The directory
+uses the word people already know from Hono's `Handler`,
+`NotFoundHandler` and `ErrorHandler` and from Go's `http.Handler`. It
+also avoids `entries`, which reads like data once todos arrive.
+Middleware is not a handler here: it belongs to the per-request half
+of startup, and gets its own name (`middleware`) when it has a home.
+
+**Changed in the code.** The layer directory is `src/app/handlers/`,
+not `src/app/entries/` (S1). R8's edge list reads
+`handlers → operations → business` and `data → business`.
