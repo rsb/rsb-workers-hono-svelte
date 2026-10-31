@@ -9,12 +9,46 @@ The decisions behind this story are:
   [drafts/2026-10-30-02-slice-1-decisions.md](drafts/2026-10-30-02-slice-1-decisions.md);
 - S1–S2, in the same draft;
 - D1–D20, in
-  [drafts/2026-10-31-04-slice-2-decisions.md](drafts/2026-10-31-04-slice-2-decisions.md).
+  [drafts/2026-10-31-04-slice-2-decisions.md](drafts/2026-10-31-04-slice-2-decisions.md);
+- A1–A9, agreed with the owner after slice 2 (2026-10-31). They are
+  recorded in this story first, and the stage's decisions draft
+  follows:
+  - A1: apps deliver and packages hold; `package.json` enforces the
+    layers (chapter 0).
+  - A2: operations live in packages (chapter 6).
+  - A3: a contract is its own package, published by its provider
+    (chapter 11).
+  - A4: a contract holds endpoints with narrowed error kinds, and no
+    client (chapter 11).
+  - A5: the system is closed, so compatibility is deploy skew
+    (chapter 11).
+  - A6: the BFF is a bff-api and a frontend, and the bff-api follows
+    this story (chapter 12).
+  - A7: a client for another of our systems is data (chapter 8).
+  - A8: each boundary translates once (chapter 5).
+  - A9: names, and what `internal` means (chapter 0).
 
-After slice 2 (Add and list), the code follows the story throughout,
-except for config, which has nothing to hold yet (chapter 3).
+After slice 2 (Add and list), the code follows chapters 1–10
+throughout, except for config, which has nothing to hold yet
+(chapter 3).
 
-Paths are under `apps/todo/api/src/`.
+A1–A9 change where the code lives and how the api's architecture
+reaches past the api. The code does not follow them yet. Paragraphs
+marked **Target.** describe what they ask for. Two refactors get the
+code there:
+- **Refactor A, the move:** apps and packages take the layout of
+  chapter 0. Behaviour does not change, and tests change only their
+  import paths.
+- **Refactor B, the BFF:** the BFF takes the api's architecture
+  (chapter 12), with the contract's endpoints (chapter 11) and the
+  api client in data (chapter 8).
+
+Chapter 0 and chapters 11–12 are new. They are numbered so that
+references to chapters 1–10 elsewhere in the logbook stay correct.
+
+Paths are under `apps/todo/api/src/`. After refactor A they are under
+`apps/api/src/`, and business, operations and data are packages
+(chapter 0).
 
 ```
 index.ts            the story
@@ -26,6 +60,96 @@ app/
 ├─ business/        types, rules, Result
 └─ data/            one package per real thing
 ```
+
+## 0. Where the api lives
+
+The api is one system in a closed system: the monorepo. Everything
+that calls it, and everything it calls of ours, is in the same
+repository and ships from it. "Internal" in this story means *inside
+the closed system* (A9).
+
+### Apps and packages
+
+The monorepo has two kinds of workspace (A1):
+
+- **Apps** are how the business is delivered. Each app is one
+  deployable: the api (HTTP), the BFF (pages). An app composes
+  packages. It does not own them.
+- **Packages** hold what more than one app, script or CLI may need:
+  business, operations, data, and the contracts between systems.
+
+Business, operations and data move out of the api into packages. What
+stays in an app is its composition zone (`index.ts`, config,
+construct, the HTTP module) and its handlers, because handlers are the
+delivery.
+
+Each package declares its dependencies in its own `package.json`. The
+layering of chapter 9 then holds at the package boundary too: a
+package that does not list another cannot import it, and pnpm makes
+that a failure rather than a convention.
+
+**Target.**
+
+```
+apps/
+├─ api/                   deployable: the api
+└─ bff/                   deployable: bff-api + frontend (chapter 12)
+packages/
+├─ contract/
+│  ├─ api/                published by the api, consumed by the bff-api
+│  └─ bff-api/            published by the bff-api, consumed by the frontend
+├─ business/
+├─ operations/
+└─ data/
+   ├─ memory/             the api's storage today
+   └─ internal/
+      └─ api/             client for the api, used by the bff-api
+```
+
+Today this is `apps/todo/{api,web,contract}`. Refactor A moves:
+
+| Today | Target |
+|---|---|
+| `apps/todo/api` | `apps/api` |
+| `apps/todo/web` | `apps/bff` |
+| `apps/todo/contract` | `packages/contract/api` |
+| `api/src/app/business` | `packages/business` |
+| `api/src/app/operations` | `packages/operations` |
+| `api/src/app/data/memory` | `packages/data/memory` |
+
+Refactor B adds `packages/data/internal/api` (from the BFF's
+`lib/server/api/`) and `packages/contract/bff-api`.
+
+Under `data/`, each real thing is its own workspace package. `data/`
+and `data/internal/` are directories, not packages, until something
+must be shared through them (chapter 8).
+
+### Names
+
+The names follow four rules (A9):
+
+- **No product namespace.** The monorepo is "todo", so nothing inside
+  it is called todo: `apps/api`, not `apps/todo/api`.
+- **Role names, while there is one of each.** `api` and `bff` say what
+  the deployable is for. A name taken from today's feature ages badly:
+  the owner turned down `list` as "one ticket away from being stale".
+- **Who names what:**
+  - an app directory names the deployable;
+  - a contract names the system that publishes it (`contract/api`);
+  - a data client names the system it reaches (`data/internal/api`),
+    as `data/stripe` would name Stripe.
+- **No protocol in an identity.** `api`, not `http-api` or `rest-api`.
+  The protocol can change without a rename.
+
+`internal` groups the clients for our own systems, so they are not
+mistaken for vendors beside them. It never means *private to a
+package*, as Go's `internal/` does. Privacy, if a package needs it,
+uses something else, such as subpath `exports` (chapter 9).
+
+**Open.**
+- The npm scope: `@todo/…`, as today, or an org-wide scope. Claude's
+  default for refactor A is `@todo/…` (`@todo/contract-api`,
+  `@todo/business`, `@todo/data-memory`).
 
 ## 1. Startup
 
@@ -190,6 +314,26 @@ The duties are delegated to these places:
 Contract is the wire. In the api, only the handlers layer and
 `http.ts` import it (D1).
 
+**Target.** Handlers stay in the app, because they are the delivery.
+They import the operations, business and contract packages. The rule
+"only handlers and `http.ts` import contract" becomes a rule about
+the provider's side of a contract (chapter 11).
+
+The handler's error mapping is one step in a chain. Each boundary
+translates once, and no boundary passes on a word it did not define
+(A8):
+
+| Boundary | Translates | Example |
+|---|---|---|
+| api operation | returns a business error | `{ kind: "full" }` |
+| api handler | business → wire | `full` → `limit` |
+| bff-api data client | wire → business | `limit` → `{ kind: "full" }` |
+| bff-api handler | business → page | `full` → a form status and message |
+
+The client adds the one error the api cannot report:
+`{ kind: "unavailable" }`, for a network failure, an unexpected status
+or a reply that does not decode (chapter 8).
+
 Entry points share logging and telemetry with middleware. Startup and
 construct create entry points and inject their dependencies.
 
@@ -226,9 +370,38 @@ makes `addTodo`'s check-then-add exact: no other request can run
 between the count and the add (D14). An async store would reopen this
 question, and the PRD puts concurrency out of scope.
 
+**Target.** Operations live in packages, so that anything that
+delivers the business can run them: the api, a tooling script, a CLI
+(A2). The owner's preference is that every operation lives there, with
+a rule that says who may use each one.
+
+Claude's refinement, which the owner has not yet settled:
+- An operation that needs only business and the ports it declares goes
+  in `packages/operations`.
+- An operation that needs the delivery itself stays in its app. The
+  BFF's `loadTodos` and `addTodo` today call the api, so they belong
+  to the bff-api (chapter 12).
+
+Refactor A moves `operations/todos/` as it is: `add-todo.ts` and
+`list-todos.ts`, each with its port.
+
+The hazard is that a package of operations can be imported by any app,
+so the BFF could run `addTodo` against its own store and bypass the
+api. The owner judged it minor: "easy to spot and we can write rules
+to prevent that". The api stays the one authority for adding a todo.
+Ways to enforce it:
+- a subpath export per operation (`@todo/operations/todos/add-todo`);
+- an allow-list of operations per app;
+- a lint rule or import scan in `pnpm check`.
+
 **Open.**
 - What happens to the ports, and to the cap's exactness, when a store
   needs `await`.
+- Operations in depth. The owner: "we have not gone into operations
+  yet." To settle:
+  - the package layout (one `operations` package, or one per area);
+  - the usage rule and how it is enforced;
+  - how the bff-api's operations differ from the api's.
 
 ## 7. Business
 
@@ -277,9 +450,38 @@ id:
 
 Data makes no ids and checks no rules. It only maps (D13, D14).
 
+**Target.** Each data package is a workspace package of its own under
+`packages/data/` (A1). `data/memory` is the first.
+
+Another system of ours is a real thing too. Calling the api from the
+BFF is a concrete call over the network, so the client belongs in
+data, as a Stripe client would (A7). It lives in
+`packages/data/internal/api`:
+- **Transport injected.** The client takes a `fetch`. Construct hands
+  it the service binding in the BFF, plain `fetch` in a CLI, and the
+  api's own `app.fetch` in integration tests.
+- **Maps both ways.** It sends business values as the contract's
+  request messages, and decodes every reply at runtime with the
+  contract's schemas. It returns business values and business errors
+  (chapter 5's chain), never envelopes.
+- **One extra error.** Anything that is not a well-formed reply
+  (network failure, unexpected status, a body that does not decode)
+  becomes `{ kind: "unavailable" }`.
+
+This changes the import rule for data:
+- Data imports business, plus the contract of the system it talks to.
+  Nothing else of ours.
+
+`data/internal/` is where a shared `call` helper goes once a second
+internal client needs one, not before. There is probably never a
+`data/internal/bff-api`: the frontend reaches the bff-api through
+SvelteKit's own transport (chapter 12).
+
 **Open.**
 - Who owns the port if a database package replaces the memory store
   (L5's second half).
+- A contract test: each internal client run against the provider's
+  real `app.fetch`, so client and provider cannot drift apart.
 
 ## 9. The shape of the code
 
@@ -333,8 +535,36 @@ apply, as with Go's `cmd/`.
 
 All of this can be checked exactly by an import scan.
 
+**Target.** The rules survive the move to packages. What changes is
+where they are enforced (A1):
+- The **composition zone** stays in each app, at the top of its
+  `src/`.
+- The **layers** become packages. An edge between layers is a
+  dependency in `package.json`, so pnpm refuses an edge that is not
+  declared. The hierarchy rules still hold inside each package.
+- The **edges** gain contracts (A3, A7):
+
+  ```
+  handlers   → operations → business
+  handlers   → business
+  handlers   → contract     (the provider's own contract)
+  data       → business
+  data       → contract     (the contract of the system it reaches)
+  ```
+
+  Business imports nothing of ours, contract included. A contract
+  imports nothing of ours either.
+- **Within an app**, handlers keep the hierarchy rules as a directory
+  tree.
+- **In the BFF**, SvelteKit decides which files are routes. The rules
+  apply to routes by file suffix and to `$lib` by directory
+  (chapter 12).
+
 **Open.**
-- How privacy is shown without Go's `internal/`.
+- How privacy is shown without Go's `internal/`. A9 settles half of
+  it: `internal` means *inside the closed system*, never *private*, so
+  the name is not available for privacy. If a package needs privacy,
+  subpath `exports` can hide what it does not list.
 
 ## 10. Object style
 
@@ -364,3 +594,127 @@ receives a handler. A unit with nothing to inject is a plain value
 - Naming: the operation is `addTodo` and its handler is `postTodos`,
   after the route, as `getHealth` is. Whether handlers should be
   named after their route or their operation.
+
+## 11. Contracts
+
+A contract is what one system publishes so that others can call it.
+`contract/api` is the api's. It is a package of its own in
+`packages/`, not part of the api, so that the endpoint is not coupled
+to its consumers (A3).
+
+### Who depends on whom
+
+Provider and consumers both depend on the contract. Neither depends
+on the other. This is dependency inversion across systems:
+- **Inside a process**, the consumer owns its ports: an operation
+  declares the store interface it needs (chapter 6).
+- **Across the network**, the provider publishes. Many consumers call
+  one api, and the api cannot own a port per consumer. The contract is
+  the port, published once.
+
+Only these import a contract:
+- the provider's handlers and its HTTP module (D1);
+- the consumers' data clients (chapter 8).
+
+**Target.** Each contract says who consumes it, in its README or
+`package.json` description, so that a change shows who it reaches.
+
+### What a contract holds
+
+Today `contract` holds (D1, D4):
+- **messages**: the request and reply shapes (`AddTodoBody`,
+  `TodoReply`, `TodoListReply`, `HealthReply`) as valibot schemas;
+- **boundary input rules**: the title rule (`Title`);
+- **wire limits**: `BODY_LIMIT_BYTES`, `TITLE_MAX`;
+- **error vocabulary**: the envelope's kinds (`validation`, `limit`,
+  …) and the `Envelope` shape;
+- **runtime decoding**: the same schemas parse the request in the api
+  and the reply in the client.
+
+**Target.** It also gets endpoints (A4). An endpoint is plain data:
+- method and path;
+- the input schema;
+- the reply schema;
+- the error kinds this endpoint can return, narrowed from the full
+  vocabulary.
+
+Narrowing the kinds lets a consumer switch on them exhaustively:
+`POST /todos` can fail with `validation` or `limit`, and TypeScript
+says so. Today both sides hard-code the path `"/todos"`, and nothing checks
+that a switch on an error kind is exhaustive (review tour §8).
+
+A contract holds no client. A client is the consumer's concrete call,
+so it lives in the consumer's data (chapter 8). The consumer derives
+the types it sends from the schemas (valibot's `InferInput`).
+
+### Which rules go in a contract
+
+- **Shape rules** go in the contract. Anyone can check them with the
+  message alone: a title is 1–256 characters.
+- **Stateful rules** stay in business. They need state that only the
+  provider has: the 500 cap. The contract only names the outcome
+  (`limit`).
+
+Validation has one authority. The contract defines the rule, and the
+api enforces it. A consumer may apply the same rule early, for a
+better form, but the api never trusts that it did.
+
+The messages in a contract become the words consumers show, unless a
+consumer replaces them. Putting a message in the contract is choosing
+shared UI wording.
+
+### Compatibility
+
+The system is closed (chapter 0), so the contract has no outside
+users and no versioning (A5). Compatibility reduces to deploy skew: for a
+short time, a new bff-api can talk to an old api, or the reverse. A
+change to a contract must survive one deploy in either order. The
+consumer decodes every reply at runtime, so a skewed reply becomes
+`unavailable` rather than a wrong value.
+
+**Open.**
+- How a deploy is ordered when a change cannot survive skew.
+
+## 12. The BFF on the same architecture
+
+The BFF is two things in one deployable (A6):
+- **the bff-api**, the server half: loads, actions, server routes and
+  hooks;
+- **the frontend**, the half that runs in the browser.
+
+The bff-api is an api, and it follows this story: handlers,
+operations with ports, construct, data. Loads and actions are its
+handlers, and each has the four duties of chapter 5. Calling the api
+is its data (`data/internal/api`, chapter 8). The bff-api never runs
+the api's `addTodo`: adding a todo has one authority, and it is the
+api.
+
+The bff-api publishes `contract/bff-api` for the frontend: the shape
+of page data and of action results. The frontend reaches it through
+SvelteKit's own transport, so it needs no data client.
+
+### SvelteKit interleaves the two halves
+
+The two halves are not separate directory trees. SvelteKit decides by
+file name and by directory:
+
+| Half | Files |
+|---|---|
+| bff-api | `+page.server.ts`, `+server.ts`, `hooks.server.ts`, `$lib/server/` |
+| frontend | `+page.svelte`, `+layout.svelte`, the rest of `$lib` |
+
+SvelteKit already refuses a client import of `$lib/server`. The
+hierarchy rules work with that:
+- in `src/routes/`, a file's half is decided by its **suffix**;
+- in `$lib`, by its **directory**.
+
+[The BFF story](the-bff-story.md) was the first pass at this, before
+A6. Its chapters 4, 6 and 8 describe what refactor B replaces:
+no construct, no operations, and envelopes returned from
+`lib/server/api/`.
+
+**Open.**
+- What the frontend is, defined in the same terms: its layers, its
+  ports and its rules.
+- Whether one architecture story should replace this story and the
+  BFF story, with a short page per app. Claude suggested it.
