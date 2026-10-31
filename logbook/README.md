@@ -10,11 +10,18 @@ logbook/
 ├─ profile-notes.md        candidate registry entities
 ├─ findings/NN-<slice>.md  findings about the code, per slice
 ├─ drafts/                 the draft of each stage, as reviewed
+├─ reports/                one per session: what was generated and why
 └─ handoffs/               one per stage
 ```
 
 Drafts and handoffs are named `YYYY-MM-DD-NN-<stage>[-<name>].md`; a
 stage's drafts share the number of the handoff it ends with.
+
+Reports are named `YYYY-MM-DD-NN-<session-kind>-<name>.md`, with the
+number of the stage the session belongs to. The kind says what the
+session was for (`code-exploration`: walking generated code to find
+patterns, checks and rules). A report records what happened, not
+whether it was right.
 
 **profile-notes entry:** kind (rule | heuristic | check | pattern |
 template | note), one-line statement, realized by (path:lines),
