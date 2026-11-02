@@ -16,6 +16,10 @@ Paths are under `apps/todo/api/src/` unless they say otherwise.
 
 ## Layout the decisions produce
 
+This is the layout at the end of slice 2. Refactor A has since moved
+business, operations and data into packages; the current layout is in
+[the api story](../the-api-story.md), chapter 0.
+
 ```
 api/src/
 ├─ index.ts                     the story: construct, then wire (D3, D9)
