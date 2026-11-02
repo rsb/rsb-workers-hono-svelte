@@ -14,13 +14,13 @@
     "@todo/business": "workspace:*",
     "@todo/contract-api": "workspace:*",
     "@todo/data-d1": "workspace:*",
+    "@todo/fail": "workspace:*",
     "@todo/operations": "workspace:*",
     "hono": "4.13.14",
     "valibot": "catalog:"
   },
   "devDependencies": {
     "@cloudflare/vitest-plugin": "1.4.11",
-    "@todo/data-memory": "workspace:*",
     "typescript": "catalog:",
     "vitest": "catalog:",
     "wrangler": "catalog:"

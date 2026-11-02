@@ -34,7 +34,7 @@ packages/
   contract/api/     the api's contract: schemas, types and limits (valibot)
   business/         business types, rules and Result
   operations/       operations, each with the ports it needs
-  data/memory/      the isolate's memory as a todo store
+  data/d1/          a D1 database as the DbStore, with its migrations
 prd/                what to build
 logbook/            handoffs, drafts, findings and profile notes; not part of the app
 ```

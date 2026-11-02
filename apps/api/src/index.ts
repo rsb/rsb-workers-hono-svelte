@@ -1,15 +1,10 @@
 import { env } from "cloudflare:workers";
-import { readConfig } from "./config.ts";
 import { construct } from "./construct.ts";
 import { serve } from "./http.ts";
 
-// Once per isolate: load config, build everything, then wire it to HTTP.
-const config = readConfig(env);
-
-// A broken config is a deploy error, not a request error: the Worker refuses
-// to start, and says which value is wrong (DB5).
-if (!config.ok) throw new Error(`config: ${config.error}`);
-
-const api = construct(config.value);
+// Once per isolate: build everything from the bindings, then wire it to HTTP.
+// No I/O here: Workers forbid it at module scope, and the toolchain already
+// checks the bindings (`wrangler types --check`).
+const api = construct({ db: env.DB });
 
 export default serve(api);

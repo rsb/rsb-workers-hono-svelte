@@ -1,8 +1,10 @@
-import { Failure, TITLE_MAX, TodoReply, envelope } from "@todo/contract-api";
+import { Failure, TodoReply, envelope } from "@todo/contract-api";
+import { TITLE_MAX } from "@todo/business/todos/todo.ts";
 import { Context } from "hono";
 import * as v from "valibot";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { err, ok } from "@todo/business/result.ts";
+import { limitReached, unavailable, wrap } from "@todo/fail/fail.ts";
 import { postTodos } from "../../../../../src/app/handlers/todos/post-todos.ts";
 import type { AddTodo } from "@todo/operations/todos/add-todo.ts";
 
@@ -38,6 +40,15 @@ describe("postTodos", () => {
     expect(error).toMatchObject({ kind: "validation", field: "done" });
   });
 
+  it("rejects a title that is empty after trim", async () => {
+    const response = await postTodos(unreached)(post('{"title":"   "}'));
+
+    expect(await failed(response)).toEqual({
+      status: 422,
+      error: { kind: "validation", field: "title", message: "title is empty" },
+    });
+  });
+
   it("rejects a title over the limit", async () => {
     const title = "x".repeat(TITLE_MAX + 1);
     const response = await postTodos(unreached)(post(JSON.stringify({ title })));
@@ -49,7 +60,8 @@ describe("postTodos", () => {
   });
 
   it("answers limit when the list is full", async () => {
-    const response = await postTodos(async () => err({ kind: "full" }))(post('{"title":"buy milk"}'));
+    const full = wrap(limitReached("the list is full"), "add todo");
+    const response = await postTodos(async () => err(full))(post('{"title":"buy milk"}'));
 
     expect(await failed(response)).toEqual({
       status: 409,
@@ -57,8 +69,22 @@ describe("postTodos", () => {
     });
   });
 
+  it("answers internal when the store cannot answer, without the cause", async () => {
+    // Silences the log; the test does not assert on it.
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const down = wrap(unavailable("add unless full: D1_ERROR: Network connection lost."), "add todo");
+    const response = await postTodos(async () => err(down))(post('{"title":"buy milk"}'));
+    const text = await response.clone().text();
+
+    expect(await failed(response)).toEqual({
+      status: 500,
+      error: { kind: "internal", message: "internal error" },
+    });
+    expect(text).not.toContain("D1_ERROR");
+  });
+
   it("adds the trimmed title and presents the todo", async () => {
-    const add: AddTodo = async (title) => ok({ id: "id-1", title, completed: false });
+    const add: AddTodo = async (input) => ok({ id: "id-1", title: input.title, completed: false });
     const response = await postTodos(add)(post('{"title":"  buy milk  "}'));
 
     expect(response.status).toBe(201);

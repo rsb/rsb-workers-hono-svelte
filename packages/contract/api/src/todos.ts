@@ -1,16 +1,10 @@
 import * as v from "valibot";
-import { TITLE_MAX } from "./limits.ts";
 
-/** A title is trimmed, then must be 1 to `TITLE_MAX` characters. */
-export const Title = v.pipe(
-  v.string("title must be text"),
-  v.trim(),
-  v.minLength(1, "title is empty"),
-  v.maxLength(TITLE_MAX, `title is longer than ${TITLE_MAX} characters`),
-);
-
-/** The body of `POST /todos`. Unknown keys are rejected. */
-export const AddTodoBody = v.strictObject({ title: Title });
+/**
+ * The body of `POST /todos`: its shape only. Unknown keys are rejected. The
+ * title's rules (trim, empty, too long) are checked by each handler.
+ */
+export const AddTodoBody = v.strictObject({ title: v.string("title must be text") });
 export type AddTodoBody = v.InferOutput<typeof AddTodoBody>;
 
 /** A todo on the wire. */

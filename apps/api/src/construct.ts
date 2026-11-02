@@ -1,35 +1,41 @@
-import { d1Todos } from "@todo/data-d1/todos.ts";
-import { type AddStore, type AddTodo, addTodo } from "@todo/operations/todos/add-todo.ts";
-import { type ListStore, type ListTodos, listTodos } from "@todo/operations/todos/list-todos.ts";
+import { type DbStore, createDbStore } from "@todo/data-d1/store.ts";
+import { type AddTodo, addTodo } from "@todo/operations/todos/add-todo.ts";
+import { type ListTodos, listTodos } from "@todo/operations/todos/list-todos.ts";
 import { notFound, onError, tooLarge } from "./app/handlers/errors/errors.ts";
 import { getHealth } from "./app/handlers/health/health.ts";
 import { getTodos } from "./app/handlers/todos/get-todos.ts";
 import { postTodos } from "./app/handlers/todos/post-todos.ts";
-import type { Config } from "./config.ts";
 import type { Api, Route } from "./http.ts";
 
 // The app's whole dependency graph, one builder per level (A10). Each level
 // takes the one below, so a caller can enter at any level and replace a piece.
 
-/** The concrete world: the store and the id source. */
-export type Infra = { store: AddStore & ListStore; newId: () => string };
+/** What the platform hands over already configured and built: not config. */
+export type Bindings = { db: D1Database };
+
+/** The concrete world: the database store and the id source. */
+export type Infra = { dbStore: DbStore; newId: () => string };
 
 /** Every operation, each built with the ports it declares. */
 export type Operations = { addTodo: AddTodo; listTodos: ListTodos };
 
 /**
- * The only builder that sees config: it copies each value into what needs it.
+ * The only builder that sees the bindings: it passes each to what uses it.
  * The running Worker always stores todos in D1 (DB4).
  */
-export const constructInfra = (config: Config): Infra => ({
-  store: d1Todos(config.db),
+export const constructInfra = (bindings: Bindings): Infra => ({
+  dbStore: createDbStore(bindings.db),
   newId: () => crypto.randomUUID(),
 });
 
-/** The same store goes to both operations, so an add is seen by the next list (D15). */
+/**
+ * Every operation gets the whole `DbStore`; each port lets it see only the
+ * methods it declares. The same store goes to all, so an add is seen by the
+ * next list (D15).
+ */
 export const constructOperations = (infra: Infra): Operations => ({
-  addTodo: addTodo({ store: infra.store, newId: infra.newId }),
-  listTodos: listTodos({ store: infra.store }),
+  addTodo: addTodo({ dbStore: infra.dbStore, newId: infra.newId }),
+  listTodos: listTodos({ dbStore: infra.dbStore }),
 });
 
 /** Each handler with the operation it runs, laid out as routes. */
@@ -47,6 +53,10 @@ export const constructApi = (routes: readonly Route[]): Api => ({
   onError,
 });
 
-/** The default chain, which `index.ts` calls. */
-export const construct = (config: Config, overrides?: Partial<Infra>): Api =>
-  constructApi(constructRoutes(constructOperations({ ...constructInfra(config), ...overrides })));
+/** Builds the whole app from the bindings, one A10 level at a time. `index.ts` calls this. */
+export const construct = (bindings: Bindings): Api => {
+  const infra = constructInfra(bindings);
+  const operations = constructOperations(infra);
+  const routes = constructRoutes(operations);
+  return constructApi(routes);
+};
