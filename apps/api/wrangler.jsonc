@@ -5,5 +5,15 @@
   "compatibility_date": "2026-10-30",
   // Not public: reachable only through the BFF Worker's service binding.
   "workers_dev": false,
-  "preview_urls": false
+  "preview_urls": false,
+  // Local only: wrangler keeps the database under .wrangler/, so there is no
+  // database_id until the api is deployed. The schema lives with its data
+  // package (DB8).
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "todo",
+      "migrations_dir": "../../packages/data/d1/migrations"
+    }
+  ]
 }
