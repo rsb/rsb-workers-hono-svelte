@@ -29,10 +29,27 @@ The decisions behind this story are:
   - A9: names, and what `internal` means (chapter 0).
   - A10: everything stays in construct, as granular builders composed
     into one default chain; tests may enter at any level (chapter 4).
+- DB1–DB11, stage 06 (a database), in
+  [drafts/2026-10-31-06-database-decision.md](drafts/2026-10-31-06-database-decision.md),
+  as the owner's review changed them. The review and its numbered
+  items are in
+  [reports/2026-11-02-06-database-review-tour.md](reports/2026-11-02-06-database-review-tour.md).
+  Its lessons are told where they apply:
+  - bindings are not config (chapter 3);
+  - one flat `DbStore`, with ports declared by the operations
+    (chapters 4, 6 and 8);
+  - the store reports facts and the operation decides what they mean
+    (chapter 6);
+  - a data package in three layers: Stmt, Raw and Outer (chapter 8);
+  - one failure type for every layer, named once at its root
+    (chapter 13);
+  - handlers that read as a story (chapter 5).
 
-After slice 2 (Add and list), the code follows chapters 1–10
+After slice 2 (Add and list), the code followed chapters 1–10
 throughout, except for config, which has nothing to hold yet
-(chapter 3).
+(chapter 3). Stage 06 replaced the memory store with D1 and reworked
+failures, handlers and ports. The chapters below describe the code
+after stage 06.
 
 A1–A9 change where the code lives and how the api's architecture
 reaches past the api. Since refactor A the code has their layout,
@@ -45,11 +62,11 @@ ask for. Three refactors get the code there:
 - **Refactor B, the BFF:** the BFF takes the api's architecture
   (chapter 12), with the contract's endpoints (chapter 11) and the
   api client in data (chapter 8).
-- **Refactor C, construct:** the api's construct splits into granular
-  builders (A10, chapter 4). Behaviour does not change. It could run
-  before B; the order is the owner's call.
+- **Refactor C, construct:** done in stage 06 (`1542aac`), before B
+  (DB11). The api's construct is split into granular builders (A10,
+  chapter 4).
 
-Chapter 0 and chapters 11–12 are new. They are numbered so that
+Chapter 0 and chapters 11–13 are new. They are numbered so that
 references to chapters 1–10 elsewhere in the logbook stay correct.
 
 Paths are under `apps/api/src/`. Business, operations and data are
@@ -64,6 +81,7 @@ apps/api/src/
 packages/
 ├─ operations/         the work
 ├─ business/           types, rules, Result
+├─ fail/               every failure our code can name (chapter 13)
 └─ data/               one package per real thing
 ```
 
@@ -105,16 +123,18 @@ packages/
 │  ├─ api/                published by the api, consumed by the bff-api
 │  └─ bff-api/            published by the bff-api, consumed by the frontend
 ├─ business/
+├─ fail/
 ├─ operations/
 └─ data/
-   ├─ memory/             the api's storage today
+   ├─ d1/                 the api's database, with its migrations
    └─ internal/
       └─ api/             client for the api, used by the bff-api
 ```
 
 Refactor A (`a6676cd`) moved the code from `apps/todo/{api,web,contract}`
 into this layout. Everything in the tree exists except
-`contract/bff-api` and `data/internal/api`:
+`contract/bff-api` and `data/internal/api`. Stage 06 added `fail` and
+`data/d1`, and deleted `data/memory` (chapter 8):
 
 | Before | Now |
 |---|---|
@@ -123,7 +143,7 @@ into this layout. Everything in the tree exists except
 | `apps/todo/contract` | `packages/contract/api` |
 | `api/src/app/business` | `packages/business` |
 | `api/src/app/operations` | `packages/operations` |
-| `api/src/app/data/memory` | `packages/data/memory` |
+| `api/src/app/data/memory` | `packages/data/memory`, deleted in stage 06 |
 
 Refactor B adds `packages/data/internal/api` (from the BFF's
 `lib/server/api/`) and `packages/contract/bff-api`.
@@ -157,14 +177,15 @@ uses something else, such as subpath `exports` (chapter 9).
 **Open.**
 - The npm scope: `@todo/…`, as today, or an org-wide scope. Claude's
   default for refactor A is `@todo/…` (`@todo/contract-api`,
-  `@todo/business`, `@todo/data-memory`).
+  `@todo/business`, `@todo/data-d1`).
 
 ## 1. Startup
 
 Startup has two halves:
 
-- **Once per isolate**, before the first request: load config,
-  construct everything, wire it to the HTTP layer.
+- **Once per isolate**, before the first request: load config (when
+  there is any), construct everything from the bindings, wire it to
+  the HTTP layer.
 - **On each request**, until an entry point takes over: the
   middleware that every request passes through.
 
@@ -179,11 +200,17 @@ In the code:
   that is only the body limit, which runs before routing so that an
   oversized body is a 413 on any path (D16).
 
-Whatever the first half builds lives as long as the isolate. The
-todos are part of that: they survive a reload and are lost when the
-Worker restarts (deviation 3). `wrangler dev` runs one isolate, which
-is all the lab has. With more than one isolate, each would hold its
-own list (D15).
+Whatever the first half builds lives as long as the isolate. Since
+stage 06 that is only objects, never state: the `DbStore` holds the D1
+binding and nothing else, and the todos live in D1. They survive a
+restart, and every isolate sees the same list. Before stage 06 the
+todos lived in the isolate's memory, so a restart lost them
+(deviation 3) and each isolate would have held its own list (D15).
+
+The first half does no I/O. Workers forbid it at module scope, and
+nothing needs it: building the store only keeps the binding, and
+prepares no statement. A store whose creation needs I/O (a Postgres
+pool, a D1 session per request) reopens this (review item 30).
 
 **Open.**
 - What the per-request half contains beyond the body limit.
@@ -193,7 +220,7 @@ own list (D15).
 ## 2. `index.ts`
 
 `index.ts` is where the story is read, top to bottom: load config
-(and handle its failure), construct, wire. It delegates every step and
+(and handle its failure), construct from the bindings, wire. It delegates every step and
 does nothing itself.
 
 Hono is not the vocabulary of the story. `http.ts`, our own module,
@@ -207,12 +234,18 @@ Hono's configuration behind it:
 `http.ts` also exports the types `Api` and `Route`, which describe
 what construct must hand it.
 
-Today the story has two steps, because there is no config:
+Today the story has two steps, because there is no config. The
+bindings come from `cloudflare:workers`, and construct takes them as
+they are:
 
 ```ts
-const api = construct();
+const api = construct({ db: env.DB });
 export default serve(api);
 ```
+
+`index.ts` does not check that the `DB` binding exists. The toolchain
+already does: `wrangler types --check` fails `pnpm check` when the
+binding and the generated types disagree.
 
 `http.ts` sits in the composition zone. Handlers do not import it.
 They take Hono's own types (`Context`) from `hono` (D3).
@@ -234,19 +267,39 @@ Config is the first thing processed. It:
 Only `index.ts` and construct import config.
 
 Facts that are not environment values do not belong to config:
-- Wire facts, which both sides check, belong to contract:
-  `BODY_LIMIT_BYTES` and `TITLE_MAX`.
-- Business facts belong to business: `TODO_LIMIT`.
+- Wire facts belong to contract: `BODY_LIMIT_BYTES`.
+- Business facts belong to business: `TODO_LIMIT` and `TITLE_MAX`
+  (review item 38, chapter 7).
 
-The api reads no environment value yet, so there is no config package.
-It arrives with the first environment value (D9).
+### Bindings are not config
+
+Stage 06 first treated the D1 binding as config: `readConfig` checked
+that `env.DB` was a D1 database, and construct read the store from
+config (DB5). The owner's review turned that down (review item 34):
+
+- **Config is data.** Plain values that vary by deployment, such as
+  limits, URLs and flags. Our code reads them, checks them and freezes
+  them.
+- **A binding is a capability.** The platform hands it over already
+  configured and built. There is nothing to read or check: the
+  toolchain checks that it exists (chapter 2), and a broken database
+  shows up as a query failure (chapter 13), or in health.
+
+So bindings skip config and go straight to `constructInfra`, typed as
+construct's `Bindings` (chapter 4). The only check of the database our
+code will make is in health, one cheap query per call (review item 35,
+not built yet).
+
+The api reads no environment value yet, so `config.ts` holds only a
+comment saying this. Config arrives with the first environment value
+(D9).
 
 ## 4. Construct
 
 Construct knows how to build every object and its dependencies,
-entry points and routes included, from a fully loaded config. It
-copies config values into whatever needs them. Nothing else sees
-config.
+entry points and routes included, from the bindings and a fully
+loaded config. It passes each binding and config value to whatever
+needs it. Nothing else sees config or the bindings.
 
 Only `index.ts` and tests import construct, which keeps the import
 graph acyclic (A10).
@@ -272,28 +325,33 @@ Construct is not one function. It is one builder per level, each
 taking the level below as its argument and each exported:
 
 ```ts
-constructInfra(): Infra                     // the store, the id source; later, from config
+constructInfra(bindings): Infra             // the DbStore, the id source; later, config too
 constructOperations(infra): Operations      // each operation with the ports it declares
 constructRoutes(operations): Route[]        // each handler with the operation it runs
 constructApi(routes): Api                   // plus the failure handlers, typed by http.ts
-construct(overrides?: Partial<Infra>): Api  // the default chain, which index.ts calls
+construct(bindings): Api                    // the default chain, which index.ts calls
 ```
 
-`construct()` is
-`constructApi(constructRoutes(constructOperations({ ...constructInfra(), ...overrides })))`.
+`construct(bindings)` runs the levels in order, naming each result:
+infra, then operations, then routes, then the api.
 
 Any caller can enter at any level and replace one piece, which is
 what makes construct usable for more than production:
-- a seeded store: `construct({ store })`, so a test reaches the todo
-  limit without 100 POSTs;
-- a fixed id: `construct({ newId: () => "id-1" })`, so a test asserts
-  the whole reply;
+- a fake store and a fixed id:
+  `constructOperations({ dbStore: fakeDbStore(), newId: () => "id-1" })`,
+  so a test runs the whole route table with no workerd and asserts the
+  whole reply (`construct.test.ts`);
 - one stubbed operation:
   `constructRoutes({ ...constructOperations(infra), listTodos: failing })`,
-  so a test reaches `onError` through real routing.
+  so a test reaches a failure through real routing.
 
-The existing integration tests still go through the Worker's default
-export, so the production path stays covered.
+The integration tests still go through the Worker's default export,
+on a real local D1, so the production path stays covered.
+
+Tests enter one level down rather than through `construct`, so
+`construct` takes no overrides. It had an `overrides?: Partial<Infra>`
+parameter until stage 06, when nothing used it any more (review
+item 12).
 
 **One file while it reads at a glance.** The modularity is in the
 exported functions, not in files. `construct.ts` reads top to bottom
@@ -303,31 +361,50 @@ arrives or a second domain does. The split is then likely by domain
 (`construct/todos.ts`), since a new domain adds a builder at every
 level.
 
-**Target.** The code still has one `construct()` that does all levels
-inline. Refactor C, after refactor B, splits it into the builders
-above. Behaviour does not change.
-
-In the code today (`construct.ts`), construct:
-- builds one memory store and one id source (`crypto.randomUUID`);
+In the code (`construct.ts`), construct:
+- types the bindings it takes: `Bindings = { db: D1Database }`;
+- builds one `DbStore` from the D1 binding (`createDbStore(db)`) and
+  one id source (`crypto.randomUUID`);
 - builds each operation with the dependencies it declares
-  (`addTodo({ store, newId })`, `listTodos({ store })`);
+  (`addTodo({ dbStore, newId })`, `listTodos({ dbStore })`);
 - builds each handler with the operation it runs
   (`postTodos(addTodo)`);
 - returns the route table and the three failure handlers, typed by
   `http.ts`'s `Api`.
 
-The same store goes to both operations. That is how an add is seen by
-the next list (D15). Construct may import `http.ts` for types only,
+The running Worker always stores todos in D1. There is no runtime
+switch between stores, and no second store kept for tests (DB4 as the
+owner decided it: the memory store was deleted).
+
+The same `DbStore` goes to every operation. That is how an add is seen
+by the next list (D15). Construct may import `http.ts` for types only,
 so a typo in the route table fails here (D3).
 
-Construct is where interfaces meet. The data package does not know
-the operations' interfaces, and the operations do not know the data
-package. TypeScript checks that the one fits the other at the point
-where construct hands it over (D5).
+### The composition root
+
+Construct is where interfaces meet, and the only place that does. The
+data package does not know the operations' ports, and the operations
+do not know the data package. Each operation declares the methods it
+needs (chapter 6), and `d1` exports one flat `DbStore` with every
+database method (chapter 8). Construct hands the whole `DbStore` to
+each operation, and TypeScript checks there that it has every method
+the operation's port asks for (D5). Each operation then sees only the
+methods its port names.
+
+This is dependency inversion with construct as the composition root.
+Before stage 06 the same was true of the memory store. What stage 06
+added is the single `DbStore`: one object per database, not one per
+table or per operation, so construct passes one thing and does not
+pick methods apart.
 
 **Open.**
 - Whether each handler needs a constructor. Today only handlers with
   something to inject have one (D8).
+- A test that enters at `constructOperations` must fake the whole
+  `DbStore`, not just the methods one test needs. With two methods
+  that is a short array-backed fake. With hundreds it is too big, so
+  whole-route-table tests may belong with the integration-testing
+  session (chapter 8).
 
 ## 5. Entry points
 
@@ -346,31 +423,62 @@ duties:
 Validation, operations and presentation are delegated, so the
 template itself has no reason to change.
 
-`postTodos` is the first entry point with all four duties:
+`postTodos` is the first entry point with all four duties. A handler
+tells a story: each step is named, each `if` has braces, and a
+comment says why the step is there (review item 36):
 
 ```ts
 export const postTodos = (addTodo: AddTodo) => async (c: Context) => {
-  const input = await readJson(c, AddTodoBody);
-  if (!input.ok) return failure(c, "validation", input.error.message, input.error.field);
+  // The body must be JSON, shaped as the contract says.
+  const body = await validateBody(c, AddTodoBody);
+  if (!body.ok) {
+    return userFailure(c, body.error);
+  }
 
-  const added = addTodo(input.value.title);
-  if (!added.ok) return failure(c, "limit", "the list is full");
+  // The title must follow the business rules.
+  const newTodo = validateTitle(body.value);
+  if (!newTodo.ok) {
+    return userFailure(c, newTodo.error);
+  }
 
-  return success(c, presentTodo(added.value), 201);
+  // Adding can fail for the user (the list is full) or for us (the store).
+  const added = await addTodo(newTodo.value);
+  if (!added.ok) {
+    return mapFailure(c, added.error);
+  }
+
+  const reply = presentTodo(added.value);
+  return created(c, reply);
 };
 ```
 
 The duties are delegated to these places:
-- **Validate:** `handlers/validate.ts`. `readJson(c, schema)` reads the
-  body and parses it with a contract schema. It returns
-  `Result<…, { field, message }>` and never throws. Errors on the
-  request path stay values from the first byte (D4).
-- **Operate:** the operation construct injected.
-- **Handle errors:** in the template itself. Each business error is
-  mapped to an envelope kind by name (`full` → `limit`). This is the
-  only place a business word meets a wire word (D10).
+- **Validate:** in two steps, each returning `Result<…, Fail<"invalid">>`
+  and never throwing. Errors on the request path stay values from the
+  first byte (D4).
+  - `handlers/validate.ts` holds what every handler shares.
+    `validateBody(c, schema)` reads the body, parses it as JSON and
+    checks it against a contract schema: the wire shape only.
+  - `handlers/todos/validate.ts` holds what only the todos handlers
+    need. `validateTitle` trims the title and applies the business
+    rule (`TITLE_MAX`), and turns the body into a `NewTodo`.
+  - One `validate.ts` per handler package, split only when it grows
+    too large.
+  - A function is named for the problem it solves, not for how it
+    works: `readJson` became `validateBody` (review item 39).
+- **Operate:** the operation construct injected. It now returns a
+  promise, since the store is a database (chapter 6).
+- **Handle errors:** with one of two calls, chosen by what the
+  handler knows (chapter 13):
+  - when the failure's kind is known, the explicit one:
+    `userFailure` after validation, which can only fail as `invalid`;
+  - when it is dynamic, as an operation's failure is, `mapFailure`
+    resolves it to `userFailure` or `serverFailure` by kind.
 - **Present:**
-  - `handlers/present.ts` builds the envelope (`success`, `failure`);
+  - `handlers/present.ts` builds the envelope and is the only handler
+    file that knows status codes: `success` (200), `created` (201),
+    `userFailure` (4xx) and `serverFailure` (5xx). Handlers speak this
+    presentation vocabulary, not HTTP (review items 40, 41).
   - `handlers/todos/present.ts` maps a business `Todo` to contract's
     `TodoReply`, copying the fields by name. A business field reaches
     the wire only when someone adds it there (D2).
@@ -389,10 +497,19 @@ translates once, and no boundary passes on a word it did not define
 
 | Boundary | Translates | Example |
 |---|---|---|
-| api operation | returns a business error | `{ kind: "full" }` |
-| api handler | business → wire | `full` → `limit` |
+| api data package | a driver error → a failure | D1's text → `unavailable` or `server` |
+| api operation | a fact → a failure | "not inserted" → `limit` |
+| api handler | failure kind → wire kind | `limit` → `limit`, `invalid` → `validation` |
 | bff-api data client | wire → business | `limit` → `{ kind: "full" }` |
 | bff-api handler | business → page | `full` → a form status and message |
+
+Stage 06 changed the api's rows. Before it, the operation returned a
+business error of its own (`{ kind: "full" }`), and the handler
+translated it by name. Now the api has one failure type, `Fail`, with
+a fixed set of kinds (chapter 13). The package that first meets a
+failure names its kind, and the layers above only add context. The
+handler's translation is a table in `present.ts`, checked by the
+compiler for every kind. The bff-api's rows are refactor B's.
 
 The client adds the one error the api cannot report:
 `{ kind: "unavailable" }`, for a network failure, an unexpected status
@@ -402,9 +519,14 @@ Entry points share logging and telemetry with middleware. Startup and
 construct create entry points and inject their dependencies.
 
 **Open.**
-- Logging: `onError` still calls `console.error` directly (F5).
-- `onError` turns an `HTTPException` into a 500. After D4 nothing on
-  the request path throws one.
+- Logging: `serverFailure` calls `console.error` directly, with the
+  whole failure chain (F5). It moved there from `onError`, so every
+  5xx is logged in one place.
+- `onError` turns any throw, an `HTTPException` included, into a
+  `server` failure and a 500. After D4 nothing on the request path
+  throws one.
+- Content type: a `text/plain` body holding valid JSON is accepted
+  today (review item 37).
 
 ## 6. Operations
 
@@ -416,23 +538,57 @@ injects the data package that satisfies it. The store's interface is
 owned by the operation that uses it, not by data.
 
 Each operation declares the smallest interface it needs, in its own
-file (D5):
-- `addTodo` needs `AddStore`: `count` and `add`.
-- `listTodos` needs `ListStore`: `list`, "in the order they were
-  added".
+file (D5, DB2):
+- `addTodo` needs `AddStore`: `addTodoUnlessFull(todo, limit)`,
+  answered with whether the todo was inserted.
+- `listTodos` needs `ListStore`: `listTodos()`, "in the order they
+  were added".
 
 There is no shared `TodoStore`. Two operations that need the same
-method each say so.
+method each say so. The methods are named for the whole app, not for
+one table (`addTodoUnlessFull`, not `addUnlessFull`), because they all
+live side by side in one flat `DbStore` (chapter 8). Each operation
+takes it as `dbStore`, typed by its own port.
 
-An operation that can fail returns a `Result` with a business error
-(`addTodo` returns `{ kind: "full" }`). One that cannot fail returns
-its value (`listTodos`) (D10). An operation also gets anything
+### Every port is async and returns a Result
+
+A database answers later, so every port returns a promise (DB3), and
+so does every operation. Every operation that touches a store can
+fail, since the store can, so every operation returns
+`Result<T, AnyFail>` (chapter 13). `listTodos` used to return its
+value because nothing could refuse it. Now the database can fail, so
+it returns a `Result` like the rest. An operation also gets anything
 impure injected, such as the id source (D13).
 
-The store ports are synchronous because the store is in memory. That
-makes `addTodo`'s check-then-add exact: no other request can run
-between the count and the add (D14). An async store would reopen this
-question, and the PRD puts concurrency out of scope.
+### The cap is one atomic step behind the port
+
+The memory store's ports were synchronous, which made `addTodo`'s
+check-then-add exact: no other request could run between the count
+and the add (D14). An async store breaks that, since another add can
+land between an awaited count and an awaited insert.
+
+So the port asks for an intent, not two steps (DB1):
+`addTodoUnlessFull(todo, limit)`. The store answers it with one SQL
+statement that counts and inserts together (chapter 8). The check
+stays exact under concurrency without a transaction, and D1 has no
+`BEGIN` to span two statements. A rule that needs several statements
+reopens this, with `batch()` or a transaction (review item 29).
+
+### The store reports facts, the operation decides what they mean
+
+The store answers `addTodoUnlessFull` with `true` or `false`: inserted
+or not. It does not say why not, and returns no `limit` failure. The
+operation decides: here, "not inserted" means the list is full, so
+`addTodo` returns `limitReached("the list is full")`.
+
+This keeps the business meaning in one place. If a second reason for
+not inserting appears, the operation is the one place that changes,
+and the data package stays a mapper (D14).
+
+A store failure is different: the operation does not decide its
+meaning. The data package already named it `unavailable` or `server`,
+and the operation only wraps it with what it was doing:
+`wrap(failure, "add todo")` (chapter 13).
 
 **Target.** Operations live in packages, so that anything that
 delivers the business can run them: the api, a tooling script, a CLI
@@ -459,8 +615,6 @@ Ways to enforce it:
 - a lint rule or import scan in `pnpm check`.
 
 **Open.**
-- What happens to the ports, and to the cap's exactness, when a store
-  needs `await`.
 - Operations in depth. The owner: "we have not gone into operations
   yet." To settle:
   - the package layout (one `operations` package, or one per area);
@@ -479,17 +633,26 @@ In the code:
 - `business/todos/todo.ts` holds:
   - `Todo`: the api's own type, separate from the wire's `TodoReply`
     (D2);
+  - `NewTodo = { title }`: what someone asks to add. It is not a todo
+    yet: it has no id and no completed flag;
+  - `TITLE_MAX`: 256, the longest title after trimming;
   - `TODO_LIMIT`: 500, a rule about the list (D14);
-  - `newTodo(id, title)`: a new todo is not completed (D13).
+  - `newTodo(id, input)`: a new todo is not completed (D13).
 - `business/result.ts` holds `Result`, `ok` and `err`. Every layer
   that returns or reads a `Result` can reach it (D10).
 
-Business does not check the title. Contract defines the title rule,
-the handler applies it, and the operation receives a valid title (D1).
+Business owns the title rule but does not apply it. The rule is a
+business fact (`TITLE_MAX`), so the api and the BFF both import it
+from business. Applying it is validation, which is a handler's job:
+`validateTitle` in the api's handlers, and the same check in the BFF's
+action. The operation receives a valid `NewTodo`. Before stage 06 the
+contract held the title rule; now it holds only the wire shape
+(review item 38, chapter 11).
 
 **Open.**
 - Whether `Result`, which is not about todos, should get a home of its
-  own if more such helpers appear.
+  own if more such helpers appear. Failures, which are not about todos
+  either, got one in stage 06: `packages/fail` (chapter 13).
 
 ## 8. Data
 
@@ -498,24 +661,121 @@ vendor such as Stripe. A data package takes business objects, maps
 them to its own internal representation (a row, a vendor payload) and
 back. The same business object can live in several data packages.
 
-Data imports business, nothing else of ours.
+Data imports business and fail, nothing else of ours. It names the
+root of every failure it meets (chapter 13).
 
-In the code, `data/memory/todos.ts` is the isolate's memory.
-`memoryTodos()` keeps rows `{ title, completed }` in a `Map` keyed by
-id:
-- **Order:** a `Map` iterates in insertion order, so `list` keeps
-  creation order without an order field.
-- **Copies:** todos are copied in and out, so no caller can change
-  stored state through an object it holds.
-- **Interfaces:** it does not import or name the operations'
-  interfaces. It returns a plain object that happens to satisfy both
-  `AddStore` and `ListStore`, as a Go type satisfies an interface
-  (D5).
+Data makes no ids and decides no rules. It maps, and it reports facts
+(D13, D14, chapter 6).
 
-Data makes no ids and checks no rules. It only maps (D13, D14).
+### The D1 package
+
+`packages/data/d1` is the api's database. It holds the migrations
+(`migrations/0001_todos.sql`) beside the code that depends on them,
+and `apps/api/wrangler.jsonc` points `migrations_dir` at them (DB8).
+
+The table:
+- **Order:** SQL has no insertion order, so the table has a `seq`
+  column, the rowid, and `listTodos` orders by it. `seq` never leaves
+  the package (DB6).
+- **Mapping:** SQLite has no boolean, so `completed` is stored as 0 or
+  1, with a `CHECK`. `Row`, `toRow` and `toTodo` map between the row
+  and the business `Todo` (DB7).
+- **`STRICT`**, so SQLite refuses a value of the wrong type rather
+  than storing it.
+
+### One flat `DbStore`
+
+`store.ts` builds the store the app uses: `createDbStore(db)`, one
+flat object that spreads in each table's methods (`...todoStore(db)`).
+`DbStore` is its type. It names no operation's port: each operation
+declares the methods it needs, and construct checks that `DbStore`
+fits them (chapter 4).
+
+Flat means one namespace. If two tables gave a method the same name,
+the later one would silently replace the earlier. Two things guard
+against it: method names include their table (`listTodos`, not
+`list`), and a unit test lists every method the store has.
+
+Building the store only keeps `db`. It prepares no statement and does
+no I/O, so it is cheap to build once per isolate (chapter 1).
+
+### Three layers per method
+
+Each table's file (`todos.ts`) builds each method from three layers,
+top to bottom:
+
+| Layer | Holds | Speaks |
+|---|---|---|
+| **Stmt** | the SQL and its binds, side by side | placeholders and values |
+| **Raw** | runs one statement and names its failure | rows and change counts |
+| **Outer** | the `DbStore` method | business objects and facts |
+
+- **Stmt** keeps each `?1` next to the value bound to it, so the bind
+  order can be read at a glance. SQL is written by hand. Every value is
+  bound and never put in the SQL text. Building a statement does no
+  I/O.
+- **Raw** runs the statement through a driver helper and gives the
+  failure its context: "insert todo unless full", "select todos".
+- **Outer** maps the business object to a row and back, and turns a
+  raw answer into a fact: one changed row means "inserted".
+
+The driver helpers in `driver.ts` are the only code that runs a D1
+statement. `queryAll` returns rows and `execute` returns the change
+count. D1 reports every error by throwing, so each helper catches the
+error and returns it classified. Each takes a function that builds
+the statement, not the statement itself. D1 can throw while binding a
+value it cannot store, and building inside the `try` means that error
+is classified too.
+
+`queryFirst` and `batch` are named in the design but not written,
+since no method needs them yet.
+
+### Classifying D1's errors
+
+D1 throws a plain `Error` with no error code, so `classify.ts` reads
+the message:
+- the texts Cloudflare documents as passing (a lost connection, a
+  reset, an overload) become `unavailable`;
+- account limits (database size, the free plan's daily rows) become
+  `unavailable` too;
+- anything else becomes `server`, including our own bugs: bad SQL, a
+  missing table, a broken constraint.
+
+The D1 error stays the failure's cause, so the log keeps all of it.
+
+Matching on message text is fragile. If Cloudflare rewords a message,
+it falls through to `server`, the safe side: a passing outage is
+logged as a bug, and nothing breaks.
+
+### Rows are trusted, not checked
+
+`queryAll<Row>()` casts D1's rows to `Row`. Nothing checks at run time
+that they match. Our own database is not a trust boundary, and a row
+that does not match is a bug, not an input. What would catch such a
+bug is a test of the real SQL against the migrations, which belongs
+to the integration-testing session.
+
+A runtime check (valibot in the driver helper, throwing on a mismatch)
+is an open question. Its cost grows with rows × columns: an estimated
+few microseconds per row, small next to a D1 round trip but counted
+as CPU time, and the free plan allows 10 ms of CPU per request. If the
+question is taken up, measure it on a realistic list first.
+
+### What the tests prove
+
+The d1 unit tests run on a fake `D1Database` that records each
+statement's SQL and binds. They prove what we send to D1 and how we
+read its answer: the bind order, "one changed row means inserted",
+the mapping, and that failures are classified with their context.
+They do not prove that the SQL is right. Only a real D1 can, which
+today means the api's integration and e2e tests.
 
 **Target.** Each data package is a workspace package of its own under
-`packages/data/` (A1). `data/memory` is the first.
+`packages/data/` (A1). `data/d1` is the first. `data/memory` was the
+first until stage 06 deleted it. It was kept for tests at first (DB4),
+then the owner chose to delete it. Its places in the tests are taken
+by a fake `D1Database` in the d1 unit tests and an array-backed fake
+`DbStore` in `construct.test.ts`.
 
 Another system of ours is a real thing too. Calling the api from the
 BFF is a concrete call over the network, so the client belongs in
@@ -541,9 +801,18 @@ internal client needs one, not before. There is probably never a
 `data/internal/bff-api`: the frontend reaches the bff-api through
 SvelteKit's own transport (chapter 12).
 
+L5's second half, who owns the port once a database replaces the
+memory store, is answered: the operations still do. The data package
+exports `DbStore` and never names a port (chapter 4).
+
 **Open.**
-- Who owns the port if a database package replaces the memory store
-  (L5's second half).
+- **The integration-testing session**, an open design session: whether
+  `data/d1` tests its own SQL against a local D1, and how to prove
+  that `Row` matches the migrated table.
+- Runtime checking of rows, and its CPU cost (above).
+- Building the `DbStore` per request: D1 sessions for read
+  replication, or a driver over a socket (review item 30).
+- SQL dialect differences, if a second database arrives (stage 08).
 - A contract test: each internal client run against the provider's
   real `app.fetch`, so client and provider cannot drift apart.
 
@@ -615,10 +884,11 @@ where they are enforced (A1):
   handlers   → contract     (the provider's own contract)
   data       → business
   data       → contract     (the contract of the system it reaches)
+  handlers, operations, data → fail
   ```
 
   Business imports nothing of ours, contract included. A contract
-  imports nothing of ours either.
+  imports nothing of ours either, and neither does fail (chapter 13).
 - **Within an app**, handlers keep the hierarchy rules as a directory
   tree.
 - **In the BFF**, SvelteKit decides which files are routes. The rules
@@ -646,14 +916,24 @@ the function, or plain object, that does the work (D8):
 
 ```ts
 export const addTodo =
-  (deps: { store: AddStore; newId: () => string }): AddTodo =>
-  (title) => { … };
+  (deps: { dbStore: AddStore; newId: () => string }): AddTodo =>
+  async (input) => { … };
 ```
 
 The type of what it returns is named after it (`AddTodo`). The code
 has no classes and no `this`, so nothing loses its binding when Hono
 receives a handler. A unit with nothing to inject is a plain value
 (`getHealth`).
+
+One class exists, and it is data, not behaviour: `Fail` extends
+`Error`, so a failure carries a stack and a `cause` chain that
+`console.error` prints in full (chapter 13).
+
+Code is written to be read (review items 36, 38):
+- name intermediate values, and write steps in the order they happen;
+- every `if` has braces;
+- no terse one-liners and no nested ternaries;
+- name a function for the problem it solves.
 
 **Open.**
 - Naming: the operation is `addTodo` and its handler is `postTodos`,
@@ -689,8 +969,7 @@ Only these import a contract:
 Today `contract` holds (D1, D4):
 - **messages**: the request and reply shapes (`AddTodoBody`,
   `TodoReply`, `TodoListReply`, `HealthReply`) as valibot schemas;
-- **boundary input rules**: the title rule (`Title`);
-- **wire limits**: `BODY_LIMIT_BYTES`, `TITLE_MAX`;
+- **wire limits**: `BODY_LIMIT_BYTES`;
 - **error vocabulary**: the envelope's kinds (`validation`, `limit`,
   …) and the `Envelope` shape;
 - **runtime decoding**: the same schemas parse the request in the api
@@ -714,15 +993,23 @@ the types it sends from the schemas (valibot's `InferInput`).
 
 ### Which rules go in a contract
 
-- **Shape rules** go in the contract. Anyone can check them with the
-  message alone: a title is 1–256 characters.
-- **Stateful rules** stay in business. They need state that only the
-  provider has: the 500 cap. The contract only names the outcome
-  (`limit`).
+- **Shape** goes in the contract: which fields a message has and their
+  types. `AddTodoBody` is an object with a string `title`, and no
+  other keys.
+- **Rules** stay in business, whether or not they need state. A title
+  is 1–256 characters after trimming (`TITLE_MAX`); the list holds at
+  most 500 todos (`TODO_LIMIT`). The contract only names the outcome
+  (`validation`, `limit`).
 
-Validation has one authority. The contract defines the rule, and the
-api enforces it. A consumer may apply the same rule early, for a
-better form, but the api never trusts that it did.
+Slice 2 put the title rule in the contract, as a shape rule anyone
+could check with the message alone. Stage 06 moved it to business
+(review item 38), and the contract kept only the wire shape. Both the
+api and the BFF already import business, so neither lost access to
+the rule.
+
+Validation has one authority. Business defines the rule, and the api
+enforces it. A consumer may apply the same rule early, for a better
+form, but the api never trusts that it did.
 
 The messages in a contract become the words consumers show, unless a
 consumer replaces them. Putting a message in the contract is choosing
@@ -783,3 +1070,113 @@ no construct, no operations, and envelopes returned from
   ports and its rules.
 - Whether one architecture story should replace this story and the
   BFF story, with a short page per app. Claude suggested it.
+
+## 13. Failures
+
+Stage 06 gave the api one failure type for every layer. Before it,
+each layer had its own: the operation returned `{ kind: "full" }`, the
+memory store could not fail, and the handler translated by name. A
+database can fail in every call, so failures now cross every layer,
+and they need one shape to do it.
+
+### One type, a fixed set of kinds
+
+`packages/fail` holds every failure our code can name. It imports
+nothing, so every layer can import it (chapter 9). It is a package of
+its own, not part of business, because failures are not about todos,
+and not part of the contract, because its kinds are not the wire's
+(below).
+
+| Kind | Meaning | Made by |
+|---|---|---|
+| `invalid` | input breaks a rule; `field` names it | `invalid(field, message)` |
+| `not_found` | the thing asked for does not exist | `notFound` |
+| `limit` | a business limit refused the request | `limitReached` |
+| `too_large` | the request is bigger than we accept | `tooLarge` |
+| `unavailable` | something we depend on cannot answer now | `unavailable` |
+| `server` | our own fault, or an error nobody recognised | `serverFault` |
+
+`Fail` is a class that extends `Error`, so each failure has a stack
+and a standard `cause`. `AnyFail` is the union of `Fail<K>` for every
+kind, so checking `kind` narrows it.
+
+### Named once, at the root, then wrapped
+
+The package that first meets an error decides its kind. Every package
+above only adds context, as Go's `%w` does:
+
+```
+d1:        classify     → unavailable("select todos: D1_ERROR: Network connection lost.")
+operation: wrap(…, "list todos")
+           → unavailable("list todos: select todos: D1_ERROR: Network connection lost.")
+handler:   mapFailure   → 500, and the whole chain in the log
+```
+
+`wrap` keeps the kind and the field, and points `cause` at what it
+wraps. A failure's kind never changes on the way up. So the handler
+can trust it, and a log shows the chain back to the root.
+
+Every layer returns `Result<T, AnyFail>`, or a narrower failure when
+it knows more (`validateBody` returns `Fail<"invalid">`).
+
+### Only bugs throw
+
+On the request path, failures are values (D4). A throw means a bug,
+and `onError` turns it into a `server` failure and a 500.
+
+Stated exactly: our own TypeScript throws only on a bug. Anything D1
+reports comes back as a `Result`, even when the cause is our bug (bad
+SQL, a missing table, a value D1 cannot bind). D1 reports every error
+by throwing, so the driver helpers catch everything and classify it
+(chapter 8). The reply and the log come out the same either way.
+
+### Resolved once, at the edge
+
+`handlers/present.ts` turns a failure into a reply, with two tables
+the compiler checks for every kind (`satisfies Record<…>`):
+- `contractKind` maps each failure kind to a wire kind: `invalid` →
+  `validation`, and `unavailable` and `server` → `internal`.
+- `status` maps each wire kind to a status code.
+
+A new failure kind does not compile until it has a wire kind, a status
+and a side.
+
+The side decides what the reply says:
+- `userFailure` takes the four user kinds and replies 4xx. The message
+  is the root failure's.
+- `serverFailure` takes `unavailable` and `server` and replies 500
+  with `internal error`. The whole failure goes to the log, never to
+  the caller (PRD, Envelope).
+
+A handler picks one by what it knows. When the failure is known (a
+validation step can only fail as `invalid`) it calls `userFailure`
+itself. When the failure is dynamic (an operation can fail either
+way) it calls `mapFailure`, whose `switch` names every kind and ends
+in a `never` check.
+
+### Who reads a message
+
+A failure's message has two readers, decided by its kind:
+- for a **user** kind, the root's message is the reply, so it is
+  written for the user: "the list is full", "title is empty";
+- for a **server** kind, it is for logs and developers only: "select
+  todos: D1_ERROR: …".
+
+So a user failure's message must never come from a server failure.
+`rootOf`, which finds the message a reply shows, follows the `cause`
+chain only while the kind stays the same. A `not_found` failure caused
+by an `unavailable` one shows its own message, not D1's. Before the
+review, `rootOf` walked the whole chain, and such a failure would have
+sent D1's text to the caller. Nothing created one yet, but the types
+allowed it.
+
+**Open.**
+- `unavailable` is `internal` and 500 today, because the PRD's
+  envelope has no kind for it. A `503` with `Retry-After` would tell
+  the caller that trying again may work. The health database check
+  would likely add it (review item 41).
+- Account limits count as `unavailable`, but a daily limit clears only
+  tomorrow. Nothing retries today. Once something does, they need a
+  kind of their own, or they will be retried over and over.
+- The BFF's failures, in refactor B: the bff-api has the same need,
+  and its data client already adds `unavailable` (chapter 8).

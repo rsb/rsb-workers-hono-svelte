@@ -189,9 +189,12 @@ importers:
       '@todo/contract-api':
         specifier: workspace:*
         version: link:../../packages/contract/api
-      '@todo/data-memory':
+      '@todo/data-d1':
         specifier: workspace:*
-        version: link:../../packages/data/memory
+        version: link:../../packages/data/d1
+      '@todo/fail':
+        specifier: workspace:*
+        version: link:../../packages/fail
       '@todo/operations':
         specifier: workspace:*
         version: link:../../packages/operations
@@ -217,6 +220,9 @@ importers:
 
   apps/bff:
     dependencies:
+      '@todo/business':
+        specifier: workspace:*
+        version: link:../../packages/business
       '@todo/contract-api':
         specifier: workspace:*
         version: link:../../packages/contract/api
@@ -280,21 +286,42 @@ importers:
         specifier: 'catalog:'
         version: 5.0.5(@types/node@26.6.6)(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2))
 
-  packages/data/memory:
+  packages/data/d1:
     dependencies:
       '@todo/business':
         specifier: workspace:*
         version: link:../../business
+      '@todo/fail':
+        specifier: workspace:*
+        version: link:../../fail
+    devDependencies:
+      '@cloudflare/workers-types':
+        specifier: 5.20261029.1
+        version: 5.20261029.1
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.5(@types/node@26.6.6)(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2))
+
+  packages/fail:
     devDependencies:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.5(@types/node@26.6.6)(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2))
 
   packages/operations:
     dependencies:
       '@todo/business':
         specifier: workspace:*
         version: link:../business
+      '@todo/fail':
+        specifier: workspace:*
+        version: link:../fail
     devDependencies:
       typescript:
         specifier: 'catalog:'

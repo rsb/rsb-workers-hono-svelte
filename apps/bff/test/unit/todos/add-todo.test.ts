@@ -1,4 +1,4 @@
-import { TITLE_MAX } from "@todo/contract-api";
+import { TITLE_MAX } from "@todo/business/todos/todo.ts";
 import { describe, expect, it } from "vitest";
 import { addTodo } from "../../../src/lib/server/todos/add-todo.ts";
 
