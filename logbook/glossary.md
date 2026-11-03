@@ -15,13 +15,15 @@ We ground our language in DDD's concepts, with two cautions:
   intent per port, plain types rather than hydrated objects, and one
   translation per boundary.
 
-Decisions L1–L13 were agreed in the language session of 2026-11-03.
-They are recorded in [the api story](the-api-story.md).
+Decisions L1–L21 were agreed in the language sessions of 2026-11-03:
+L1–L13 on language, L14–L21 on operations. They are recorded in
+[the api story](the-api-story.md).
 
 Status:
 - **locked:** agreed, and the story follows it;
 - **target:** agreed, and the code does not follow it yet;
 - **not used:** a DDD term we deliberately do without;
+- **retired:** a word we used and no longer use;
 - **open:** still under discussion.
 
 ## The chain
@@ -29,15 +31,16 @@ Status:
 ### Chain
 
 The path every request takes:
-startup → entry point → operation (using business) → port ← data.
-Construct does the wiring. Each link has one role, and a request
-cannot skip a link.
+startup → entry point → [process →] operation (using business) → port
+← data. Construct does the wiring. Each link has one role, and a
+request cannot skip a link. A process is there only when the use case
+needs one.
 
 - **DDD:** layered architecture, with the domain at the centre.
 - **We differ:** the boundary is kept by the architecture (checked
   imports and tests), not by encapsulation. Each link can be tested on
   its own, with or without a mock, and in every test category.
-- **Status:** locked (L2).
+- **Status:** locked (L2, L18).
 
 ### Boundary
 
@@ -51,9 +54,10 @@ by tests.
 
 ### Seam
 
-The point where one link calls the next. Both of our seams are shaped
-by the caller:
-- an entry point calls an operation with business inputs;
+The point where one link calls the next. Our seams are shaped by the
+caller:
+- an entry point calls an operation or a process with business inputs;
+- a process calls operations;
 - an operation calls a port declared for what it needs.
 
 Ports are coupled to business types on purpose. Because the seams
@@ -65,11 +69,41 @@ for the work that uses it.
 ### Entry point
 
 A handler. It turns loose input into well-defined business inputs,
-runs one operation, handles its failures and presents its result.
-See [the api story](the-api-story.md), chapter 5.
+runs exactly one unit, an operation or a process, handles its failures
+and presents its result. Never both, never neither: a route with no
+unit to run is a probe, not an entry point. See
+[the api story](the-api-story.md), chapter 5.
+
+Lives in `app/handlers/`.
 
 - **DDD:** application layer, inbound adapter.
-- **Status:** locked.
+- **Status:** locked (L19).
+
+### Probe
+
+A check of the Worker and its dependencies: liveness (is the Worker
+up?) and readiness (can it reach its store?). A probe completes no
+business task, so it runs no unit. When it needs to reach a
+dependency, it declares a probe port of its own (`ping()`), which data
+satisfies cheaply (`SELECT 1`).
+
+A probe never uses an operation's port or a business action. It must
+be cheap, since it may be called often: for a paid or rate-limited
+provider it checks configuration or the provider's status, and never
+sends anything. A public probe answers up or down; the detail goes to
+the logs.
+
+Lives in `app/probes/`. `health` is today's liveness probe.
+
+- **DDD:** none. It is operational, not business.
+- **Status:** target (L20). Today `health` sits in `app/handlers/`.
+
+### Errors
+
+Failure presentation, shared by handlers and probes: not-found and
+on-error. Lives in `app/errors/`.
+
+- **Status:** target (L20). Today it sits in `app/handlers/errors/`.
 
 ### Validate once
 
@@ -82,46 +116,103 @@ against `TITLE_MAX`. No new type is needed for that.
 
 ### Trusted
 
-What everything below the entry point is. An operation, a port and
-data receive input the entry point has already validated, and do not
-check it again. Rows read back from our own store are trusted too.
+What everything below the entry point is. A process, an operation, a
+port and data receive input the entry point has already validated, and
+do not check it again. Rows read back from our own store are trusted
+too.
 
 - **Status:** locked (L12).
 
+### Process
+
+Composes operations into one business flow. It holds their order and
+their dependencies (the first operation's result decides whether the
+next ones run), handles their failures as its spec says (stop,
+continue, retry, compensate) and returns one result.
+
+A process:
+- never touches a port; every effect happens in an operation;
+- enforces no business rule; it decides flow only;
+- has no atomic scope: each operation commits on its own, so undoing a
+  step is an operation too (a compensation);
+- runs in one of two modes, chosen by its spec:
+  - **immediate:** inside the request. It is fast and returns the
+    whole result, but a step after a crash is lost;
+  - **durable:** on a runner that keeps each step's result and retries
+    (Cloudflare Workflows). Every step runs, but the request cannot
+    wait for all of them;
+- receives built operations from construct, so its tests mock
+  operations only.
+
+Processes do not call processes.
+
+- **DDD:** process manager (also called a saga).
+- **Not called:** workflow (rsb-workflow and Cloudflare Workflows use
+  the word), saga (suggests compensation only), pipeline (suggests a
+  straight line).
+- **Status:** target (L18). The todo app's first process is "notify on
+  add".
+
 ### Operation
 
-The only place anything happens to an entity. It takes business
-inputs, enforces the business rules, uses its ports and produces one
-outcome: an entity, several entities, a mix of the two, or a failure.
-A different outcome is a new operation, which may reuse the same
-entity behaviour.
+A business use case. "Use case" reads oddly in code, so the code says
+operation, but that is what it is. Each one is driven by its spec.
 
-Lives in `packages/operations`, one file per operation with its port.
+An operation is the only place anything happens to an entity. It
+takes business inputs, enforces the business rules, and composes
+entity behaviour with the actions of one or more ports. It may have
+several effects and returns one result. A different result is a new
+operation, which may reuse the same entity behaviour.
+
+A light operation is fine. A use case that only reads still has an
+operation, so the rule "only operations and probes call ports" has no
+exception, and logic that arrives later (list *my* todos) has a place
+to go. `listTodos` is one.
+
+Operations do not call operations. Shared work is entity behaviour or
+a shared action; a sequence of operations is a process.
+
+Lives in `packages/operations`, one file per operation with its ports.
 
 - **DDD:** application service, and also the job of the aggregate
   (guarding a rule across several entities).
 - **We differ:** it is a function, not a service object, and it holds
   no state.
-- **Status:** locked (L1, L4, L5).
+- **Status:** locked (L1, L4, L5, L14).
+
+### Spec
+
+What drives a use case. An operation's spec states its intent, input,
+the rules it enforces, the action that carries its decision and what
+it keeps atomic, its effects (for each external one: inline or
+recorded, and what its failure does to the result), its result and its
+failures. A process's spec states its steps, their dependencies, the
+failure policy for each step, its mode and its result.
+
+A light operation's spec is a few lines.
+
+- **Status:** locked (L14) that a spec drives each use case. Its form,
+  and how specs enter rsb-workflow, are parked.
 
 ### Port
 
-The interface an operation declares for what it needs from the world.
-It is owned by the operation, named for intent
-(`addTodoUnlessFull(todo, limit)`), speaks business types and returns
-a `Result`.
+The interface a caller declares for what it needs from the world. It
+is owned by its caller, speaks business types and returns a `Result`.
+Only operations and probes declare ports.
+
+Its methods are actions.
 
 - **DDD:** repository.
 - **We differ:** no repository per entity and no generic CRUD. Each
-  operation declares the smallest port it needs, and one flat store
-  satisfies them all.
+  operation declares the smallest port it needs, one per real thing it
+  touches (a store, a mailer), and one flat store satisfies them all.
 
 A port may carry out behaviour for its operation: a patch, a bulk
 update, counts. The operation still owns the decision. If performance
 moves behaviour away from where it would otherwise live, a comment
 there says what moved and why.
 
-- **Status:** locked (L13).
+- **Status:** locked (L6, L13, L15, L20).
 
 ### Data
 
@@ -131,6 +222,61 @@ facts. It makes no ids and decides no rules.
 
 - **DDD:** infrastructure, repository implementation.
 - **Status:** locked.
+
+## Effects
+
+### Action
+
+A method on a port: how an operation asks the world for one thing.
+Named for intent, as the caller needs it: `addTodoUnlessFull(todo,
+limit)`, `insertTodo(todo)`, `sendEmail(message)`. A probe's actions
+are probe actions (`ping()`), never business ones.
+
+- **Status:** locked (L15).
+
+### Effect
+
+A change an operation makes in the world: a row written, an email
+sent, a text sent. An operation may have several. Two kinds:
+- **atomic:** a store action inside the operation's transaction scope;
+- **external:** anything else. It cannot be rolled back, so it never
+  runs inside the scope. The spec chooses, for each one:
+  - **inline:** done after the commit, best effort. The operation
+    knows how it went, and the spec says whether a failure fails the
+    result;
+  - **recorded:** written as an outbox row inside the transaction and
+    delivered later, at least once. It cannot fail the result, since
+    it has not happened yet.
+
+- **Status:** locked (L15, L17).
+
+### Result
+
+The one thing an operation or a process returns: a value or a failure.
+Every operation and process returns `Result<T, AnyFail>`.
+
+- **Status:** locked (L15).
+
+### Outcome
+
+Retired. It meant both the result and the effects. We now say which.
+
+- **Status:** retired (L15).
+
+### Outbox
+
+Rows that record external effects inside the operation's transaction,
+so the decision and the intent to notify commit together or not at
+all. A relay delivers them later and marks them done. Delivery is at
+least once, so the outbox row's id is the idempotency key, passed to
+the provider where it takes one.
+
+The relay is a process: its trigger (a queue message, a cron sweep) is
+an entry point, and each delivery is an operation.
+
+- **DDD:** none; it is the transactional outbox pattern.
+- **Status:** target (L17). Nothing in the todo app records an effect
+  yet.
 
 ## Rules
 
@@ -147,7 +293,7 @@ them.
 
 ### Enforce
 
-To apply a rule to a real case and decide the outcome. Only operations
+To apply a rule to a real case and decide the result. Only operations
 enforce. `addTodo` enforces `TODO_LIMIT`.
 
 - **Status:** locked (L1).
@@ -162,11 +308,52 @@ engine:
   transaction.
 
 The store promises atomicity, and the story does not depend on how it
-is kept.
+is kept. An operation gets it in one of two ways: a transaction scope,
+or a single intent action.
 
 - **DDD:** the aggregate's consistency boundary.
 - **Status:** locked (L1, L7). How Postgres keeps it, and at what
   cost, is open: it needs experiments.
+
+### Transaction scope
+
+The operation marks where its transaction starts and what rolls it
+back; the port does all of the work. The operation hands its work to
+the port, and the port runs it inside a transaction:
+
+```ts
+const added = await dbStore.transaction(async (tx) => {
+  const count = await tx.countTodos();
+  if (!count.ok) {
+    return count;
+  }
+  if (count.value >= TODO_LIMIT) {
+    return limitReached("the list is full");
+  }
+  …
+});
+```
+
+The port:
+- begins when `transaction` is called;
+- commits if the work returns `ok`;
+- rolls back if the work returns a failure, so the operation decides
+  by returning, not by throwing;
+- rolls back and reports a failure if anything throws.
+
+Inside the work, `tx` is still the operation's smallest port. Only one
+store's actions run there; external effects never do. The work is
+short, since it holds locks across round trips. The spec states the
+isolation the operation needs.
+
+The alternative is a single intent action (`addTodoUnlessFull`): one
+round trip, with the decision carried out by the store (L13). The spec
+says which one the operation uses.
+
+- **DDD:** unit of work, without the object.
+- **Status:** target (L16). D1 cannot offer it: it has no interactive
+  transactions, only `batch()`. Postgres over Hyperdrive can; that
+  needs experiments.
 
 ### Fact
 
@@ -195,9 +382,9 @@ Named plainly, with no suffix: `Todo`, never `TodoEntity`.
 
 Pure business logic about an entity, which lives beside it.
 `newTodo(id, input)` is entity behaviour: a new todo is not completed.
-Operations compose entity behaviour with their ports to produce their
-outcome. Behaviour that several operations need is shared as a pure
-function, not turned into a new type.
+Operations compose entity behaviour with actions to produce their
+effects and result. Behaviour that several operations need is shared
+as a pure function, not turned into a new type.
 
 - **DDD:** a rich domain model, as opposed to an anaemic one.
 - **We differ:** the behaviour is pure and changes nothing. Anything
@@ -282,6 +469,17 @@ api is one: its routes serve the contract.
 - **DDD:** open host service.
 - **Status:** locked (L9).
 
+## The BFF
+
+### BFF operation
+
+The BFF's own operations: aggregation, filtering and other UI
+concerns. The BFF never touches a database and never runs a backend
+operation; it reaches the api through its client. `apps/bff` never
+lists `@todo/operations`.
+
+- **Status:** locked (L21). The rest waits for the BFF story.
+
 ## Open
 
 To be settled in later sessions:
@@ -291,5 +489,9 @@ To be settled in later sessions:
   shapes, `Result`;
 - business rules vs validation rules;
 - presentation;
-- the Supabase access route, and how each intent port keeps its
-  atomic promise there: it needs experiments.
+- the Supabase access route, and how transaction scopes and intent
+  actions keep their atomic promise there: it needs experiments;
+- whether D1 stays for the lab, since it cannot offer a transaction
+  scope;
+- the spec's form, and how use cases enter rsb-workflow (parked);
+- the package layout for operations and processes.
