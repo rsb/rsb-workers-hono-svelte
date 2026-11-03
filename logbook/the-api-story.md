@@ -44,6 +44,32 @@ The decisions behind this story are:
   - one failure type for every layer, named once at its root
     (chapter 13);
   - handlers that read as a story (chapter 5).
+- L1–L10, agreed with the owner in the language session
+  (2026-11-03). Each term is defined in the
+  [glossary](glossary.md):
+  - L1: business states rules, the operation enforces them, and the
+    store keeps the operation's decision atomic and answers with facts
+    (chapters 6 and 7).
+  - L2: the boundary is the chain: startup → entry point → operation
+    (using business) → port ← data, wired by construct. Checked imports
+    and tests keep it, not encapsulation.
+  - L3: business objects with identity are entities, named plainly
+    (`Todo`, never `TodoEntity`) (chapter 7).
+  - L4: an entity's behaviour is pure business logic and lives beside
+    the entity. Operations compose it. Anything that happens to an
+    entity happens only in an operation. A different outcome is a new
+    operation (chapters 6 and 7).
+  - L5: we use no aggregate. The operation does its job (chapter 6).
+  - L6: both seams are shaped by the caller, and ports couple to
+    business types by design (chapter 6).
+  - L7: the store is engine-neutral. Its promise is atomicity. Supabase
+    (Postgres) is the target, and D1 is one engine (chapter 6).
+  - L8: value objects are adopted (chapter 7).
+  - L9: the anti-corruption layers are the inbound translations. The
+    contract is the published language, and presenting translates into
+    it (chapters 5 and 8).
+  - L10: `Title` is the first value object. Where its rule is applied
+    stays open (chapter 7).
 
 After slice 2 (Add and list), the code followed chapters 1–10
 throughout, except for config, which has nothing to hold yet
@@ -423,6 +449,12 @@ duties:
 Validation, operations and presentation are delegated, so the
 template itself has no reason to change.
 
+Two of the duties translate (L9):
+- **validate** is an anti-corruption layer: it turns a language that
+  is not ours, the request, into business inputs;
+- **present** translates outward, into the published language: the
+  contract. The api serves that language as an open host service.
+
 `postTodos` is the first entry point with all four duties. A handler
 tells a story: each step is named, each `if` has braces, and a
 comment says why the step is there (review item 36):
@@ -532,6 +564,36 @@ construct create entry points and inject their dependencies.
 
 Operations do the work. Entry points use them.
 
+### Business states, the operation enforces (L1, L4, L5)
+
+Each layer has one part in a rule:
+- **business states it:** a type, a constant, a pure function
+  (`TODO_LIMIT`);
+- **the operation enforces it:** it applies the rule to a real case
+  and decides the outcome (`addTodo` refuses the 501st todo);
+- **the store keeps it atomic:** no other request lands inside the
+  operation's decision, and the store answers with facts.
+
+An operation is the only place anything happens to an entity. It
+composes the entity's behaviour (`newTodo`) with its ports to produce
+one outcome: an entity, several entities, a mix of the two, or a
+failure. A different outcome is a new operation, which may reuse the
+same entity behaviour. Behaviour that several operations need is
+shared as a pure function in business, not turned into a new type.
+
+This is why we use no aggregate. In DDD an aggregate guards the rules
+that span several entities. Here the operation does that, and the idea
+survives as two questions every operation answers: which rules span
+several entities, and what must the store keep atomic?
+
+### Ports are shaped by the operation (L6)
+
+Both seams are shaped by the caller. An entry point calls an
+operation with business inputs, and an operation calls a port
+declared for exactly what it needs. Ports speak business types, so
+they are coupled to business on purpose. That is why we build in
+vertical slices: each seam is made for the work that uses it.
+
 Operations import business directly. They never import data.
 Instead, an operation declares the interface it needs, and construct
 injects the data package that satisfies it. The store's interface is
@@ -568,11 +630,22 @@ and the add. An async store breaks that, since another add can
 land between an awaited count and an awaited insert.
 
 So the port asks for an intent, not two steps (DB1):
-`addTodoUnlessFull(todo, limit)`. The store answers it with one SQL
-statement that counts and inserts together (chapter 8). The check
-stays exact under concurrency without a transaction, and D1 has no
-`BEGIN` to span two statements. A rule that needs several statements
-reopens this, with `batch()` or a transaction (review item 29).
+`addTodoUnlessFull(todo, limit)`. The store's promise is that the
+intent is atomic: no other add lands between its count and its
+insert (L7). How it keeps that promise depends on the engine:
+- **D1 (SQLite)**, today: one SQL statement counts and inserts
+  together (chapter 8). SQLite runs one write at a time, so the
+  statement is atomic. D1 has no `BEGIN` to span two statements; a
+  rule that needs several reopens this, with `batch()` (review
+  item 29).
+- **Postgres (Supabase)**, the target: one statement is not enough
+  under READ COMMITTED, since two can count at once. It needs a row
+  lock (`FOR UPDATE`), an advisory lock or a serializable
+  transaction. Which ones are possible depends on how we reach it,
+  which is open (chapter 8).
+
+The port does not change between engines. The operation sees an
+intent and a fact either way.
 
 ### The store reports facts, the operation decides what they mean
 
@@ -623,8 +696,23 @@ Ways to enforce it:
 
 ## 7. Business
 
-Business is business types, behaviour (interfaces) and pure logic
-only. It has no db, io, network or api calls.
+Business states the rules (L1): types, constants and pure functions
+only. It has no db, io, network or api calls, and it enforces nothing.
+The words below are defined in the [glossary](glossary.md).
+
+It holds:
+- **Entities** (L3): business types with identity. `Todo` is one,
+  known by its `id`. They are named plainly: `Todo`, never
+  `TodoEntity`.
+- **Entity behaviour** (L4): pure functions beside the entity, which
+  operations compose. `newTodo` is one.
+- **Value objects** (L8): types defined only by their value, never
+  changed once made, and valid whenever you hold one. Each is made by
+  a constructor that returns a `Result`, and in TypeScript it is a
+  branded type. A value earns one when it has a rule, could be
+  confused with another value, is made of parts that belong together,
+  or has behaviour of its own. Otherwise it stays a primitive.
+- **Rules:** constants such as `TITLE_MAX` and `TODO_LIMIT`.
 
 Anything may import business. Business imports none of our other
 packages, contract included (D1).
@@ -649,7 +737,20 @@ action. The operation receives a valid `NewTodo`. Before stage 06 the
 contract held the title rule; now it holds only the wire shape
 (review item 38, chapter 11).
 
+**Target.**
+- `Title` becomes the first value object (L10): a branded string made
+  by `title(raw)`, which trims it and returns a `Result`. A title has
+  no identity, and it has a rule, so it earns a type.
+- The package becomes `business/entity`, so its name says what it
+  holds.
+
 **Open.**
+- Where the title rule is applied once `Title` exists: in the
+  handler's validation, as today, or only in the constructor. This is
+  part of business rules vs validation rules.
+- What sits beside entities in `business/entity`: rules, input types
+  (`NewTodo`, `TodoPatch`, `TodoFilter`), read shapes (`TodoCounts`)
+  and `Result`. Their names are open too.
 - Whether `Result`, which is not about todos, should get a home of its
   own if more such helpers appear. Failures, which are not about todos
   either, got one in stage 06: `packages/fail` (chapter 13).
@@ -717,7 +818,9 @@ top to bottom:
 - **Raw** runs the statement through a driver helper and gives the
   failure its context: "insert todo unless full", "select todos".
 - **Outer** maps the business object to a row and back, and turns a
-  raw answer into a fact: one changed row means "inserted".
+  raw answer into a fact: one changed row means "inserted". It is
+  data's anti-corruption layer (L9): rows and driver answers stop
+  here, and only business objects and facts go up.
 
 The driver helpers in `driver.ts` are the only code that runs a D1
 statement. `queryAll` returns rows and `execute` returns the change
@@ -813,6 +916,16 @@ exports `DbStore` and never names a port (chapter 4).
 - Building the `DbStore` per request: D1 sessions for read
   replication, or a driver over a socket (review item 30).
 - SQL dialect differences, if a second database arrives (stage 08).
+- **Supabase (Postgres) is the target store (L7).** To settle:
+  - the access route: PostgREST (`supabase-js`) has no transaction
+    across calls, while Hyperdrive with `postgres.js` or `pg` gives
+    interactive transactions, at the cost of round trips while a lock
+    is held;
+  - how each intent port keeps its atomic promise there (chapter 6);
+  - whether D1 stays for the lab.
+- Entity behaviour that lives in SQL today: the patch's `COALESCE`,
+  `setAllCompleted`, `deleteCompleted` and the counts'
+  `COUNT(*) FILTER`. To be walked with the data layer (L4).
 - A contract test: each internal client run against the provider's
   real `app.fetch`, so client and provider cannot drift apart.
 

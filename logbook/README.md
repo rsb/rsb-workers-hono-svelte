@@ -10,6 +10,7 @@ logbook/
 ├─ profile-notes.md        candidate registry entities
 ├─ the-api-story.md        how the api is put together, a chapter per layer
 ├─ the-bff-story.md        the same for the web Worker (first pass)
+├─ glossary.md             the words we use, grounded in DDD
 ├─ findings/NN-<slice>.md  findings about the code, per slice
 ├─ drafts/                 the draft of each stage, as reviewed
 ├─ reports/                one per session: what was generated and why
