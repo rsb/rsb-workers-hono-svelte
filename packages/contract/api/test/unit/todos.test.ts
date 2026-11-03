@@ -1,6 +1,6 @@
 import * as v from "valibot";
 import { describe, expect, it } from "vitest";
-import { AddTodoBody, PatchTodoBody } from "../../src/index.ts";
+import { AddTodoBody, DeletedReply, PatchTodoBody } from "../../src/index.ts";
 
 /** The issue a body fails with: its first path key and its message. */
 const issue = (body: unknown, schema: v.GenericSchema = AddTodoBody) => {
@@ -66,5 +66,15 @@ describe("PatchTodoBody", () => {
       title: "buy milk",
       completed: true,
     });
+  });
+});
+
+describe("DeletedReply", () => {
+  it("reads the id of the todo deleted", () => {
+    expect(v.parse(DeletedReply, { id: "id-1" })).toEqual({ id: "id-1" });
+  });
+
+  it("rejects anything more than the id", () => {
+    expect(issue({ id: "id-1", title: "buy milk" }, DeletedReply)?.field).toBe("title");
   });
 });

@@ -9,7 +9,7 @@ it("holds every table's methods, flat", () => {
 
   const names = Object.keys(createDbStore(db)).sort();
 
-  expect(names).toEqual(["addTodoUnlessFull", "listTodos", "updateTodo"]);
+  expect(names).toEqual(["addTodoUnlessFull", "deleteTodo", "listTodos", "updateTodo"]);
 });
 
 it("prepares nothing when it is built", () => {

@@ -53,6 +53,11 @@ const updateTodoStmt = (db: D1Database, id: string, title: string | null, comple
   return db.prepare(sql).bind(id, title, completed);
 };
 
+const deleteTodoStmt = (db: D1Database, id: string) => {
+  const sql = "DELETE FROM todos WHERE id = ?1";
+  return db.prepare(sql).bind(id);
+};
+
 // Raw: runs a statement and deals only in rows. A D1 error becomes the root
 // failure here, named by what the statement does.
 
@@ -66,6 +71,10 @@ const selectTodosRaw = (db: D1Database) => {
 
 const updateTodoRaw = (db: D1Database, id: string, title: string | null, completed: Row["completed"] | null) => {
   return queryAll<Row>(() => updateTodoStmt(db, id, title, completed), "update todo");
+};
+
+const deleteTodoRaw = (db: D1Database, id: string) => {
+  return execute(() => deleteTodoStmt(db, id), "delete todo");
 };
 
 /**
@@ -128,5 +137,17 @@ export const todoStore = (db: D1Database) => ({
     }
 
     return ok(toTodo(row));
+  },
+
+  /** Whether a todo was deleted. It is not when no todo has that id. */
+  deleteTodo: async (id: string): Promise<Result<boolean, AnyFail>> => {
+    const changes = await deleteTodoRaw(db, id);
+    if (!changes.ok) {
+      return err(changes.error);
+    }
+
+    // The id is unique, so the delete changes one row or none.
+    const deleted = changes.value === 1;
+    return ok(deleted);
   },
 });
