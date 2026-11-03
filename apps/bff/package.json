@@ -16,6 +16,7 @@
   "dependencies": {
     "@todo/business": "workspace:*",
     "@todo/contract-api": "workspace:*",
+    "@todo/valid": "workspace:*",
     "valibot": "catalog:"
   },
   "devDependencies": {

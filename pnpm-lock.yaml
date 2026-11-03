@@ -198,6 +198,9 @@ importers:
       '@todo/operations':
         specifier: workspace:*
         version: link:../../packages/operations
+      '@todo/valid':
+        specifier: workspace:*
+        version: link:../../packages/valid
       hono:
         specifier: 4.13.14
         version: 4.13.14
@@ -226,6 +229,9 @@ importers:
       '@todo/contract-api':
         specifier: workspace:*
         version: link:../../packages/contract/api
+      '@todo/valid':
+        specifier: workspace:*
+        version: link:../../packages/valid
       valibot:
         specifier: 'catalog:'
         version: 1.5.0(typescript@6.0.3)
@@ -325,6 +331,19 @@ importers:
       '@todo/fail':
         specifier: workspace:*
         version: link:../fail
+    devDependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.5(@types/node@26.6.6)(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2))
+
+  packages/valid:
+    dependencies:
+      '@todo/business':
+        specifier: workspace:*
+        version: link:../business
     devDependencies:
       typescript:
         specifier: 'catalog:'

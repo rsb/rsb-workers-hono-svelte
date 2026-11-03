@@ -7,7 +7,8 @@
 
 	let { data, form }: PageProps = $props();
 
-	// A new object for every failed add, so a repeated message shows again.
+	// Failures reach `form` only without JavaScript. With it, each form keeps
+	// its own failure, so one action's result never clears another's.
 	let failed = $derived.by(() => {
 		if (form?.message === undefined) {
 			return null;

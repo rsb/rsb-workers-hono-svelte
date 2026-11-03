@@ -1,10 +1,13 @@
-import { type Page, expect, test } from "@playwright/test";
+import { type Locator, type Page, expect, test } from "@playwright/test";
 
 // PRD scenarios 2.1–2.8. The API's store is shared by the whole run (D19):
 // 2.1 needs it empty and runs first; the rest assert on the end of the list.
 
 const input = (page: Page) => page.getByRole("textbox", { name: "New to-do" });
 const items = (page: Page) => page.getByRole("listitem");
+
+/** A row's title, as its checkbox is named by it. The title button also says how to edit. */
+const titleOf = (item: Locator) => item.getByRole("checkbox");
 
 /** Types a title and presses Enter. Returns how many todos were listed before. */
 const submit = async (page: Page, title: string) => {
@@ -42,7 +45,7 @@ test("2.3 when I type buy milk and press Enter, then the list shows it and the i
   await page.goto("/");
   await add(page, "buy milk");
 
-  await expect(items(page).last()).toHaveText("buy milk");
+  await expect(titleOf(items(page).last())).toHaveAccessibleName("buy milk");
   await expect(input(page)).toHaveValue("");
 });
 
@@ -51,8 +54,8 @@ test("2.4 given buy milk, when I add walk dog, then walk dog is below buy milk",
   await add(page, "buy milk");
   await add(page, "walk dog");
 
-  await expect(items(page).nth(-2)).toHaveText("buy milk");
-  await expect(items(page).last()).toHaveText("walk dog");
+  await expect(titleOf(items(page).nth(-2))).toHaveAccessibleName("buy milk");
+  await expect(titleOf(items(page).last())).toHaveAccessibleName("walk dog");
 });
 
 test("2.5 when I add a title with spaces around it, then the list shows it trimmed", async ({
@@ -61,7 +64,7 @@ test("2.5 when I add a title with spaces around it, then the list shows it trimm
   await page.goto("/");
   await add(page, "  buy milk  ");
 
-  await expect(items(page).last()).toHaveText("buy milk");
+  await expect(titleOf(items(page).last())).toHaveAccessibleName("buy milk");
 });
 
 test("2.6 when I press Enter on only spaces, then no todo is added and I see why", async ({ page }) => {
@@ -90,5 +93,5 @@ test("2.8 given buy milk, when I reload, then buy milk is still there", async ({
 
   await page.reload();
 
-  await expect(items(page).last()).toHaveText("buy milk");
+  await expect(titleOf(items(page).last())).toHaveAccessibleName("buy milk");
 });

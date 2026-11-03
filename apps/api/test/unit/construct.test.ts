@@ -10,7 +10,7 @@ import { serve } from "../../src/http.ts";
 /**
  * A fake `DbStore` that keeps todos in an array. It reports facts as the
  * real one does: whether a todo was inserted, every todo in order, and a
- * todo as it is after its `completed` is set.
+ * todo as it is after a patch is applied.
  */
 const fakeDbStore = (): DbStore => {
   const todos: Todo[] = [];
@@ -25,13 +25,13 @@ const fakeDbStore = (): DbStore => {
     listTodos: async () => {
       return ok([...todos]);
     },
-    setCompleted: async (id, completed) => {
+    updateTodo: async (id, patch) => {
       const index = todos.findIndex((todo) => todo.id === id);
       const found = todos[index];
       if (found === undefined) {
         return ok(null);
       }
-      const updated = { ...found, completed };
+      const updated = { ...found, ...patch };
       todos[index] = updated;
       return ok(updated);
     },

@@ -5,7 +5,7 @@
 	type Props = {
 		/** At least one todo; with none there is no list. */
 		todos: TodoReply[];
-		/** The last failed toggle: which todo, and why. */
+		/** The last failed toggle without JavaScript: which todo, and why. */
 		toggleFailed: { id: string; message: string } | null;
 	};
 
