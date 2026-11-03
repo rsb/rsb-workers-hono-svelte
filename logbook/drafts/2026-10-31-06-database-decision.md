@@ -192,7 +192,7 @@ Claude's recommendation follows each one.
     - The memory store is async too. Its `addUnlessFull` has no
       `await` in its body, so the check and the set still run in one
       go: exact within an isolate, as before.
-    - D14's "synchronous, so exact" is replaced by "atomic behind the
+    - "Synchronous, so exact" is replaced by "atomic behind the
       port". The `AddStore` comment changes with it.
 - **DB4 The memory store.** Delete it, or keep it as a second adapter
   that config selects (`STORE=memory|d1`)? *Recommend keeping it.*

@@ -177,7 +177,7 @@ fields by name.
    the handler to handle it, and the new kind would answer `limit`.
    Claude proposes an exhaustive `switch`, about 3 lines.
 
-## 4. Operations (D5, D8, D10, D13, D14)
+## 4. Operations (D5, D8, D10, D13)
 
 **Shown.**
 - `add-todo.ts`:
@@ -190,9 +190,6 @@ fields by name.
 **Why.**
 - D5 (R9): each operation declares its own small interface. There is
   no shared `TodoStore`.
-- D14: the cap is a business constant checked by the operation, not
-  by the store. The ports are synchronous, so the check and the add
-  cannot interleave, and the cap is exact (the 501st post is 409).
 - D10: an operation that can fail returns `Result`. One that cannot
   fail returns its value.
 - D13: `newId` is injected.
@@ -214,7 +211,7 @@ fields by name.
    transactional port (`addIfBelow(limit, todo)`) or accepting an
    approximate cap.
 
-## 5. Business (D1, D2, D10, D13, D14)
+## 5. Business (D1, D2, D10, D13)
 
 **Shown.**
 - `result.ts`: `Result<T, E>`, with `ok` returning `Result<T, never>`
@@ -226,7 +223,6 @@ fields by name.
 - D10: anything may import business, so `Result` reaches every layer
   without a new edge. It stays out of contract (C4).
 - D2: `Todo` is the api's own type.
-- D14: the cap is a rule about the list.
 - D13: `newTodo` is pure, and the id is passed in.
 - D1: business does no title check.
 
@@ -245,7 +241,7 @@ fields by name.
    would make "already valid" a fact of the type, but it pulls the
    title rule back toward business, against D1.
 
-## 6. Data (D5, D13, D14, D15)
+## 6. Data (D5, D13, D15)
 
 **Shown.**
 - `data/memory/todos.ts`: `memoryTodos()` keeps

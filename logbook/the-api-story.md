@@ -564,7 +564,7 @@ impure injected, such as the id source (D13).
 
 The memory store's ports were synchronous, which made `addTodo`'s
 check-then-add exact: no other request could run between the count
-and the add (D14). An async store breaks that, since another add can
+and the add. An async store breaks that, since another add can
 land between an awaited count and an awaited insert.
 
 So the port asks for an intent, not two steps (DB1):
@@ -583,7 +583,7 @@ operation decides: here, "not inserted" means the list is full, so
 
 This keeps the business meaning in one place. If a second reason for
 not inserting appears, the operation is the one place that changes,
-and the data package stays a mapper (D14).
+and the data package stays a mapper.
 
 A store failure is different: the operation does not decide its
 meaning. The data package already named it `unavailable` or `server`,
@@ -636,7 +636,7 @@ In the code:
   - `NewTodo = { title }`: what someone asks to add. It is not a todo
     yet: it has no id and no completed flag;
   - `TITLE_MAX`: 256, the longest title after trimming;
-  - `TODO_LIMIT`: 500, a rule about the list (D14);
+  - `TODO_LIMIT`: 500, a rule about the list;
   - `newTodo(id, input)`: a new todo is not completed (D13).
 - `business/result.ts` holds `Result`, `ok` and `err`. Every layer
   that returns or reads a `Result` can reach it (D10).
@@ -665,7 +665,7 @@ Data imports business and fail, nothing else of ours. It names the
 root of every failure it meets (chapter 13).
 
 Data makes no ids and decides no rules. It maps, and it reports facts
-(D13, D14, chapter 6).
+(D13, chapter 6).
 
 ### The D1 package
 
