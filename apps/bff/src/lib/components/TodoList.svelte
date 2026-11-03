@@ -7,25 +7,27 @@
 		todos: TodoReply[];
 		/** The last failed toggle without JavaScript: which todo, and why. */
 		toggleFailed: { id: string; message: string } | null;
+		/** The last failed remove without JavaScript: which todo, and why. */
+		removeFailed: { id: string; message: string } | null;
 	};
 
-	let { todos, toggleFailed }: Props = $props();
+	let { todos, toggleFailed, removeFailed }: Props = $props();
 
-	/** The failed toggle's message, for the todo it was about. */
-	const errorFor = (todo: TodoReply): string | null => {
-		if (toggleFailed === null) {
+	/** A failure's message, for the todo it was about. */
+	const messageFor = (failed: { id: string; message: string } | null, todo: TodoReply): string | null => {
+		if (failed === null) {
 			return null;
 		}
-		if (toggleFailed.id !== todo.id) {
+		if (failed.id !== todo.id) {
 			return null;
 		}
-		return toggleFailed.message;
+		return failed.message;
 	};
 </script>
 
 <ul>
 	{#each todos as todo (todo.id)}
-		<TodoItem {todo} error={errorFor(todo)} />
+		<TodoItem {todo} error={messageFor(toggleFailed, todo)} removeError={messageFor(removeFailed, todo)} />
 	{/each}
 </ul>
 

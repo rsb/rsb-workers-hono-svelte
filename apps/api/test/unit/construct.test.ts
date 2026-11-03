@@ -1,4 +1,4 @@
-import { Failure, TodoListReply, TodoReply, envelope } from "@todo/contract-api";
+import { DeletedReply, Failure, TodoListReply, TodoReply, envelope } from "@todo/contract-api";
 import { ok } from "@todo/business/result.ts";
 import { TODO_LIMIT, type Todo } from "@todo/business/todos/todo.ts";
 import type { DbStore } from "@todo/data-d1/store.ts";
@@ -10,7 +10,7 @@ import { serve } from "../../src/http.ts";
 /**
  * A fake `DbStore` that keeps todos in an array. It reports facts as the
  * real one does: whether a todo was inserted, every todo in order, and a
- * todo as it is after a patch is applied.
+ * todo as it is after a patch is applied, and whether a todo was deleted.
  */
 const fakeDbStore = (): DbStore => {
   const todos: Todo[] = [];
@@ -34,6 +34,14 @@ const fakeDbStore = (): DbStore => {
       const updated = { ...found, ...patch };
       todos[index] = updated;
       return ok(updated);
+    },
+    deleteTodo: async (id) => {
+      const index = todos.findIndex((todo) => todo.id === id);
+      if (index === -1) {
+        return ok(false);
+      }
+      todos.splice(index, 1);
+      return ok(true);
     },
   };
 };
@@ -106,4 +114,20 @@ it("a toggle of an id no todo has is refused with not_found", async () => {
 
   expect(refused.status).toBe(404);
   expect(v.parse(Failure, await refused.json()).error.kind).toBe("not_found");
+});
+
+it("a deleted todo is not in the next list, and a second delete is refused with not_found", async () => {
+  const api = app();
+  await api.request("/todos", { method: "POST", body: '{"title":"buy milk"}' });
+  const remove = () => api.request("/todos/id-1", { method: "DELETE" });
+
+  const deleted = await remove();
+  expect(deleted.status).toBe(200);
+  expect(v.parse(envelope(DeletedReply), await deleted.json())).toEqual({ ok: true, data: { id: "id-1" } });
+  const listed = await api.request("/todos");
+  expect(v.parse(envelope(TodoListReply), await listed.json())).toEqual({ ok: true, data: [] });
+
+  const again = await remove();
+  expect(again.status).toBe(404);
+  expect(v.parse(Failure, await again.json()).error.kind).toBe("not_found");
 });

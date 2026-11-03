@@ -36,3 +36,7 @@ export type TodoReply = v.InferOutput<typeof TodoReply>;
 /** The data of `GET /todos`, in creation order. */
 export const TodoListReply = v.array(TodoReply);
 export type TodoListReply = v.InferOutput<typeof TodoListReply>;
+
+/** The data of `DELETE /todos/:id`: the id of the todo deleted. */
+export const DeletedReply = v.strictObject({ id: v.string() });
+export type DeletedReply = v.InferOutput<typeof DeletedReply>;

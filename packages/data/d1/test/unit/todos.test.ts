@@ -132,3 +132,37 @@ describe("updateTodo", () => {
     });
   });
 });
+
+describe("deleteTodo", () => {
+  it("binds the id", async () => {
+    const { db, prepared } = fakeD1({ changes: 1 });
+
+    await todoStore(db).deleteTodo("id-1");
+
+    expect(prepared).toHaveLength(1);
+    expect(prepared[0]?.bound).toEqual(["id-1"]);
+  });
+
+  it("reports deleted when one row changed", async () => {
+    const { db } = fakeD1({ changes: 1 });
+
+    expect(await todoStore(db).deleteTodo("id-1")).toEqual({ ok: true, value: true });
+  });
+
+  it("reports not deleted when no row changed, without deciding why", async () => {
+    const { db } = fakeD1({ changes: 0 });
+
+    expect(await todoStore(db).deleteTodo("id-9")).toEqual({ ok: true, value: false });
+  });
+
+  it("passes a D1 failure up, named by the statement", async () => {
+    const { db } = fakeD1({ throws: new Error("D1_ERROR: Network connection lost.") });
+
+    const deleted = await todoStore(db).deleteTodo("id-1");
+
+    expect(deleted).toMatchObject({
+      ok: false,
+      error: { kind: "unavailable", message: "delete todo: D1_ERROR: Network connection lost." },
+    });
+  });
+});

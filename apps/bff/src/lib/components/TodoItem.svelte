@@ -7,14 +7,17 @@
 		todo: TodoReply;
 		/** Why the last toggle of this todo failed without JavaScript, or nothing. */
 		error: string | null;
+		/** Why the last remove of this todo failed without JavaScript, or nothing. */
+		removeError: string | null;
 	};
 
-	let { todo, error }: Props = $props();
+	let { todo, error, removeError }: Props = $props();
 
 	let titleId = $derived(`todo-title-${todo.id}`);
 	let errorId = $derived(`todo-error-${todo.id}`);
 	let editId = $derived(`todo-edit-${todo.id}`);
 	let editErrorId = $derived(`todo-edit-error-${todo.id}`);
+	let removeErrorId = $derived(`todo-remove-error-${todo.id}`);
 
 	// --- Toggle ---
 
@@ -168,6 +171,57 @@
 			stopEditing(returnFocus);
 		};
 	};
+
+	// --- Remove ---
+
+	let removeLabel = $derived(`Remove ‘${todo.title}’`);
+
+	// From the page without JavaScript. With it, `remove` sets it from its
+	// own result, so another action's result never clears it.
+	let removeFailure = $derived(removeError);
+
+	/**
+	 * Where focus goes once this row is gone: the next row's title, else the
+	 * previous row's, else the new to-do input when the list is now empty.
+	 */
+	const focusAfterRemove = (neighbour: Element | null) => {
+		if (neighbour !== null && neighbour.isConnected) {
+			const title = neighbour.querySelector<HTMLButtonElement>("button.title");
+			if (title !== null) {
+				title.focus();
+				return;
+			}
+		}
+		document.getElementById("new-todo")?.focus();
+	};
+
+	const remove: SubmitFunction<{ removed: string }, { remove: { id: string; message: string } }> = ({
+		formElement,
+	}) => {
+		removeFailure = null;
+
+		// Read before the row goes: whether focus is in it, and the row that
+		// will take its place.
+		const row = formElement.closest("li");
+		const hadFocus = row !== null && row.contains(document.activeElement);
+		let neighbour: Element | null = null;
+		if (row !== null) {
+			neighbour = row.nextElementSibling ?? row.previousElementSibling;
+		}
+
+		return async ({ result, update }) => {
+			// A failure stays with this row, so the page's `form` is left alone.
+			if (result.type === "failure" && result.data !== undefined) {
+				removeFailure = result.data.remove.message;
+				return;
+			}
+
+			await update();
+			if (hadFocus) {
+				focusAfterRemove(neighbour);
+			}
+		};
+	};
 </script>
 
 <li class={["row", { done: checked }]}>
@@ -225,7 +279,26 @@
 		{#if toggleError}
 			<p id={errorId} class="row-error" role="alert">{toggleError}</p>
 		{/if}
+		{#if removeFailure}
+			<p id={removeErrorId} class="row-error" role="alert">{removeFailure}</p>
+		{/if}
 	</div>
+	<!-- Not shown while editing; the check stays (deviation 18). -->
+	{#if !editing}
+		<form method="POST" action="?/remove" class="remove-form" use:enhance={remove}>
+			<input type="hidden" name="id" value={todo.id} />
+			<button
+				type="submit"
+				class="remove"
+				aria-label={removeLabel}
+				aria-describedby={removeFailure ? removeErrorId : undefined}
+			>
+				<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+					<path d="M6 6l12 12M18 6L6 18"></path>
+				</svg>
+			</button>
+		</form>
+	{/if}
 </li>
 
 <style>
@@ -376,6 +449,55 @@
 
 	.field-error.is-visible {
 		padding-top: 8px;
+	}
+
+	.remove-form {
+		display: flex;
+		flex: none;
+	}
+
+	/* Always in the page, so the keyboard reaches it; shown on hover or focus within the row (deviation 11). */
+	.remove {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 36px;
+		height: 36px;
+		margin: -5px -8px -5px 0;
+		padding: 0;
+		border: 0;
+		border-radius: 8px;
+		background: none;
+		color: var(--fg2);
+		opacity: 0;
+		transition:
+			opacity 0.15s,
+			color 0.15s,
+			background 0.15s;
+	}
+
+	.remove svg {
+		fill: none;
+		stroke: currentColor;
+		stroke-width: 2;
+		stroke-linecap: round;
+	}
+
+	.row:hover .remove,
+	.row:focus-within .remove {
+		opacity: 1;
+	}
+
+	.remove:hover {
+		background: var(--line);
+		color: var(--fg);
+	}
+
+	/* A device that cannot hover always shows it. */
+	@media (hover: none) {
+		.remove {
+			opacity: 1;
+		}
 	}
 
 	.row-error {

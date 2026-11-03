@@ -2,17 +2,23 @@ import { type Page, expect, test } from "@playwright/test";
 
 // PRD scenarios 4.1–4.9. The API's store is shared by the whole run (D19),
 // so each test adds its own todo with a unique title and finds it by that.
-// 4.1's "remove is hidden" is checked with slice 5, when remove exists.
 
 const input = (page: Page) => page.getByRole("textbox", { name: "New to-do" });
 const editInput = (page: Page) => page.getByRole("textbox", { name: "Edit to-do" });
 
+/** The title as the start of a pattern, its special characters escaped. */
+const startsWith = (title: string) => new RegExp(`^${title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`);
+
 /**
  * The title button of the todo with this title. Its name also says how to
- * edit, and Chromium puts a space between the two spans, so the title is
- * matched as part of the name. Titles are unique, so that is enough.
+ * edit, and Chromium puts a space between the two spans, so the name is
+ * matched by how it starts. The remove button's name, "Remove ‘title’",
+ * also holds the title, but does not start with it. Titles are unique.
  */
-const titleOf = (page: Page, title: string) => page.getByRole("button", { name: title });
+const titleOf = (page: Page, title: string) => page.getByRole("button", { name: startsWith(title) });
+
+/** The remove button of the todo with this title. */
+const removeOf = (page: Page, title: string) => page.getByRole("button", { name: `Remove ‘${title}’`, exact: true });
 
 /** The row of the todo with this title, found by its checkbox. */
 const rowOf = (page: Page, title: string) =>
@@ -55,8 +61,9 @@ test("4.1 when I double-click its title, then it is in editing mode with the tit
 
   await expect(editInput(page)).toHaveValue(title);
   await expect(editInput(page)).toBeFocused();
-  // The check stays while editing (PRD deviation 18).
+  // The check stays while editing; only the remove button is hidden (PRD deviation 18).
   await expect(rowOf(page, title).getByRole("checkbox")).toBeVisible();
+  await expect(removeOf(page, title)).toHaveCount(0);
 });
 
 test("4.2 when I change the text and press Enter, then the title is saved", async ({ page }) => {

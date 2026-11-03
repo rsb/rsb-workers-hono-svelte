@@ -21,6 +21,12 @@
 		}
 		return form.toggle;
 	});
+	let removeFailed = $derived.by(() => {
+		if (form?.remove === undefined) {
+			return null;
+		}
+		return form.remove;
+	});
 	let hasTodos = $derived(data.todos.length > 0);
 </script>
 
@@ -34,7 +40,7 @@
 	<NewTodo {failed} />
 
 	{#if hasTodos}
-		<TodoList todos={data.todos} {toggleFailed} />
+		<TodoList todos={data.todos} {toggleFailed} {removeFailed} />
 		<TodoFooter active={data.active} />
 	{:else}
 		<EmptyState error={data.error} />

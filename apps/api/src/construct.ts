@@ -1,9 +1,11 @@
 import { type DbStore, createDbStore } from "@todo/data-d1/store.ts";
 import { type AddTodo, addTodo } from "@todo/operations/todos/add-todo.ts";
+import { type DeleteTodo, deleteTodo } from "@todo/operations/todos/delete-todo.ts";
 import { type ListTodos, listTodos } from "@todo/operations/todos/list-todos.ts";
 import { type UpdateTodo, updateTodo } from "@todo/operations/todos/update-todo.ts";
 import { notFound, onError, tooLarge } from "./app/handlers/errors/errors.ts";
 import { getHealth } from "./app/handlers/health/health.ts";
+import { deleteTodo as deleteTodoHandler } from "./app/handlers/todos/delete-todo.ts";
 import { getTodos } from "./app/handlers/todos/get-todos.ts";
 import { patchTodo } from "./app/handlers/todos/patch-todo.ts";
 import { postTodos } from "./app/handlers/todos/post-todos.ts";
@@ -19,7 +21,12 @@ export type Bindings = { db: D1Database };
 export type Infra = { dbStore: DbStore; newId: () => string };
 
 /** Every operation, each built with the ports it declares. */
-export type Operations = { addTodo: AddTodo; listTodos: ListTodos; updateTodo: UpdateTodo };
+export type Operations = {
+  addTodo: AddTodo;
+  listTodos: ListTodos;
+  updateTodo: UpdateTodo;
+  deleteTodo: DeleteTodo;
+};
 
 /**
  * The only builder that sees the bindings: it passes each to what uses it.
@@ -39,6 +46,7 @@ export const constructOperations = (infra: Infra): Operations => ({
   addTodo: addTodo({ dbStore: infra.dbStore, newId: infra.newId }),
   listTodos: listTodos({ dbStore: infra.dbStore }),
   updateTodo: updateTodo({ dbStore: infra.dbStore }),
+  deleteTodo: deleteTodo({ dbStore: infra.dbStore }),
 });
 
 /** Each handler with the operation it runs, laid out as routes. */
@@ -47,6 +55,7 @@ export const constructRoutes = (operations: Operations): Route[] => [
   { method: "GET", path: "/todos", handler: getTodos(operations.listTodos) },
   { method: "POST", path: "/todos", handler: postTodos(operations.addTodo) },
   { method: "PATCH", path: "/todos/:id", handler: patchTodo(operations.updateTodo) },
+  { method: "DELETE", path: "/todos/:id", handler: deleteTodoHandler(operations.deleteTodo) },
 ];
 
 /** The routes plus the failure handlers, typed by `http.ts`. */
