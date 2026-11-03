@@ -1,6 +1,6 @@
 import * as v from "valibot";
 import { describe, expect, it } from "vitest";
-import { AddTodoBody, ToggleTodoBody } from "../../src/index.ts";
+import { AddTodoBody, PatchTodoBody } from "../../src/index.ts";
 
 /** The issue a body fails with: its first path key and its message. */
 const issue = (body: unknown, schema: v.GenericSchema = AddTodoBody) => {
@@ -27,23 +27,44 @@ describe("AddTodoBody", () => {
   });
 });
 
-describe("ToggleTodoBody", () => {
+describe("PatchTodoBody", () => {
   it("rejects completed that is not a boolean", () => {
-    expect(issue({ completed: "true" }, ToggleTodoBody)).toEqual({
+    expect(issue({ completed: "true" }, PatchTodoBody)).toEqual({
       field: "completed",
       message: "completed must be true or false",
     });
   });
 
-  it("rejects a title until editing comes with slice 4", () => {
-    expect(issue({ completed: true, title: "buy milk" }, ToggleTodoBody)?.field).toBe("title");
+  it("rejects a title that is not text", () => {
+    expect(issue({ title: 1 }, PatchTodoBody)).toEqual({
+      field: "title",
+      message: "title must be text",
+    });
   });
 
-  it("rejects a body without completed", () => {
-    expect(issue({}, ToggleTodoBody)?.field).toBe("completed");
+  it("rejects a body with neither title nor completed", () => {
+    expect(issue({}, PatchTodoBody)).toEqual({
+      field: undefined,
+      message: "body must have title, completed or both",
+    });
   });
 
-  it("passes completed through", () => {
-    expect(v.parse(ToggleTodoBody, { completed: false })).toEqual({ completed: false });
+  it("rejects an unknown key", () => {
+    expect(issue({ completed: true, order: 1 }, PatchTodoBody)?.field).toBe("order");
+  });
+
+  it("passes completed alone through", () => {
+    expect(v.parse(PatchTodoBody, { completed: false })).toEqual({ completed: false });
+  });
+
+  it("passes title alone through, untrimmed", () => {
+    expect(v.parse(PatchTodoBody, { title: " buy milk " })).toEqual({ title: " buy milk " });
+  });
+
+  it("passes both through", () => {
+    expect(v.parse(PatchTodoBody, { title: "buy milk", completed: true })).toEqual({
+      title: "buy milk",
+      completed: true,
+    });
   });
 });

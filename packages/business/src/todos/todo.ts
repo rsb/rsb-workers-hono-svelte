@@ -7,6 +7,12 @@ export type Todo = { id: string; title: string; completed: boolean };
  */
 export type NewTodo = { title: string };
 
+/**
+ * What someone asks to change in a todo: its title, its `completed`, or
+ * both. A title here was already validated by a handler.
+ */
+export type TodoPatch = { title?: string; completed?: boolean };
+
 /** The longest title, after trim, in UTF-16 code units (PRD deviation 7). */
 export const TITLE_MAX = 256;
 

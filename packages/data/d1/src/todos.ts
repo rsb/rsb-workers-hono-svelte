@@ -1,5 +1,5 @@
 import { type Result, err, ok } from "@todo/business/result.ts";
-import type { Todo } from "@todo/business/todos/todo.ts";
+import type { Todo, TodoPatch } from "@todo/business/todos/todo.ts";
 import type { AnyFail } from "@todo/fail/fail.ts";
 import { execute, queryAll } from "./driver.ts";
 
@@ -39,13 +39,18 @@ const selectTodosStmt = (db: D1Database) => {
   return db.prepare(sql);
 };
 
-/** One statement that updates and reads back, so the todo returned is the one written. */
-const updateCompletedStmt = (db: D1Database, id: string, completed: Row["completed"]) => {
+/**
+ * One statement that updates and reads back, so the todo returned is the one
+ * written. A column bound to `NULL` keeps its value: neither column can be
+ * `NULL`, so `NULL` only ever means "not asked to change".
+ */
+const updateTodoStmt = (db: D1Database, id: string, title: string | null, completed: Row["completed"] | null) => {
   const sql = `
-    UPDATE todos SET completed = ?2
+    UPDATE todos
+    SET title = COALESCE(?2, title), completed = COALESCE(?3, completed)
     WHERE id = ?1
     RETURNING id, title, completed`;
-  return db.prepare(sql).bind(id, completed);
+  return db.prepare(sql).bind(id, title, completed);
 };
 
 // Raw: runs a statement and deals only in rows. A D1 error becomes the root
@@ -59,8 +64,8 @@ const selectTodosRaw = (db: D1Database) => {
   return queryAll<Row>(() => selectTodosStmt(db), "select todos");
 };
 
-const updateCompletedRaw = (db: D1Database, id: string, completed: Row["completed"]) => {
-  return queryAll<Row>(() => updateCompletedStmt(db, id, completed), "update todo completed");
+const updateTodoRaw = (db: D1Database, id: string, title: string | null, completed: Row["completed"] | null) => {
+  return queryAll<Row>(() => updateTodoStmt(db, id, title, completed), "update todo");
 };
 
 /**
@@ -93,14 +98,25 @@ export const todoStore = (db: D1Database) => ({
     return ok(todos);
   },
 
-  /** The todo after its `completed` is set, or `null` when no todo has that id. */
-  setCompleted: async (id: string, completed: boolean): Promise<Result<Todo | null, AnyFail>> => {
-    let flag: Row["completed"] = 0;
-    if (completed) {
-      flag = 1;
+  /**
+   * The todo after the patch is applied, or `null` when no todo has that id.
+   * A field the patch leaves out is bound as `NULL`, which keeps its value.
+   */
+  updateTodo: async (id: string, patch: TodoPatch): Promise<Result<Todo | null, AnyFail>> => {
+    let title: string | null = null;
+    if (patch.title !== undefined) {
+      title = patch.title;
     }
 
-    const rows = await updateCompletedRaw(db, id, flag);
+    let flag: Row["completed"] | null = null;
+    if (patch.completed === true) {
+      flag = 1;
+    }
+    if (patch.completed === false) {
+      flag = 0;
+    }
+
+    const rows = await updateTodoRaw(db, id, title, flag);
     if (!rows.ok) {
       return err(rows.error);
     }

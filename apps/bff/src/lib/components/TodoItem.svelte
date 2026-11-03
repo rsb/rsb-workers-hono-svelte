@@ -5,7 +5,7 @@
 
 	type Props = {
 		todo: TodoReply;
-		/** Why the last toggle of this todo failed, or nothing. */
+		/** Why the last toggle of this todo failed without JavaScript, or nothing. */
 		error: string | null;
 	};
 
@@ -13,6 +13,14 @@
 
 	let titleId = $derived(`todo-title-${todo.id}`);
 	let errorId = $derived(`todo-error-${todo.id}`);
+	let editId = $derived(`todo-edit-${todo.id}`);
+	let editErrorId = $derived(`todo-edit-error-${todo.id}`);
+
+	// --- Toggle ---
+
+	// From the page without JavaScript. With it, `toggle` sets it from its
+	// own result, so another action's result never clears it.
+	let toggleError = $derived(error);
 
 	// The value a toggle in flight asks for, shown until the list reloads.
 	let pending: boolean | null = $state(null);
@@ -27,19 +35,137 @@
 	// then and never when the page loads.
 	let justDone = $state(false);
 
-	const toggle: SubmitFunction = () => {
+	const toggle: SubmitFunction<{ toggled: string }, { toggle: { id: string; message: string } }> = () => {
 		const next = !checked;
 		pending = next;
 		justDone = next;
+		toggleError = null;
 
 		return async ({ result, update }) => {
-			await update();
-			// A failure does not reload the list on its own; the reload shows
-			// the todo as it really is, or drops it if it is gone.
-			if (result.type === "failure") {
+			// A failure stays with this row, so the page's `form` is left alone.
+			// The reload shows the todo as it really is, or drops it if it is gone.
+			if (result.type === "failure" && result.data !== undefined) {
+				toggleError = result.data.toggle.message;
 				await invalidateAll();
+			} else {
+				await update();
 			}
 			pending = null;
+		};
+	};
+
+	// --- Edit (JavaScript only) ---
+
+	let editing = $state(false);
+	let draft = $state("");
+	let editError = $state("");
+	let hasEditError = $derived(editError !== "");
+
+	// The check is named by the title. While editing, the title is not shown,
+	// so the check takes the saved title as its own label.
+	let checkLabelledBy = $derived.by(() => {
+		if (editing) {
+			return undefined;
+		}
+		return titleId;
+	});
+	let checkLabel = $derived.by(() => {
+		if (editing) {
+			return todo.title;
+		}
+		return undefined;
+	});
+
+	// Set once a save or a cancel has begun, so the blur that follows does
+	// not save again. A failed save clears it, as the input stays open.
+	let closing = false;
+
+	// Set when editing ends from the keyboard, so focus goes back to the title.
+	let focusTitle = false;
+
+	const focusInput = (input: HTMLInputElement) => {
+		input.focus();
+	};
+
+	const focusTitleIfAsked = (button: HTMLButtonElement) => {
+		if (focusTitle) {
+			focusTitle = false;
+			button.focus();
+		}
+	};
+
+	const startEditing = () => {
+		draft = todo.title;
+		editError = "";
+		closing = false;
+		editing = true;
+	};
+
+	/** Ends editing. When it was ended from the keyboard, focus goes back to the title. */
+	const stopEditing = (returnFocus: boolean) => {
+		focusTitle = returnFocus;
+		editing = false;
+	};
+
+	const onTitleDoubleClick = () => {
+		startEditing();
+	};
+
+	// A click from the keyboard (Enter or Space) has no mouse clicks, so its
+	// `detail` is 0. A mouse click does nothing; a double-click edits.
+	const onTitleClick = (event: MouseEvent) => {
+		const fromKeyboard = event.detail === 0;
+		if (fromKeyboard) {
+			startEditing();
+		}
+	};
+
+	const onEditKeydown = (event: KeyboardEvent) => {
+		// Enter submits the form on its own.
+		if (event.key === "Escape") {
+			event.preventDefault();
+			closing = true;
+			stopEditing(true);
+		}
+	};
+
+	const onEditInput = () => {
+		editError = "";
+	};
+
+	// Leaving the input saves, unless a save or a cancel already began.
+	const onEditBlur = (event: FocusEvent & { currentTarget: HTMLInputElement }) => {
+		if (closing) {
+			return;
+		}
+		event.currentTarget.form?.requestSubmit();
+	};
+
+	const edit: SubmitFunction<{ edited: string }, { edit: { id: string; title: string; message: string } }> = ({
+		cancel,
+	}) => {
+		closing = true;
+		const returnFocus = document.activeElement !== null && document.activeElement.id === editId;
+
+		// An unchanged title needs no request.
+		const unchanged = draft.trim() === todo.title;
+		if (unchanged) {
+			cancel();
+			stopEditing(returnFocus);
+			return;
+		}
+
+		return async ({ result, update }) => {
+			// A failure keeps the input open with what was typed and why.
+			if (result.type === "failure" && result.data !== undefined) {
+				draft = result.data.edit.title;
+				editError = result.data.edit.message;
+				closing = false;
+				return;
+			}
+
+			await update({ reset: false });
+			stopEditing(returnFocus);
 		};
 	};
 </script>
@@ -54,17 +180,50 @@
 			class={["check", { "just-done": justDone }]}
 			role="checkbox"
 			aria-checked={checked}
-			aria-labelledby={titleId}
-			aria-describedby={error ? errorId : undefined}
+			aria-labelledby={checkLabelledBy}
+			aria-label={checkLabel}
+			aria-describedby={toggleError ? errorId : undefined}
 		></button>
 		<svg class="tick" viewBox="0 0 24 24" aria-hidden="true">
 			<path d="M6.5 12.5l3.5 3.5 7.5-8"></path>
 		</svg>
 	</form>
 	<div class="body">
-		<span id={titleId} class="title">{todo.title}</span>
-		{#if error}
-			<p id={errorId} class="row-error" role="alert">{error}</p>
+		{#if editing}
+			<form method="POST" action="?/edit" class="edit-form" use:enhance={edit}>
+				<input type="hidden" name="id" value={todo.id} />
+				<label for={editId} class="vh">Edit to-do</label>
+				<input
+					id={editId}
+					class="edit"
+					name="title"
+					type="text"
+					autocomplete="off"
+					bind:value={draft}
+					onkeydown={onEditKeydown}
+					oninput={onEditInput}
+					onblur={onEditBlur}
+					aria-describedby={editErrorId}
+					aria-invalid={hasEditError}
+					{@attach focusInput}
+				/>
+				<p id={editErrorId} class={["field-error", { "is-visible": hasEditError }]} aria-live="polite">
+					{editError}
+				</p>
+			</form>
+		{:else}
+			<button
+				type="button"
+				class="title"
+				ondblclick={onTitleDoubleClick}
+				onclick={onTitleClick}
+				{@attach focusTitleIfAsked}
+			>
+				<span id={titleId}>{todo.title}</span><span class="vh">, press Enter to edit</span>
+			</button>
+		{/if}
+		{#if toggleError}
+			<p id={errorId} class="row-error" role="alert">{toggleError}</p>
 		{/if}
 	</div>
 </li>
@@ -161,14 +320,21 @@
 
 	/* Completed is shown by the check, the strike-through and the dimmed title, never by colour alone. */
 	.title {
+		align-self: flex-start;
+		max-width: 100%;
+		padding: 0;
+		border: 0;
+		background: none;
 		color: var(--fg);
 		font-size: 17px;
 		line-height: 1.5;
+		text-align: left;
 		text-decoration-line: line-through;
 		text-decoration-color: transparent;
 		text-decoration-thickness: 1.5px;
 		overflow-wrap: anywhere;
 		text-wrap: pretty;
+		cursor: text;
 		transition:
 			color 0.25s ease,
 			text-decoration-color 0.3s ease 0.06s;
@@ -177,6 +343,39 @@
 	.row.done .title {
 		color: var(--fg2);
 		text-decoration-color: var(--fg2);
+	}
+
+	.edit-form {
+		display: flex;
+		flex-direction: column;
+	}
+
+	.edit {
+		min-width: 0;
+		margin: -4px 0 -4px -8px;
+		padding: 4px 8px;
+		border: 0;
+		border-radius: 6px;
+		background: var(--fill);
+		color: var(--fg);
+		font-size: 17px;
+		line-height: 1.5;
+	}
+
+	.edit:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: 2px;
+	}
+
+	.field-error {
+		margin: 0;
+		color: var(--error);
+		font-size: 14px;
+		line-height: 1.45;
+	}
+
+	.field-error.is-visible {
+		padding-top: 8px;
 	}
 
 	.row-error {

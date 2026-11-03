@@ -1,25 +1,45 @@
 <script lang="ts">
-	import { enhance } from "$app/forms";
+	import { type SubmitFunction, enhance } from "$app/forms";
+
+	type Failed = { title: string; message: string };
 
 	type Props = {
-		/** The last failed add: what was typed and why it failed. A new object each time. */
-		failed: { title: string; message: string } | null;
+		/** The last failed add without JavaScript: what was typed and why it failed. */
+		failed: Failed | null;
 	};
 
 	let { failed }: Props = $props();
 
+	// What was typed and the server's message, from the page without
+	// JavaScript. With it, `add` sets them from its own result, so another
+	// action's result never clears them.
 	let title = $derived(failed?.title ?? "");
-	// The server's message, until the person starts typing again. It is set
-	// again by every new failure, even one with the same message.
 	let error = $derived(failed?.message ?? "");
 	let hasError = $derived(error !== "");
 
 	const clearError = () => {
 		error = "";
 	};
+
+	const add: SubmitFunction<{ added: string }, Failed> = () => {
+		return async ({ result, update }) => {
+			// A failure stays with this form, so the page's `form` is left alone.
+			if (result.type === "failure" && result.data !== undefined) {
+				title = result.data.title;
+				error = result.data.message;
+				return;
+			}
+
+			await update();
+			if (result.type === "success") {
+				title = "";
+				error = "";
+			}
+		};
+	};
 </script>
 
-<form method="POST" action="?/add" class={["new-form", { "has-error": hasError }]} use:enhance>
+<form method="POST" action="?/add" class={["new-form", { "has-error": hasError }]} use:enhance={add}>
 	<div class="line">
 		<!-- Holds the place of the mark-all toggle, which comes with slice 6. -->
 		<span class="toggle-slot" aria-hidden="true"></span>

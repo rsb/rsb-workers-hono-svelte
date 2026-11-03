@@ -8,11 +8,22 @@ export const AddTodoBody = v.strictObject({ title: v.string("title must be text"
 export type AddTodoBody = v.InferOutput<typeof AddTodoBody>;
 
 /**
- * The body of `PATCH /todos/:id`, as slice 3 has it: only `completed`.
- * Unknown keys are rejected, `title` too, until editing comes with slice 4.
+ * The body of `PATCH /todos/:id`: its shape only. It has `title`,
+ * `completed` or both; unknown keys are rejected. The title's rules are
+ * checked by the handler, as for `AddTodoBody`.
  */
-export const ToggleTodoBody = v.strictObject({ completed: v.boolean("completed must be true or false") });
-export type ToggleTodoBody = v.InferOutput<typeof ToggleTodoBody>;
+export const PatchTodoBody = v.pipe(
+  v.strictObject({
+    title: v.exactOptional(v.string("title must be text")),
+    completed: v.exactOptional(v.boolean("completed must be true or false")),
+  }),
+  v.check((body) => {
+    const hasTitle = body.title !== undefined;
+    const hasCompleted = body.completed !== undefined;
+    return hasTitle || hasCompleted;
+  }, "body must have title, completed or both"),
+);
+export type PatchTodoBody = v.InferOutput<typeof PatchTodoBody>;
 
 /** A todo on the wire. */
 export const TodoReply = v.strictObject({

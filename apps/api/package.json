@@ -16,6 +16,7 @@
     "@todo/data-d1": "workspace:*",
     "@todo/fail": "workspace:*",
     "@todo/operations": "workspace:*",
+    "@todo/valid": "workspace:*",
     "hono": "4.13.14",
     "valibot": "catalog:"
   },
