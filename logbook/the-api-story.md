@@ -57,8 +57,8 @@ The decisions behind this story are:
     (`Todo`, never `TodoEntity`) (chapter 7).
   - L4: an entity's behaviour is pure business logic and lives beside
     the entity. Operations compose it. Anything that happens to an
-    entity happens only in an operation. A different outcome is a new
-    operation (chapters 6 and 7).
+    entity happens only in an operation. A different result is a new
+    operation (chapters 6 and 7). It said "outcome" until L15.
   - L5: we use no aggregate. The operation does its job (chapter 6).
   - L6: both seams are shaped by the caller, and ports couple to
     business types by design (chapter 6).
@@ -84,6 +84,38 @@ The decisions behind this story are:
   - L13: a port may carry out behaviour for its operation. When
     performance moves behaviour away from where it would otherwise
     live, a comment there says what moved and why (chapters 6 and 8).
+- L14–L21, agreed with the owner in the operations session
+  (2026-11-03):
+  - L14: an operation is a business use case, driven by its spec. A
+    light operation is fine: a use case that only reads still has one.
+    The spec's form, and how use cases enter rsb-workflow, are parked
+    (chapter 6).
+  - L15: an action is a port method, an effect is a change in the
+    world, and the result is the one thing an operation or process
+    returns. An operation may have several effects. "Outcome" is
+    retired (chapter 6).
+  - L16: the operation marks its transaction scope, and the port does
+    the work: begin, commit, and roll back when the work returns a
+    failure. Only one store's actions run inside it. A single intent
+    action stays available for performance (L13) (chapter 6).
+  - L17: an external effect is inline (after the commit, best effort)
+    or recorded (an outbox row inside the transaction, delivered at
+    least once). The spec chooses, and says whether a failed inline
+    effect fails the result (chapter 6).
+  - L18: a process composes operations. It holds their order,
+    dependencies and failure policy, returns one result, never touches
+    a port and enforces no rule. It runs immediate or durable, as its
+    spec chooses. Processes do not call processes, and operations do
+    not call operations (chapter 6).
+  - L19: a handler runs exactly one unit: an operation or a process.
+    Never both, never neither (chapter 5).
+  - L20: probes check the Worker and its dependencies. They run no
+    unit, declare probe ports of their own, and live in `app/probes/`.
+    `errors/` moves up to `app/`, shared by handlers and probes
+    (chapters 5 and 9).
+  - L21: the BFF never runs a backend operation. Its own operations
+    are UI concerns: aggregation, filtering. They wait for the BFF
+    story (chapters 6 and 12).
 
 After slice 2 (Add and list), the code followed chapters 1–10
 throughout, except for config, which has nothing to hold yet
@@ -323,12 +355,12 @@ config (DB5). The owner's review turned that down (review item 34):
 - **A binding is a capability.** The platform hands it over already
   configured and built. There is nothing to read or check: the
   toolchain checks that it exists (chapter 2), and a broken database
-  shows up as a query failure (chapter 13), or in health.
+  shows up as a query failure (chapter 13), or in a probe.
 
 So bindings skip config and go straight to `constructInfra`, typed as
 construct's `Bindings` (chapter 4). The only check of the database our
-code will make is in health, one cheap query per call (review item 35,
-not built yet).
+code will make is a readiness probe, one cheap query per call (review
+item 35, L20, not built yet).
 
 The api reads no environment value yet, so `config.ts` holds only a
 comment saying this. Config arrives with the first environment value
@@ -454,7 +486,8 @@ of the api route aimed at it, and follows one template with four
 duties:
 
 1. **Validate:** turn unsafe input into validated, well-defined shapes.
-2. **Operate:** run the operations it exists for.
+2. **Operate:** run the one unit it exists for: an operation or a
+   process (L19).
 3. **Handle errors:** from input, from operations and from
    presentation.
 4. **Present:** convert the operation's result into the expected
@@ -475,6 +508,48 @@ input shape from the result. A single property is checked as a
 property: the title against `TITLE_MAX`, with no type of its own
 (L10). Everything below the entry point trusts what it receives:
 operations, ports and data do not check it again.
+
+### One unit per handler (L19)
+
+A handler runs exactly one unit: one operation or one process. Never
+both, since sequencing operations is a process's job. Never neither,
+since a route with no use case behind it is not an entry point. The
+feature's spec decides which unit a handler runs. When a handler seems
+to need two operations, that is a new use case: a new operation, or a
+process.
+
+### Probes and errors (L20)
+
+Not every route is an entry point. A probe checks the Worker and its
+dependencies, and completes no business task, so it runs no unit:
+- **liveness:** is the Worker up? `health` is one, and it touches
+  nothing;
+- **readiness:** can the Worker reach what it needs? The probe
+  declares a probe port of its own (`ping()`), which data satisfies
+  with something cheap (`SELECT 1`). It never uses an operation's port
+  or a business action.
+
+Probes may be called often, so they stay cheap. For a paid or
+rate-limited provider a probe checks configuration or the provider's
+status, and never sends anything. A public probe answers up or down;
+which dependency failed, and why, goes to the logs.
+
+Errors (not found, on error) present failures for handlers and probes
+alike, so they belong to neither.
+
+**Target.**
+
+```
+apps/api/src/app/
+├─ errors/     failure presentation, shared by handlers and probes
+├─ handlers/   entry points: each runs exactly one operation or process
+└─ probes/     checks of the Worker and its dependencies: no unit
+   └─ health/health.ts
+```
+
+Today `health` and `errors` both sit under `app/handlers/`.
+
+### The handler template
 
 `postTodos` is the first entry point with all four duties. A handler
 tells a story: each step is named, each `if` has braces, and a
@@ -583,7 +658,37 @@ construct create entry points and inject their dependencies.
 
 ## 6. Operations
 
-Operations do the work. Entry points use them.
+Operations do the work. Entry points use them, directly or through a
+process.
+
+### An operation is a business use case (L14)
+
+"Use case" reads oddly in code, so the code says operation, but a
+business use case is what it is. Each one is driven by its spec, which
+states its intent, input, the rules it enforces, the action that
+carries its decision and what it keeps atomic, its effects, its result
+and its failures. The spec's form, and how use cases enter
+rsb-workflow, are parked.
+
+A light operation is fine. A use case that only reads still has an
+operation: `listTodos` is one. It costs a function call, keeps "only
+operations and probes call ports" free of exceptions, and gives logic
+that arrives later (list *my* todos) a place to go. Its spec is a few
+lines.
+
+### Actions, effects and the result (L15)
+
+- An **action** is a method on a port: how an operation asks the world
+  for one thing.
+- An **effect** is a change the operation makes in the world: a row
+  written, an email sent, a text sent.
+- The **result** is the one thing the operation returns: a value or a
+  failure.
+
+An operation may use the actions of several ports, one per real thing
+it touches (`{ dbStore, mailer, texter }`), and may have several
+effects. It returns one result. The word "outcome" is retired, since it
+meant both.
 
 ### Business states, the operation enforces (L1, L4, L5)
 
@@ -591,16 +696,17 @@ Each layer has one part in a rule:
 - **business states it:** a type, a constant, a pure function
   (`TODO_LIMIT`);
 - **the operation enforces it:** it applies the rule to a real case
-  and decides the outcome (`addTodo` refuses the 501st todo);
+  and decides the result (`addTodo` refuses the 501st todo);
 - **the store keeps it atomic:** no other request lands inside the
   operation's decision, and the store answers with facts.
 
 An operation is the only place anything happens to an entity. It
-composes the entity's behaviour (`newTodo`) with its ports to produce
-one outcome: an entity, several entities, a mix of the two, or a
-failure. A different outcome is a new operation, which may reuse the
-same entity behaviour. Behaviour that several operations need is
-shared as a pure function in business, not turned into a new type.
+composes the entity's behaviour (`newTodo`) with its actions to
+produce its effects and its result. A different result is a new
+operation, which may reuse the same entity behaviour. Behaviour that
+several operations need is shared as a pure function in business, not
+turned into a new type. Operations do not call operations: a sequence
+of operations is a process.
 
 This is why we use no aggregate. In DDD an aggregate guards the rules
 that span several entities. Here the operation does that, and the idea
@@ -671,6 +777,154 @@ before it is decided.
 The port does not change between engines. The operation sees an
 intent and a fact either way.
 
+### The operation marks the transaction, the port runs it (L16)
+
+An intent action is one way to stay atomic. The other is a
+transaction scope: the operation marks where the transaction starts
+and what rolls it back, and the port does all of the work. The
+operation hands its work to the port. A sketch, not today's code:
+
+```ts
+type AddTodoTx = {
+  countTodos(): Promise<Result<number, AnyFail>>;
+  insertTodo(todo: Todo): Promise<Result<void, AnyFail>>;
+};
+
+type AddStore = {
+  transaction<T>(
+    work: (tx: AddTodoTx) => Promise<Result<T, AnyFail>>,
+  ): Promise<Result<T, AnyFail>>;
+};
+```
+
+```ts
+const added = await dbStore.transaction(async (tx) => {
+  const count = await tx.countTodos();
+  if (!count.ok) {
+    return count;
+  }
+  if (count.value >= TODO_LIMIT) {
+    return limitReached("the list is full");
+  }
+
+  const todo = newTodo(newId(), input);
+  const inserted = await tx.insertTodo(todo);
+  if (!inserted.ok) {
+    return inserted;
+  }
+  return ok(todo);
+});
+// External effects go here, after the commit.
+```
+
+The port:
+- begins when `transaction` is called;
+- commits if the work returns `ok`;
+- rolls back if the work returns a failure, so the operation decides
+  by returning, not by throwing;
+- rolls back and reports a failure if anything throws.
+
+Inside the work, `tx` is still the operation's smallest port (L6).
+Only one store's actions run there; external effects never do. The
+work stays short, since it holds locks across round trips from the
+Worker. The spec states the isolation the operation needs: count, then
+insert, is only safe if the transaction is serializable or locks the
+right rows.
+
+This puts the decision back in the operation: the limit is compared
+in TypeScript, not in SQL. The intent action (`addTodoUnlessFull`) is
+one round trip instead of three, with the decision carried out by the
+store (L13). The spec says which one an operation uses.
+
+D1 cannot offer a transaction scope: it has no interactive
+transactions, only `batch()`, whose statements are all fixed before
+any runs. Postgres can, over Hyperdrive with a driver that holds a
+connection; PostgREST cannot, since its only atomic unit is a
+database function. What a scope costs from a Worker needs experiments.
+
+### External effects are inline or recorded (L17)
+
+An email or a text cannot be rolled back, so it never runs inside a
+transaction scope. Every external effect is one of two kinds, and the
+spec chooses for each:
+
+| | How | Guarantee | Can fail the result |
+|---|---|---|---|
+| **inline** | after the commit, the operation calls the action | best effort; the operation knows how it went | as the spec says |
+| **recorded** | an outbox row, written inside the transaction | at least once, delivered later | no: it has not happened yet |
+
+A recorded effect commits with the decision or not at all, so the gap
+between "saved" and "sent" closes. A relay delivers the outbox rows
+and marks them done. The relay is a process (below): its trigger, a
+queue message or a cron sweep, is an entry point, and each delivery is
+an operation. Delivery can repeat, so the outbox row's id is the
+idempotency key, passed to the provider where it takes one.
+
+Inline effects can run after the response (`waitUntil`), which saves
+latency and loses the failure to the logs. The spec decides that too.
+
+### Processes compose operations (L18)
+
+Some use cases are several operations in an order: add a todo, then
+email, then text. The write decides whether the others run. That is a
+process: it composes operations, holds their order and their
+dependencies, handles their failures as its spec says, and returns one
+result.
+
+```ts
+export const addTodoAndNotify =
+  (deps: { addTodo: AddTodo; emailTodoAdded: EmailTodoAdded; textTodoAdded: TextTodoAdded }): AddTodoAndNotify =>
+  async (input) => {
+    // The write decides: if it fails, nothing else runs.
+    const added = await deps.addTodo(input);
+    if (!added.ok) {
+      return added;
+    }
+
+    // The notifications are independent, so they run together.
+    const [emailed, texted] = await Promise.all([
+      deps.emailTodoAdded(added.value),
+      deps.textTodoAdded(added.value),
+    ]);
+
+    // Spec: a failed notification does not fail the result.
+    return ok({ todo: added.value, notified: { email: emailed.ok, sms: texted.ok } });
+  };
+```
+
+What keeps a process from becoming a second operation layer:
+
+| | Operation | Process |
+|---|---|---|
+| Composes | entity behaviour and actions | operations |
+| Touches ports | yes | never |
+| Enforces business rules | yes | no: it decides flow (stop, continue, retry, compensate) |
+| Atomic scope | one transaction or one intent action | none: each operation commits on its own |
+| Returns | one result | one result |
+| Spec | intent, rules, decision, effects, result | steps, dependencies, failure policy per step, mode, result |
+
+Nothing is atomic across steps. Undoing a step is an operation of its
+own, a compensation. And if the Worker dies between steps, the later
+ones never run. So a process has two modes, and its spec chooses:
+- **immediate:** inside the request, as above. It is fast and returns
+  the whole result, but delivery is best effort;
+- **durable:** the same steps on a runner that keeps each step's
+  result and retries, such as Cloudflare Workflows. Every step runs,
+  but the request cannot wait for all of them: it returns after the
+  first, or returns "accepted".
+
+A process receives built operations from construct, not ports, so its
+tests mock operations only. Processes do not call processes.
+
+The name is DDD's process manager. "Workflow" was turned down because
+rsb-workflow and Cloudflare Workflows already use it, "saga" because
+it suggests compensation only, and "pipeline" because it suggests a
+straight line.
+
+**Target.** The todo app has no process yet. Since this story is the
+template for every app on the stack, it needs one: "notify on add"
+exercises a process, the outbox, a relay, retries and idempotency.
+
 ### A port may carry out behaviour (L13)
 
 The cap is behaviour the store carries out for the operation, and it
@@ -702,34 +956,28 @@ and the operation only wraps it with what it was doing:
 
 **Target.** Operations live in packages, so that anything that
 delivers the business can run them: the api, a tooling script, a CLI
-(A2). The owner's preference is that every operation lives there, with
-a rule that says who may use each one.
+(A2).
 
-Claude's refinement, which the owner has not yet settled:
-- An operation that needs only business and the ports it declares goes
-  in `packages/operations`.
-- An operation that needs the delivery itself stays in its app. The
-  BFF's `loadTodos` and `addTodo` today call the api, so they belong
-  to the bff-api (chapter 12).
+Refactor A moved `operations/todos/` as it was. Today
+`packages/operations` holds `todos/`, one file per operation with its
+port, and every import names one operation's file
+(`@todo/operations/todos/add-todo.ts`). Only the api depends on it.
 
-Refactor A moves `operations/todos/` as it is: `add-todo.ts` and
-`list-todos.ts`, each with its port.
-
-The hazard is that a package of operations can be imported by any app,
-so the BFF could run `addTodo` against its own store and bypass the
-api. The owner judged it minor: "easy to spot and we can write rules
-to prevent that". The api stays the one authority for adding a todo.
-Ways to enforce it:
-- a subpath export per operation (`@todo/operations/todos/add-todo`);
-- an allow-list of operations per app;
-- a lint rule or import scan in `pnpm check`.
+The BFF never runs a backend operation (L21). Its own operations are
+UI concerns, such as aggregation and filtering, and never touch a
+database: they reach the api through its client. That removes the
+hazard of the BFF running `addTodo` against its own store and
+bypassing the api. The rule is that `apps/bff` never lists
+`@todo/operations`, which one `package.json` check enforces. The BFF's
+operations wait for the BFF story (chapter 12).
 
 **Open.**
-- Operations in depth. The owner: "we have not gone into operations
-  yet." To settle:
-  - the package layout (one `operations` package, or one per area);
-  - the usage rule and how it is enforced;
-  - how the bff-api's operations differ from the api's.
+- The package layout: one `operations` package, or one per area, and
+  where processes live.
+- The spec's form, and how use cases enter rsb-workflow (parked).
+- Transaction scope on Postgres: the access route, the isolation each
+  operation needs, and its latency from a Worker. It needs
+  experiments, and decides whether D1 stays for the lab.
 
 ## 7. Business
 
@@ -1033,15 +1281,20 @@ where they are enforced (A1):
 
   ```
   handlers   → operations → business
+  handlers   → processes  → operations
   handlers   → business
   handlers   → contract     (the provider's own contract)
+  probes     → contract
   data       → business
   data       → contract     (the contract of the system it reaches)
-  handlers, operations, data → fail
+  handlers, probes, processes, operations, data → fail
   ```
 
   Business imports nothing of ours, contract included. A contract
   imports nothing of ours either, and neither does fail (chapter 13).
+  A process imports operations' types only, since construct hands it
+  built operations (L18). Handlers and probes both import `app/errors/`
+  (L20). Probes import neither operations nor processes.
 - **Within an app**, handlers keep the hierarchy rules as a directory
   tree.
 - **In the BFF**, SvelteKit decides which files are routes. The rules
@@ -1151,7 +1404,7 @@ the types it sends from the schemas (valibot's `InferInput`).
   other keys.
 - **Rules** stay in business, whether or not they need state. A title
   is 1–256 characters after trimming (`TITLE_MAX`); the list holds at
-  most 500 todos (`TODO_LIMIT`). The contract only names the outcome
+  most 500 todos (`TODO_LIMIT`). The contract only names the failure
   (`validation`, `limit`).
 
 Slice 2 put the title rule in the contract, as a shape rule anyone
@@ -1191,8 +1444,10 @@ The bff-api is an api, and it follows this story: handlers,
 operations with ports, construct, data. Loads and actions are its
 handlers, and each has the four duties of chapter 5. Calling the api
 is its data (`data/internal/api`, chapter 8). The bff-api never runs
-the api's `addTodo`: adding a todo has one authority, and it is the
-api.
+a backend operation, the api's `addTodo` included: adding a todo has
+one authority, and it is the api. Its own operations are UI concerns,
+such as aggregation and filtering, and never touch a database (L21).
+They wait for the BFF story.
 
 The bff-api publishes `contract/bff-api` for the frontend: the shape
 of page data and of action results. The frontend reaches it through
