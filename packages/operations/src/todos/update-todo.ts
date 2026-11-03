@@ -15,6 +15,8 @@ export type UpdateTodo = (id: string, patch: TodoPatch) => Promise<Result<Todo, 
 /**
  * Changes one todo's title, its `completed`, or both, in one write. Setting
  * a value it already has is not a failure.
+ *
+ * Use case: `prd/todo/use-cases/todos/change-a-todo.md`
  */
 export const updateTodo =
   (deps: { dbStore: UpdateStore }): UpdateTodo =>

@@ -11,7 +11,11 @@ export type DeleteStore = {
 
 export type DeleteTodo = (id: string) => Promise<Result<string, AnyFail>>;
 
-/** Deletes one todo and returns its id. */
+/**
+ * Deletes one todo and returns its id.
+ *
+ * Use case: `prd/todo/use-cases/todos/remove-a-todo.md`
+ */
 export const deleteTodo =
   (deps: { dbStore: DeleteStore }): DeleteTodo =>
   async (id) => {

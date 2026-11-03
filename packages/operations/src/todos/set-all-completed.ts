@@ -16,6 +16,8 @@ export type SetAllCompleted = (completed: boolean) => Promise<Result<readonly To
  * Sets every todo's `completed` to one value. It is the value, not "flip
  * it", so doing it twice is safe. No todos at all is not a failure: the
  * list comes back empty.
+ *
+ * Use case: `prd/todo/use-cases/todos/mark-all-completed.md`
  */
 export const setAllCompleted =
   (deps: { dbStore: SetAllCompletedStore }): SetAllCompleted =>

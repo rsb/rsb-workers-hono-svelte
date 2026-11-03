@@ -218,8 +218,8 @@ concurrency and queues, but it names no code. Its name is a hint and a
 search key, not the unit's name.
 
 - **DDD:** use case, as in application services.
-- **Status:** target (L25). The use cases are written; the units do
-  not cite them yet.
+- **Status:** locked (L25). Each todo operation's doc comment cites
+  its use case.
 
 ### Spec
 

@@ -9,7 +9,11 @@ export type CountStore = {
 
 export type CountTodos = () => Promise<Result<TodoCounts, AnyFail>>;
 
-/** Counts every todo, active and completed. No business rule refuses it; the store can still fail. */
+/**
+ * Counts every todo, active and completed. No business rule refuses it; the store can still fail.
+ *
+ * Use case: `prd/todo/use-cases/todos/count-todos.md`
+ */
 export const countTodos =
   (deps: { dbStore: CountStore }): CountTodos =>
   async () => {
