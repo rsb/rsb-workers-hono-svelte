@@ -15,6 +15,8 @@ export type DeleteCompleted = () => Promise<Result<readonly Todo[], AnyFail>>;
 /**
  * Deletes every completed todo and returns the todos left. No completed
  * todo is not a failure: the list comes back as it was.
+ *
+ * Use case: `prd/todo/use-cases/todos/clear-completed.md`
  */
 export const deleteCompleted =
   (deps: { dbStore: DeleteCompletedStore }): DeleteCompleted =>

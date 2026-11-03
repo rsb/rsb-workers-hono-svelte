@@ -14,7 +14,11 @@ export type AddStore = {
 
 export type AddTodo = (input: NewTodo) => Promise<Result<Todo, AnyFail>>;
 
-/** Adds a validated new todo to the end of the list, unless the list is full. */
+/**
+ * Adds a validated new todo to the end of the list, unless the list is full.
+ *
+ * Use case: `prd/todo/use-cases/todos/add-a-todo.md`
+ */
 export const addTodo =
   (deps: { dbStore: AddStore; newId: () => string }): AddTodo =>
   async (input) => {

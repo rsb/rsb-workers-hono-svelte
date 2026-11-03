@@ -12,6 +12,8 @@ export type ListTodos = (filter: TodoFilter) => Promise<Result<readonly Todo[], 
 /**
  * Lists the todos the filter keeps, in creation order; an empty filter keeps
  * every todo. No business rule refuses it; the store can still fail.
+ *
+ * Use case: `prd/todo/use-cases/todos/list-todos.md`
  */
 export const listTodos =
   (deps: { dbStore: ListStore }): ListTodos =>
