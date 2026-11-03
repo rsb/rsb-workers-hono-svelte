@@ -134,6 +134,13 @@ The decisions behind this story are:
   written in one line of symbols, `→` for a call and `⇢` across a
   port. Every entry point's entry chain is listed in
   `apps/api/entry-chains.md`, which is generated only (chapter 9).
+- L25, agreed with the owner in the use case session (2026-11-03):
+  a use case is written before the code, at
+  `prd/<app>/use-cases/<area>/<name>.md`, extending handoff 00's
+  `prd/<app>.md`. It is the spec L14 asks for, and it may use
+  technical language. Each is realized by exactly one unit, whose doc
+  comment cites its path. Its name is a hint and a search key, not the
+  unit's name (chapter 6).
 
 After slice 2 (Add and list), the code followed chapters 1–10
 throughout, except for config, which has nothing to hold yet
@@ -689,14 +696,48 @@ process.
 business use case is what it is. Each one is driven by its spec, which
 states its intent, input, the rules it enforces, the action that
 carries its decision and what it keeps atomic, its effects, its result
-and its failures. The spec's form, and how use cases enter
-rsb-workflow, are parked.
+and its failures. The spec is the use case file (L25); how use cases
+enter rsb-workflow is parked.
 
 A light operation is fine. A use case that only reads still has an
 operation: `listTodos` is one. It costs a function call, keeps "only
 operations and probes call ports" free of exceptions, and gives logic
 that arrives later (list *my* todos) a place to go. Its spec is a few
 lines.
+
+### Use cases are written before the code (L25)
+
+A use case is written down before any code, beside the PRD it comes
+from. The work runs in this order:
+
+```
+PRD → use cases → contract (endpoints, OpenAPI) → code → tests
+```
+
+- **Where.** `prd/<app>/use-cases/<area>/<name>.md`, filed by area as
+  the code is (L22). This extends handoff 00's `prd/<app>.md`. The PRD
+  is frozen, so a use case cites it and never edits it.
+- **One unit.** Each use case is realized by exactly one unit, an
+  operation or a process. The unit's doc comment cites the use case's
+  path. The link is the citation, not a matching name.
+- **The name** is a hint and a search key. It does not decide the
+  unit's name.
+- **The use case is the spec** L14 asks for. It is written for the
+  developer, so it may speak of databases, transactions, concurrency
+  and queues. Its contents split along the line between the business
+  and the code:
+
+| In the use case | In the unit |
+|---|---|
+| intent, and the PRD sentences it serves | the function, its type and its ports |
+| input | the input type (`TodoPatch`) |
+| rules, each citing the PRD | which entity function or port enforces each |
+| what must hold together, and under concurrency | transaction scope or intent action (L13, L16) |
+| effects, and whether each must be delivered | inline or recorded (L17) |
+| result and failures | the `Result` type and `Fail` kinds |
+
+A use case holds no code names. The entry chain index joins it to the
+code: its `use case` row is the path the unit cites (L24).
 
 ### Actions, effects and the result (L15)
 
@@ -1045,7 +1086,7 @@ Construct gains one level, between operations and routes:
 **Open.**
 - Using another system's business objects: the contract, the ACL in
   data, and our own type for the concept.
-- The spec's form, and how use cases enter rsb-workflow (parked).
+- How use cases enter rsb-workflow (parked).
 - Transaction scope on Postgres: the access route, the isolation each
   operation needs, and its latency from a Worker. It needs
   experiments, and decides whether D1 stays for the lab.
@@ -1426,7 +1467,7 @@ driver    packages/data/d1/src/driver.ts                  queryAll
 - Links every entry chain shares (`present.ts`, `mapFailure`, the body
   limit in `http.ts`) are listed once, at the top.
 - A probe's block ends at the probe; it has no unit.
-- The `use case` row waits until use cases are recorded.
+- The `use case` row is the path the unit cites (L25).
 - The index is generated, never written by hand. Its first line says
   so, names the script and says not to edit it. Its name is lowercase
   to mark it as an output.
