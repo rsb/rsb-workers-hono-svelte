@@ -549,7 +549,9 @@ The contract and the OpenAPI document are generated from it. Entry
 points and everything below them are written by hand.
 
 - **DDD:** the published language, written down before the code.
-- **Status:** target (L26). The spec is not written yet.
+- **Status:** target (L26). `prd/todo/api.md` is written, in the
+  draft vocabulary (story, chapter 11); nothing is generated from it
+  yet.
 
 ### Data spec
 
@@ -611,8 +613,8 @@ To be settled in later sessions:
   data, and our own type for the concept;
 - the workflow story: how a durable process runs on Cloudflare
   Workflows;
-- the api spec's vocabulary: how a shape, a rule and an endpoint are
-  written so that a script can read them;
+- the api spec's vocabulary: drafted in the story (chapter 11) and
+  used by `prd/todo/api.md`; settled once a parser reads it;
 - `tooling/`, the monorepo's scripts: the extractor that reads
   construct, the generator for `apps/api/entry-chains.md`, and the
   generators for the contract and the OpenAPI document;
