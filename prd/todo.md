@@ -107,6 +107,8 @@ deviation that cannot is dropped.
 - **C-secure** Security and reliability are high priorities in the
   profile's patterns: every input the API accepts is bounded, and
   nothing a client sends can grow the API's memory without limit.
+- **C-design** The design in `design/2026-11-02-ui/` (see Design): how
+  the page looks, its wording, and the interactions its screens show.
 
 ## Deviations
 One per line, each with its constraint.
@@ -139,8 +141,10 @@ One per line, each with its constraint.
     behaviour each names is kept, and e2e finds elements by role,
     label and text. The counter's number is still emphasised.
 11. "Hovering over the todo shows the remove button": the button is
-    always in the DOM, and hover only changes its visibility, so it
-    stays reachable by keyboard. E2e hovers, then clicks it.
+    always in the DOM, and hover or keyboard focus within the row only
+    changes its visibility, so it stays reachable by keyboard. On a
+    device that cannot hover it is always visible (C-design). E2e
+    hovers, then clicks it.
 12. Every mutation goes page → form action → API. Client `fetch`,
     `+server.ts` endpoints and remote functions are not used in this
     iteration; they are a later one (C-catalogue, deferred).
@@ -148,6 +152,51 @@ One per line, each with its constraint.
 14. The envelope has the kinds `internal`, `too_large` and `limit` in
     addition to `validation` and `not_found` (ours: `internal` for the
     error handler, the other two for deviations 8 and 9).
+15. The page follows the design: its look, its layout at desktop and
+    mobile widths, light and dark, and its empty state, which adds a
+    message pointing to the input (C-design).
+16. The page writes its own error text for each kind and never shows
+    the API's message. A title outside 1–256 characters, including an
+    empty one, reads "Title must be 1 to 256 characters"; the `limit`
+    error reads "This list is full — it holds 500 to-dos. Clear
+    completed or remove some to add more." The text appears under the
+    input it belongs to, and the typed text is kept (C-design).
+17. Pressing Enter on a focused title also starts editing, as well as
+    double-clicking it (C-design).
+18. While editing, only the remove button is hidden; the checkbox stays
+    (upstream: "hide the other controls") (C-design).
+19. Saving an edit that is empty after trim leaves editing and keeps
+    the title unchanged; it does not destroy the todo (upstream: "If
+    it's empty the todo should instead be destroyed") (C-design).
+20. "Mark all as complete" is a toggle button with a pressed state, not
+    a checkbox. It is pressed when every todo is completed, and is
+    shown only when there are todos (C-design).
+
+## Design
+The design is the export of the owner's Claude Design session, kept in
+`design/2026-11-02-ui/`: `todo-app.html` and one PNG per screen. Where
+its prototype differs from this file on how the page is built (hash
+links, state held in the browser), this file wins: routes stay real
+paths (4) and every mutation stays a form action (12).
+- **Screens.** Empty, a list with some completed, editing a row, an
+  input error, and the list full at 500; desktop and mobile; light and
+  dark.
+- **Theme.** Light or dark follows the system setting
+  (`prefers-color-scheme`); the page has no theme switch.
+- **Tokens.** One accent colour. The colours, type sizes and spacing
+  are those of `todo-app.html`, defined once as CSS custom properties.
+- **Type.** Instrument Sans (SIL OFL 1.1), served by the BFF, never
+  from a third-party host.
+- **Wording.** The heading reads "Todos"; the input placeholder reads
+  "What needs doing?"; a single item is a "to-do" in labels and
+  messages ("New to-do", "Edit to-do", "Remove ‘title’").
+- **Completion.** A completed todo is shown by the check, a
+  strike-through and a dimmed title, never by colour alone. The check
+  animates once when ticked.
+- **Motion.** Every transition and animation is off under
+  `prefers-reduced-motion`.
+- **Focus.** Every control is reachable by keyboard and has a visible
+  focus ring in the accent colour.
 
 ## API
 All paths are on the `todo-api` Worker, reached through the BFF's `API`
@@ -175,8 +224,9 @@ Rules that apply to every route:
 - A body that is not JSON, or has unknown fields, is a 422.
 - Any body over 8 KiB is a 413 `too_large`, before it is parsed.
 - An unknown route is a 404 `not_found`.
-- Editing a title to empty is a delete in the BFF (upstream, Editing);
-  the API's PATCH rejects an empty title with a 422.
+- Editing a title to empty leaves it unchanged, in the BFF, without
+  calling the API (19); the API's PATCH rejects an empty title with a
+  422.
 
 ## Envelope
 - Success: `{ "ok": true, "data": <reply> }`.
@@ -225,13 +275,16 @@ planned.
 | # | Slice | Upstream | Deviations |
 |---|---|---|---|
 | 1 | Health | ours | 1, 2, 8, 13, 14 |
-| 2 | Add and list | New todo, No todos, Persistence | 3, 7, 9 |
-| 3 | Toggle one and counter | Item 1, Counter | 10 |
-| 4 | Edit | Item 2, Editing | 7 |
-| 5 | Delete | Item 3 | 11 |
-| 6 | Mark all as complete | Mark all as complete | |
-| 7 | Clear completed | Clear completed | |
-| 8 | Filter | Routing | 4, 5, 6 |
+| 2 | Add and list | New todo, No todos, Persistence | 3, 7, 9, 15, 16 |
+| 3 | Toggle one and counter | Item 1, Counter | 10, 15 |
+| 4 | Edit | Item 2, Editing | 7, 15, 16, 17, 18, 19 |
+| 5 | Delete | Item 3 | 11, 15 |
+| 6 | Mark all as complete | Mark all as complete | 15, 20 |
+| 7 | Clear completed | Clear completed | 15 |
+| 8 | Filter | Routing | 4, 5, 6, 15 |
+
+Slice 2 was built before the design; it is restyled to the design
+before slice 3 starts.
 
 ## Acceptance scenarios
 E2e runs exactly these, through the BFF. Each cites the upstream
@@ -248,8 +301,8 @@ that fails (a declared failure, so it belongs to that tier).
 
 ### 2 Add and list
 1. *Given* no todos, *when* I open `/`, *then* there is no list and no
-   footer. ("When there are no todos, `#main` and `#footer` should be
-   hidden.")
+   footer, and a message points to the input. ("When there are no
+   todos, `#main` and `#footer` should be hidden."; 15)
 2. *Given* I open `/`, *then* the new-todo input has focus. ("The input
    element should be focused when the page is loaded")
 3. *Given* no todos, *when* I type "buy milk" and press Enter, *then*
@@ -261,9 +314,11 @@ that fails (a declared failure, so it belongs to that tier).
 5. *When* I add "  buy milk  ", *then* the list shows "buy milk".
    ("Make sure to `.trim()` the input")
 6. *When* I press Enter on an input of only spaces, *then* no todo is
-   added. ("check that it's not empty before creating a new todo")
-7. *When* I add a title of 257 characters, *then* no todo is added and
-   I see why. (7)
+   added and I see "Title must be 1 to 256 characters". ("check that
+   it's not empty before creating a new todo"; 16)
+7. *When* I add a title of 257 characters, *then* no todo is added, I
+   see "Title must be 1 to 256 characters", and the input still holds
+   what I typed. (7, 16)
 8. *Given* "buy milk", *when* I reload, *then* "buy milk" is still
    there. (Persistence; 3)
 
@@ -281,10 +336,10 @@ that fails (a declared failure, so it belongs to that tier).
 
 ### 4 Edit
 1. *Given* "buy milk", *when* I double-click its title, *then* an input
-   holding "buy milk" appears with focus and the checkbox and remove
-   button are hidden. ("Double-clicking the `<label>` activates editing
-   mode"; "hide the other controls and bring forward an input that
-   contains the todo title, which should be focused")
+   holding "buy milk" appears with focus and the remove button is
+   hidden. ("Double-clicking the `<label>` activates editing mode";
+   "bring forward an input that contains the todo title, which should
+   be focused"; 18)
 2. *When* I change it to "buy oat milk" and press Enter, *then* the list
    shows "buy oat milk". ("The edit should be saved on both blur and
    enter")
@@ -292,15 +347,18 @@ that fails (a declared failure, so it belongs to that tier).
    list shows "buy oat milk". (same sentence, blur)
 4. *When* I change it to "  buy oat milk  " and press Enter, *then* the
    list shows "buy oat milk". ("Make sure to `.trim()` the input")
-5. *When* I clear it and press Enter, *then* "buy milk" is removed.
-   ("If it's empty the todo should instead be destroyed.")
+5. *When* I clear it and press Enter, *then* the list still shows "buy
+   milk". (19)
 6. *When* I change it and press Escape, *then* the list shows "buy
    milk". ("If escape is pressed during the edit … any changes be
    discarded.")
 7. *When* I change it to 257 characters and press Enter, *then* the
-   title is unchanged and I see why. (7)
+   title is unchanged and I see "Title must be 1 to 256 characters"
+   under the input. (7, 16)
 8. *Given* I am editing, *when* I reload, *then* no todo is in editing
    mode. ("Editing mode should not be persisted.")
+9. *Given* "buy milk", *when* I focus its title and press Enter,
+   *then* an input holding "buy milk" appears with focus. (17)
 
 ### 5 Delete
 1. *Given* "buy milk" and "walk dog", *when* I hover over "buy milk"
@@ -310,17 +368,17 @@ that fails (a declared failure, so it belongs to that tier).
    and no footer. ("When there are no todos … hidden.")
 
 ### 6 Mark all as complete
-1. *Given* two active todos, *when* I check "Mark all as complete",
+1. *Given* two active todos, *when* I press "Mark all as complete",
    *then* both are completed. ("This checkbox toggles all the todos to
-   the same state as itself.")
-2. *Given* two completed todos, *when* I uncheck it, *then* both are
-   active. (same sentence)
+   the same state as itself."; 20)
+2. *Given* two completed todos, *when* I press it again, *then* both
+   are active. (same sentence; 20)
 3. *Given* two active todos, *when* I check each one, *then* "Mark all"
-   is checked. ("When all the todos are checked it should also get
-   checked.")
-4. *Given* all completed and "Mark all" checked, *when* I uncheck one
-   todo, *then* "Mark all" is unchecked. ("should also be updated when
-   single todo items are checked/unchecked")
+   is pressed. ("When all the todos are checked it should also get
+   checked."; 20)
+4. *Given* all completed and "Mark all" pressed, *when* I uncheck one
+   todo, *then* "Mark all" is not pressed. ("should also be updated
+   when single todo items are checked/unchecked"; 20)
 
 ### 7 Clear completed
 1. *Given* no completed todos, *then* "Clear completed" is not shown.
@@ -328,9 +386,10 @@ that fails (a declared failure, so it belongs to that tier).
 2. *Given* "buy milk" completed and "walk dog" active, *when* I click
    "Clear completed", *then* only "walk dog" is left. ("Removes
    completed todos when clicked.")
-3. *Given* all completed and "Mark all" checked, *when* I click "Clear
-   completed", *then* "Mark all" is not checked. ("Make sure to clear
-   the checked state after the "Clear completed" button is clicked.")
+3. *Given* all completed and "Mark all" pressed, *when* I click "Clear
+   completed", *then* "Mark all" is not shown, because no todos are
+   left. ("Make sure to clear the checked state after the "Clear
+   completed" button is clicked."; 20)
 
 ### 8 Filter
 1. *Given* one active and one completed todo, *when* I open `/active`,
@@ -369,3 +428,8 @@ BFF.
 - 2026-10-31, stage 06: a D1 database replaces the in-memory store;
   transactions come into scope
   (`logbook/drafts/2026-10-31-06-database-decision.md`).
+- 2026-11-02, UI design: the page follows the owner's design in
+  `design/2026-11-02-ui/`. New constraint C-design, deviation 11
+  widened, deviations 15–20, a Design section, the API rule on an
+  empty edit, the slice table, and scenarios 2.1, 2.6, 2.7, 4.1, 4.5,
+  4.7, 4.9, 6.1–6.4 and 7.3.
