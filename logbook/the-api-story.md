@@ -1610,8 +1610,8 @@ Every endpoint has the same form:
   requirement when it is a probe (a probe runs no unit, so it has no
   use case: L20, L25).
 
-The spec also holds the shapes several endpoints share (`Todo`,
-`TodoCounts`) and the envelope's kinds.
+The spec also holds the shapes several endpoints share (`TodoReply`,
+`TodoListReply`) and the envelope's kinds.
 
 The use case and the endpoint do not repeat each other. The use case
 states the input, result, rules and failures in business terms. The
@@ -1636,6 +1636,61 @@ contract's endpoints, so a path is written once, in the spec.
 
 Generation stops at the contract. Entry points, operations, business
 and data are written by hand.
+
+### The spec's vocabulary (draft)
+
+A draft, tried first on `prd/todo/api.md`. Each line below is one
+thing a parser reads.
+
+The spec has four sections, in this order:
+- **Every endpoint**: what holds for every request, and the kinds
+  every endpoint can return. An endpoint lists only the kinds it adds.
+- **Errors**: the envelope's kinds, and whether each carries `field`.
+  Statuses are not in the spec (see OpenAPI below).
+- **Shapes**: the shapes several endpoints share, one `###` heading
+  each, named in code font.
+- **Endpoints**: one `###` heading each, the method and path in code
+  font, with path parameters in braces (`/todos/{id}`).
+
+An endpoint has these parts, in this order, each left out when empty:
+- `Serves:` a use case path, or for a probe the PRD part it serves;
+- `Path:` a list of fields, one per path parameter;
+- `Query:` a shape;
+- `Body:` a shape;
+- `Reply:` the success status, then a shape;
+- `Errors:` the kinds it adds, or `none`.
+
+The spec has no tables: they are slow to write and break when a
+column is edited. Everything is a heading, a labelled line or a list
+item, one per line.
+
+A shape is a named shared shape, or a name in code font with a list of
+fields under it. A shared shape can instead be a list: one line,
+`` list of `TodoReply` ``. A field is one list item:
+
+```
+- `name`: type, optional "message"
+```
+
+- A field is required unless it says `optional`.
+- The message, in quotes, is optional: the text a caller sees when the
+  field has the wrong type.
+
+A shape line can add one object rule after a comma: `at least N
+fields`, with its message in quotes. A path parameter is a field
+without `optional` or a message.
+
+Types:
+- `text`, `boolean`;
+- `integer, min N`;
+- `literal` followed by a value in code font: `` literal `true` ``
+  for the boolean, `` literal `"true"` `` for the text;
+- `one of` followed by values in code font, separated by spaces;
+- `list of` followed by a shape's name;
+- a shape's name in code font.
+
+Every object is closed; there is no word for an open one. A rule the
+vocabulary cannot state belongs in business, not in the spec.
 
 ### OpenAPI documents the contract (L23, L26)
 
