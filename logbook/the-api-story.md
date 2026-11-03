@@ -44,7 +44,7 @@ The decisions behind this story are:
   - one failure type for every layer, named once at its root
     (chapter 13);
   - handlers that read as a story (chapter 5).
-- L1–L10, agreed with the owner in the language session
+- L1–L13, agreed with the owner in the language session
   (2026-11-03). Each term is defined in the
   [glossary](glossary.md):
   - L1: business states rules, the operation enforces them, and the
@@ -64,12 +64,26 @@ The decisions behind this story are:
     business types by design (chapter 6).
   - L7: the store is engine-neutral. Its promise is atomicity. Supabase
     (Postgres) is the target, and D1 is one engine (chapter 6).
-  - L8: value objects are adopted (chapter 7).
+  - L8: value objects are adopted, and rare. A value earns one when
+    it could be confused with another, is made of parts that belong
+    together, or has behaviour of its own; a rule alone does not. One
+    value object per whole concept: money, not amount and currency
+    (chapter 7).
   - L9: the anti-corruption layers are the inbound translations. The
     contract is the published language, and presenting translates into
     it (chapters 5 and 8).
-  - L10: `Title` is the first value object. Where its rule is applied
-    stays open (chapter 7).
+  - L10: `Title` is not a value object. It is a property, validated
+    against the business rules at the entry point (chapters 5 and 7).
+  - L11: performance is a design input. A DDD concept is taken only
+    when it costs nothing at run time or pays for what it costs: one
+    intent per port, plain types rather than hydrated objects, one
+    translation per boundary.
+  - L12: validate once. The entry point validates against the wire
+    shape and the business rules and builds the input shape.
+    Everything below it trusts what it receives (chapter 5).
+  - L13: a port may carry out behaviour for its operation. When
+    performance moves behaviour away from where it would otherwise
+    live, a comment there says what moved and why (chapters 6 and 8).
 
 After slice 2 (Add and list), the code followed chapters 1–10
 throughout, except for config, which has nothing to hold yet
@@ -455,6 +469,13 @@ Two of the duties translate (L9):
 - **present** translates outward, into the published language: the
   contract. The api serves that language as an open host service.
 
+Validation happens once, here (L12). The entry point checks the wire
+shape and the business rules, which it may import, and builds the
+input shape from the result. A single property is checked as a
+property: the title against `TITLE_MAX`, with no type of its own
+(L10). Everything below the entry point trusts what it receives:
+operations, ports and data do not check it again.
+
 `postTodos` is the first entry point with all four duties. A handler
 tells a story: each step is named, each `if` has braces, and a
 comment says why the step is there (review item 36):
@@ -644,8 +665,24 @@ insert (L7). How it keeps that promise depends on the engine:
   transaction. Which ones are possible depends on how we reach it,
   which is open (chapter 8).
 
+How much these cost, and which route allows which, needs experiments
+before it is decided.
+
 The port does not change between engines. The operation sees an
 intent and a fact either way.
+
+### A port may carry out behaviour (L13)
+
+The cap is behaviour the store carries out for the operation, and it
+is not the only one: the patch, mark all, clear completed and the
+counts each run as one statement. That is a design choice, not a
+compromise. The rule is still stated in business and the decision is
+still the operation's; the port does the work in the place that does
+it best.
+
+When performance moves behaviour away from where it would otherwise
+live, a comment at that spot says what moved and why, so the next
+reader does not move it back.
 
 ### The store reports facts, the operation decides what they mean
 
@@ -706,12 +743,14 @@ It holds:
   `TodoEntity`.
 - **Entity behaviour** (L4): pure functions beside the entity, which
   operations compose. `newTodo` is one.
-- **Value objects** (L8): types defined only by their value, never
-  changed once made, and valid whenever you hold one. Each is made by
-  a constructor that returns a `Result`, and in TypeScript it is a
-  branded type. A value earns one when it has a rule, could be
-  confused with another value, is made of parts that belong together,
-  or has behaviour of its own. Otherwise it stays a primitive.
+- **Value objects** (L8), rarely: types defined only by their value,
+  never changed once made, and valid whenever you hold one. Each is
+  made by a constructor that returns a `Result`, and in TypeScript it
+  is a branded type. A value earns one when it could be confused with
+  another, is made of parts that belong together, or has behaviour of
+  its own. A rule alone does not earn one, since the entry point
+  checks single properties (L12). One value object per whole concept:
+  money, not amount and currency. The todo app has none yet.
 - **Rules:** constants such as `TITLE_MAX` and `TODO_LIMIT`.
 
 Anything may import business. Business imports none of our other
@@ -737,17 +776,16 @@ action. The operation receives a valid `NewTodo`. Before stage 06 the
 contract held the title rule; now it holds only the wire shape
 (review item 38, chapter 11).
 
+A title is not a value object (L10). It has no identity and it has a
+rule, but the entry point checks the rule once and everything below
+trusts it (L12). That is lighter than a type with a constructor, and
+just as safe.
+
 **Target.**
-- `Title` becomes the first value object (L10): a branded string made
-  by `title(raw)`, which trims it and returns a `Result`. A title has
-  no identity, and it has a rule, so it earns a type.
 - The package becomes `business/entity`, so its name says what it
   holds.
 
 **Open.**
-- Where the title rule is applied once `Title` exists: in the
-  handler's validation, as today, or only in the constructor. This is
-  part of business rules vs validation rules.
 - What sits beside entities in `business/entity`: rules, input types
   (`NewTodo`, `TodoPatch`, `TodoFilter`), read shapes (`TodoCounts`)
   and `Result`. Their names are open too.
@@ -923,9 +961,11 @@ exports `DbStore` and never names a port (chapter 4).
     is held;
   - how each intent port keeps its atomic promise there (chapter 6);
   - whether D1 stays for the lab.
-- Entity behaviour that lives in SQL today: the patch's `COALESCE`,
+- Behaviour the store carries out today: the patch's `COALESCE`,
   `setAllCompleted`, `deleteCompleted` and the counts'
-  `COUNT(*) FILTER`. To be walked with the data layer (L4).
+  `COUNT(*) FILTER`. It may stay there (L13). To be walked with the
+  data layer: which of these moved for performance, and so need a
+  comment.
 - A contract test: each internal client run against the provider's
   real `app.fetch`, so client and provider cannot drift apart.
 

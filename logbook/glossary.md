@@ -4,13 +4,18 @@ The words we use to talk about apps on this stack. Each term says what
 it means here, how it relates to Domain-Driven Design, where it lives
 in the code and whether it is settled.
 
-We ground our language in DDD's concepts but not in its usual code.
-DDD examples are object-oriented: repositories, services and
-aggregates that guard their own state. Our code is functions and
-types arranged in a chain, so where a DDD term would bring an OO shape
-with it, we keep the idea and say how we realize it.
+We ground our language in DDD's concepts, with two cautions:
+- **Its code, not its concepts.** DDD examples are object-oriented:
+  repositories, services and aggregates that guard their own state.
+  Our code is functions and types arranged in a chain, so where a DDD
+  term would bring an OO shape with it, we keep the idea and say how
+  we realize it.
+- **Performance is a design input (L11).** We take a DDD concept only
+  when it costs nothing at run time or pays for what it costs: one
+  intent per port, plain types rather than hydrated objects, and one
+  translation per boundary.
 
-Decisions L1–L10 were agreed in the language session of 2026-11-03.
+Decisions L1–L13 were agreed in the language session of 2026-11-03.
 They are recorded in [the api story](the-api-story.md).
 
 Status:
@@ -66,6 +71,23 @@ See [the api story](the-api-story.md), chapter 5.
 - **DDD:** application layer, inbound adapter.
 - **Status:** locked.
 
+### Validate once
+
+The entry point validates input against the wire shape and the
+business rules, which it may import, and builds the input shape from
+the result. A single property is checked as a property: the title
+against `TITLE_MAX`. No new type is needed for that.
+
+- **Status:** locked (L12).
+
+### Trusted
+
+What everything below the entry point is. An operation, a port and
+data receive input the entry point has already validated, and do not
+check it again. Rows read back from our own store are trusted too.
+
+- **Status:** locked (L12).
+
 ### Operation
 
 The only place anything happens to an entity. It takes business
@@ -93,7 +115,13 @@ a `Result`.
 - **We differ:** no repository per entity and no generic CRUD. Each
   operation declares the smallest port it needs, and one flat store
   satisfies them all.
-- **Status:** locked.
+
+A port may carry out behaviour for its operation: a patch, a bulk
+update, counts. The operation still owns the decision. If performance
+moves behaviour away from where it would otherwise live, a comment
+there says what moved and why.
+
+- **Status:** locked (L13).
 
 ### Data
 
@@ -137,7 +165,8 @@ The store promises atomicity, and the story does not depend on how it
 is kept.
 
 - **DDD:** the aggregate's consistency boundary.
-- **Status:** locked (L1, L7).
+- **Status:** locked (L1, L7). How Postgres keeps it, and at what
+  cost, is open: it needs experiments.
 
 ### Fact
 
@@ -180,29 +209,35 @@ function, not turned into a new type.
 A business type defined only by its value. It has no identity, never
 changes once it is made and is valid whenever you hold one. It is made
 through a constructor that returns a `Result`. In TypeScript it is a
-branded type.
+branded type. Value objects are rare.
 
 The test:
 1. Does it matter *which one* it is, or only *what it says*? If which
    one, it is an entity.
 2. If only what it says, it earns a type of its own when it:
-   - has a rule;
-   - could be confused with another value;
+   - could be confused with another value of the same primitive;
    - is made of parts that belong together;
    - has behaviour of its own.
 
-   Otherwise it stays a primitive.
+   Otherwise it stays a primitive, or a plain type.
+
+A rule alone does not earn one. The entry point already checks a
+single property against the business rules (L12), which is lighter
+and just as safe.
+
+Granularity: one value object per whole concept, never one per part.
+Money is a value object, and its amount and currency are not.
 
 | Value | Verdict |
 |---|---|
-| title | a value object: it has a rule |
+| money | a value object: amount and currency belong together, are easily confused, and have arithmetic of their own |
+| title | a property: its rule is checked at the entry point (L10) |
 | id | a value object once a second kind of id exists |
 | completed | a primitive |
 | `TodoCounts`, `TodoFilter` | plain types |
 
 - **DDD:** value object.
-- **Status:** locked (L8). `Title` is the first value object (L10). It
-  is a target, and where its rule is applied is open (validation).
+- **Status:** locked (L8, L10).
 
 ### Aggregate
 
@@ -250,11 +285,11 @@ api is one: its routes serve the contract.
 ## Open
 
 To be settled in later sessions:
-- the owner's second caution about DDD;
 - names for input types (`NewTodo`, `TodoPatch`, `TodoFilter`) and
   read shapes (`TodoCounts`);
 - what sits beside entities in `business/entity`: rules, inputs, read
   shapes, `Result`;
 - business rules vs validation rules;
 - presentation;
-- the Supabase access route.
+- the Supabase access route, and how each intent port keeps its
+  atomic promise there: it needs experiments.
