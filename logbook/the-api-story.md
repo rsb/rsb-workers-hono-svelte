@@ -127,12 +127,13 @@ The decisions behind this story are:
   The document is generated from our code, and no code is generated
   from it. OpenAPI's operation is our route, an entry point at a
   method and path; we never call it an operation (chapter 11).
-- L24, agreed with the owner in the chain session (2026-11-03):
-  construct is the map and a path names its layer and area, so any
-  chain can be followed without a search. A chain is written in one
-  line of symbols, `→` for a call and `⇢` across a port. Every entry
-  point's chain is listed in `apps/api/entry-points.md`, which is
-  generated only (chapter 9).
+- L24, agreed with the owner in the entry chain session (2026-11-03):
+  the chain is renamed the entry chain ("entry-chains" in names).
+  Construct is the map and a path names its layer and area, so any
+  entry chain can be followed without a search. An entry chain is
+  written in one line of symbols, `→` for a call and `⇢` across a
+  port. Every entry point's entry chain is listed in
+  `apps/api/entry-chains.md`, which is generated only (chapter 9).
 
 After slice 2 (Add and list), the code followed chapters 1–10
 throughout, except for config, which has nothing to hold yet
@@ -934,7 +935,7 @@ ones never run. So a process has two modes, and its spec chooses:
   but the request cannot wait for all of them: it returns after the
   first, or returns "accepted". How a durable process runs on
   Cloudflare Workflows is a story of its own, the workflow story, not
-  written yet. The process itself, its spec and its place in the chain
+  written yet. The process itself, its spec and its place in the entry chain
   belong here.
 
 A process receives built operations from construct, not ports, so its
@@ -1380,10 +1381,10 @@ where they are enforced (A1):
   the name is not available for privacy. If a package needs privacy,
   subpath `exports` can hide what it does not list.
 
-### Following a chain (L24)
+### Following an entry chain (L24)
 
-Any chain can be followed from its entry point to the driver without
-a search. Two things keep it so, and they are rules, not side
+Any entry chain can be followed from its entry point to the driver
+without a search. Two things keep it so, and they are rules, not side
 effects:
 - **Construct is the map.** Each route in `constructRoutes` names its
   method and path, its handler and the unit the handler runs.
@@ -1391,7 +1392,7 @@ effects:
   → `operations/src/todos/update-todo.ts` → `data/d1/src/todos.ts`.
   An operation's port is declared in the operation's file.
 
-A chain is written in one line of exported symbols:
+An entry chain is written in one line of exported symbols:
 
 ```
 PATCH /todos/:id → patchTodo → updateTodo ⇢ UpdateStore.updateTodo → d1.updateTodo → queryAll
@@ -1402,11 +1403,11 @@ PATCH /todos/:id → patchTodo → updateTodo ⇢ UpdateStore.updateTodo → d1.
   picks the implementation.
 
 Each name is a symbol, so the line can be grepped as written. One
-Mermaid diagram may draw the layers once; chains themselves are
+Mermaid diagram may draw the layers once; entry chains themselves are
 written in text.
 
-**The index.** `apps/api/entry-points.md` lists every entry point, one
-block each, starting with its chain in the shorthand, then one row per
+**The index.** `apps/api/entry-chains.md` lists every entry point, one
+block each, starting with its entry chain in the shorthand, then one row per
 link: the file and the symbols it exports, with no line numbers.
 
 ```
@@ -1422,7 +1423,7 @@ data      packages/data/d1/src/todos.ts                   updateTodo
 driver    packages/data/d1/src/driver.ts                  queryAll
 ```
 
-- Links every chain shares (`present.ts`, `mapFailure`, the body
+- Links every entry chain shares (`present.ts`, `mapFailure`, the body
   limit in `http.ts`) are listed once, at the top.
 - A probe's block ends at the probe; it has no unit.
 - The `use case` row waits until use cases are recorded.
