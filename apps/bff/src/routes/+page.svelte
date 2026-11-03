@@ -1,41 +1,60 @@
 <script lang="ts">
-	import { enhance } from "$app/forms";
+	import EmptyState from "#lib/components/EmptyState.svelte";
+	import NewTodo from "#lib/components/NewTodo.svelte";
+	import TodoList from "#lib/components/TodoList.svelte";
 	import type { PageProps } from "./$types";
 
 	let { data, form }: PageProps = $props();
+
+	// A new object for every failed add, so a repeated message shows again.
+	let failed = $derived.by(() => {
+		if (form?.message === undefined) {
+			return null;
+		}
+		return { title: form.title, message: form.message };
+	});
+	let hasTodos = $derived(data.todos.length > 0);
 </script>
 
 <svelte:head>
-	<title>todos</title>
+	<title>Todos</title>
 </svelte:head>
 
-<h1>todos</h1>
+<main>
+	<h1>Todos</h1>
 
-<form method="POST" action="?/add" use:enhance>
-	<!-- Upstream, New todo: "preferably by using the `autofocus` input attribute". -->
-	<!-- svelte-ignore a11y_autofocus -->
-	<input
-		name="title"
-		aria-label="New todo"
-		placeholder="What needs to be done?"
-		autocomplete="off"
-		autofocus
-		value={form?.title ?? ""}
-	/>
-</form>
+	<NewTodo {failed} />
 
-{#if form?.message}
-	<p role="alert">{form.message}</p>
-{/if}
+	{#if hasTodos}
+		<TodoList todos={data.todos} />
+	{:else}
+		<EmptyState error={data.error} />
+	{/if}
+</main>
 
-{#if data.error}
-	<p role="alert">{data.error}</p>
-{/if}
+<style>
+	main {
+		width: 100%;
+		max-width: 640px;
+		margin: 0 auto;
+		padding: 96px 24px 40px;
+	}
 
-{#if data.todos.length > 0}
-	<ul>
-		{#each data.todos as todo (todo.id)}
-			<li>{todo.title}</li>
-		{/each}
-	</ul>
-{/if}
+	h1 {
+		margin: 0 0 28px;
+		font-size: 34px;
+		font-weight: 600;
+		letter-spacing: -0.02em;
+		line-height: 1.1;
+	}
+
+	@media (max-width: 480px) {
+		main {
+			padding: 56px 20px 28px;
+		}
+
+		h1 {
+			font-size: 30px;
+		}
+	}
+</style>

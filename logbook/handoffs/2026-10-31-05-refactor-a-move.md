@@ -115,7 +115,7 @@ Slices 3–8 can go between any of these, when the owner names one.
    - The amended PRD: Constraints, Deviations 3 and 9, Shape,
      Database, Out of scope, Amendments.
    - Api story chapters 2, 3, 4, 6 and 8.
-   - Decisions D5, D13, D14 and D15.
+   - Decisions D5, D13 and D15.
    - Findings 02, F22 (P45), and P44 in `profile-notes.md`.
 2. **Check `main`.** It must contain the commits above. If it does
    not, stop and tell the owner. `git fetch` fails in the sandbox; the

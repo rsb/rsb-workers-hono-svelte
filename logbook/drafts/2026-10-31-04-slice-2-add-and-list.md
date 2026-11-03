@@ -44,8 +44,8 @@ Layout as in the decisions draft. `app.ts` is removed, and
 | `construct.ts` | memory store, `newId`, two operations, route table, failure handlers | D3, D13, D15 |
 | `http.ts` | `serve(api)`, `Api`, `Route`; `bodyLimit` first | D3, D16 |
 | `app/business/result.ts` | `Result`, `ok`, `err` | D10 |
-| `app/business/todos/todo.ts` | `Todo`, `TODO_LIMIT`, `newTodo` | D13, D14 |
-| `app/operations/todos/add-todo.ts` | `AddStore`, `addTodo`, `AddTodo` | D5, D13, D14 |
+| `app/business/todos/todo.ts` | `Todo`, `TODO_LIMIT`, `newTodo` | D13 |
+| `app/operations/todos/add-todo.ts` | `AddStore`, `addTodo`, `AddTodo` | D5, D13 |
 | `app/operations/todos/list-todos.ts` | `ListStore`, `listTodos`, `ListTodos` | D5 |
 | `app/data/memory/todos.ts` | `memoryTodos()` | D13, D15 |
 | `app/handlers/validate.ts` | `readJson`, `Invalid` | D4 |

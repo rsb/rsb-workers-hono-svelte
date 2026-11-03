@@ -6,12 +6,13 @@
 export type FailKind = "invalid" | "not_found" | "limit" | "too_large" | "unavailable" | "server";
 
 /**
- * A failure of one kind. Who reads `message` depends on the kind: for a
- * failure the user caused (`invalid`, `not_found`, `limit`, `too_large`) the
- * root's message is the reply, so write it for the user; for a failure the
- * server caused (`unavailable`, `server`) it is for logs and developers only.
- * `cause` points to what it wraps, as Go's `%w` does, so a log shows the
- * chain back to the root cause. `field` is set only by `invalid`.
+ * A failure of one kind. `message` is for developers, never for the person
+ * using the app: the BFF writes what they see, from the kind. For a failure
+ * the caller caused (`invalid`, `not_found`, `limit`, `too_large`) the root's
+ * message goes in the API's reply, so the caller can tell what went wrong;
+ * for a failure the server caused (`unavailable`, `server`) it goes only to
+ * the log. `cause` points to what it wraps, as Go's `%w` does, so a log
+ * shows the chain back to the root cause. `field` is set only by `invalid`.
  */
 export class Fail<K extends FailKind = FailKind> extends Error {
   readonly kind: K;

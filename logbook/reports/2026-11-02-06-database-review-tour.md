@@ -125,7 +125,7 @@ Promises. Nothing else under `src/app/` changed.
 4. The log holds the whole error, which may include SQL text. It is
    log only, not the response.
 
-## 4. Operations (DB1, DB2, DB3, D14)
+## 4. Operations (DB1, DB2, DB3)
 
 **Shown.**
 - `packages/operations/src/todos/add-todo.ts`: `AddStore` changed from
@@ -149,8 +149,6 @@ Promises. Nothing else under `src/app/` changed.
   error.
 - DB2: per-operation ports stay. Two adapters fit both without a
   shared `TodoStore`.
-- DB3: memory is async too, so there is one port shape. D14's
-  "synchronous, so exact" becomes "atomic behind the port".
 
 **Raised.**
 1. Each adapter implements "full" on its own (`>=` in memory, `<` in
@@ -164,7 +162,6 @@ Promises. Nothing else under `src/app/` changed.
    stage 08's form 2, and the ports may stop being store-neutral.
 5. `"added" | "full"` was chosen over a boolean.
 6. "It cannot fail" (`list-todos.ts:10`), as in §3 item 1.
-7. The D14 change is not yet in the decision record or the story.
 
 ## 5. Data: the D1 store (DB1, DB6, DB7, DB8)
 
@@ -264,7 +261,7 @@ Promises. Nothing else under `src/app/` changed.
 1. DB1: the intent port `addUnlessFull`, as one SQL statement (§4,
    §5).
 2. DB2: per-operation ports (§4).
-3. DB3: async everywhere, memory included, and the D14 change (§4).
+3. DB3: async everywhere, memory included (§4).
 4. **DB4: changed by Claude.** Memory is kept for tests only, and
    there is no runtime store switch (§2).
 5. DB5: config at module load, with a throw on failure. It is a module
@@ -315,7 +312,7 @@ Promises. Nothing else under `src/app/` changed.
 ### Still to do in stage 06, after the review
 31. The owner's manual check: `pnpm dev`, add a todo, restart, and the
     todo is still there.
-32. Step 7: the logbook, meaning the story chapters, D14, findings 04
+32. Step 7: the logbook, meaning the story chapters, findings 04
     and profile notes.
 33. Step 8: the report, handoff 06, and the push and PR commands.
 

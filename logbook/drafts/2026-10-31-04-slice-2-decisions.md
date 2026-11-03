@@ -36,11 +36,11 @@ api/src/
    │     ├─ get-todos.ts        getTodos(listTodos)
    │     └─ post-todos.ts       postTodos(addTodo)
    ├─ operations/todos/
-   │  ├─ add-todo.ts            addTodo({ store, newId }), AddStore (D5, D13, D14)
+   │  ├─ add-todo.ts            addTodo({ store, newId }), AddStore (D5, D13)
    │  └─ list-todos.ts          listTodos({ store }), ListStore
    ├─ business/
    │  ├─ result.ts              Result, ok, err (D10)
-   │  └─ todos/todo.ts          Todo, TODO_LIMIT, newTodo (D13, D14)
+   │  └─ todos/todo.ts          Todo, TODO_LIMIT, newTodo (D13)
    └─ data/memory/todos.ts      memoryTodos(): rows in a Map (D13, D15)
 ```
 
@@ -250,7 +250,7 @@ environment value. Q10 (failure at module load) stays open until then.
 
 **Reason.** The owner said not to create config before it is needed
 (report 03 §4). `TITLE_MAX` and `BODY_LIMIT_BYTES` are wire facts
-(contract), and `TODO_LIMIT` is a business fact (D14). None of them is
+(contract), and `TODO_LIMIT` is a business fact. None of them is
 environment.
 
 **Constrains.** No `config.ts`, and no `env` parameter on `fetch`.
@@ -330,29 +330,6 @@ one it is e2e.
 memory store copies todos in and out (its row is `{ title, completed }`
 keyed by id), so a caller cannot change stored state by mutating a
 returned object.
-
-## D14 The 500 cap is a business constant that the operation checks (new: the 500 cap)
-
-**Decision.** `TODO_LIMIT = 500` lives in `business/todos/todo.ts`.
-`addTodo` returns `err({ kind: "full" })` when `store.count()` is
-already `TODO_LIMIT`, before it makes a todo. The cap is not in
-contract.
-
-The store ports are synchronous, because the store is in memory.
-
-**Reason.**
-- The cap is a rule about the list, not about the wire. The web never
-  checks it, and the wire shows only the kind `limit`.
-- A store check would put a business rule in data, which R6 rules out.
-- The check and the add run with no `await` between them, so two
-  requests in one isolate cannot interleave, and the cap is exact.
-- An async store would reopen this question. The PRD puts concurrency
-  out of scope, so that case would be a finding, not a feature.
-
-**Constrains.** `AddStore` and `ListStore` return plain values, not
-promises. P16 and P17 change: two limits live in contract
-(`BODY_LIMIT_BYTES`, `TITLE_MAX`), and one lives in api business
-(`TODO_LIMIT`).
 
 ## D15 The store is built once per isolate (new: where the store lives across requests)
 
