@@ -127,6 +127,12 @@ The decisions behind this story are:
   The document is generated from our code, and no code is generated
   from it. OpenAPI's operation is our route, an entry point at a
   method and path; we never call it an operation (chapter 11).
+- L24, agreed with the owner in the chain session (2026-11-03):
+  construct is the map and a path names its layer and area, so any
+  chain can be followed without a search. A chain is written in one
+  line of symbols, `→` for a call and `⇢` across a port. Every entry
+  point's chain is listed in `apps/api/entry-points.md`, which is
+  generated only (chapter 9).
 
 After slice 2 (Add and list), the code followed chapters 1–10
 throughout, except for config, which has nothing to hold yet
@@ -1373,6 +1379,63 @@ where they are enforced (A1):
   it: `internal` means *inside the closed system*, never *private*, so
   the name is not available for privacy. If a package needs privacy,
   subpath `exports` can hide what it does not list.
+
+### Following a chain (L24)
+
+Any chain can be followed from its entry point to the driver without
+a search. Two things keep it so, and they are rules, not side
+effects:
+- **Construct is the map.** Each route in `constructRoutes` names its
+  method and path, its handler and the unit the handler runs.
+- **A path names its layer and area.** `handlers/todos/patch-todo.ts`
+  → `operations/src/todos/update-todo.ts` → `data/d1/src/todos.ts`.
+  An operation's port is declared in the operation's file.
+
+A chain is written in one line of exported symbols:
+
+```
+PATCH /todos/:id → patchTodo → updateTodo ⇢ UpdateStore.updateTodo → d1.updateTodo → queryAll
+```
+
+- `→` is a direct call.
+- `⇢` crosses a port: the caller sees the interface, and construct
+  picks the implementation.
+
+Each name is a symbol, so the line can be grepped as written. One
+Mermaid diagram may draw the layers once; chains themselves are
+written in text.
+
+**The index.** `apps/api/entry-points.md` lists every entry point, one
+block each, starting with its chain in the shorthand, then one row per
+link: the file and the symbols it exports, with no line numbers.
+
+```
+## PATCH /todos/:id
+PATCH /todos/:id → patchTodo → updateTodo ⇢ UpdateStore.updateTodo → d1.updateTodo → queryAll
+
+use case  prd/todo/use-cases/todos/change-a-todo.md
+route     apps/api/src/construct.ts                       constructRoutes
+handler   apps/api/src/app/handlers/todos/patch-todo.ts   patchTodo
+rules     packages/valid/src/todos/title.ts               checkTitle
+op        packages/operations/src/todos/update-todo.ts    updateTodo, UpdateStore
+data      packages/data/d1/src/todos.ts                   updateTodo
+driver    packages/data/d1/src/driver.ts                  queryAll
+```
+
+- Links every chain shares (`present.ts`, `mapFailure`, the body
+  limit in `http.ts`) are listed once, at the top.
+- A probe's block ends at the probe; it has no unit.
+- The `use case` row waits until use cases are recorded.
+- The index is generated, never written by hand. Its first line says
+  so, names the script and says not to edit it. Its name is lowercase
+  to mark it as an output.
+- It is checked by regenerating it and diffing the result.
+
+**Open.**
+- The generator. It belongs with the monorepo's scripts in `tooling/`,
+  which waits for its own discussion.
+- Pointing to the index from `AGENTS.md`, which may need a recorded
+  exception (rl-0009).
 
 ## 10. Object style
 

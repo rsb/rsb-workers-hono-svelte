@@ -15,9 +15,9 @@ We ground our language in DDD's concepts, with two cautions:
   intent per port, plain types rather than hydrated objects, and one
   translation per boundary.
 
-Decisions L1–L23 were agreed in the language sessions of 2026-11-03:
+Decisions L1–L24 were agreed in the language sessions of 2026-11-03:
 L1–L13 on language, L14–L21 on operations, L22 on package layout, L23
-on OpenAPI. They are recorded in
+on OpenAPI, L24 on following a chain. They are recorded in
 [the api story](the-api-story.md).
 
 Status:
@@ -42,6 +42,20 @@ needs one.
   imports and tests), not by encapsulation. Each link can be tested on
   its own, with or without a mock, and in every test category.
 - **Status:** locked (L2, L18).
+
+A chain is written in one line of exported symbols, `→` for a direct
+call and `⇢` across a port, where construct picks the implementation:
+
+```
+PATCH /todos/:id → patchTodo → updateTodo ⇢ UpdateStore.updateTodo → d1.updateTodo → queryAll
+```
+
+Every entry point's chain, with the file and symbols of each link, is
+listed in `apps/api/entry-points.md`. The index is generated, never
+written by hand, and checked by regenerating and diffing it. See
+[the api story](the-api-story.md), chapter 9.
+
+- **Status:** target (L24). The generator is open.
 
 ### Boundary
 
@@ -551,4 +565,6 @@ To be settled in later sessions:
   Workflows;
 - how the OpenAPI document is produced: what it is generated from,
   where it lives, and how the checks keep it true to the routes we
-  serve.
+  serve;
+- `tooling/`, the monorepo's scripts, and the generator for
+  `apps/api/entry-points.md`.
