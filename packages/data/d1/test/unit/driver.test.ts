@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { execute, queryAll } from "../../src/driver.ts";
+import { execute, queryAll, writeThenQueryAll } from "../../src/driver.ts";
 import { fakeD1 } from "./fake-d1.ts";
 
 describe("queryAll", () => {
@@ -51,5 +51,53 @@ describe("execute", () => {
     const written = await execute(() => db.prepare("DELETE FROM todos WHERE id = ?1").bind(undefined), "delete todo");
 
     expect(written).toMatchObject({ ok: false, error: { kind: "server" } });
+  });
+});
+
+describe("writeThenQueryAll", () => {
+  it("runs the write and the read as one batch, and returns the read's rows", async () => {
+    const rows = [{ id: "id-1" }];
+    const { db, prepared, batches } = fakeD1({ rows });
+
+    const read = await writeThenQueryAll(
+      db,
+      () => db.prepare("UPDATE todos SET completed = 1"),
+      () => db.prepare("SELECT id FROM todos"),
+      "set all",
+    );
+
+    expect(read).toEqual({ ok: true, value: rows });
+    expect(batches).toEqual([2]);
+    expect(prepared.map((each) => each.sql)).toEqual(["UPDATE todos SET completed = 1", "SELECT id FROM todos"]);
+  });
+
+  it("classifies a D1 error, named by the context", async () => {
+    const { db } = fakeD1({ throws: new Error("D1_ERROR: Network connection lost.") });
+
+    const read = await writeThenQueryAll(
+      db,
+      () => db.prepare("UPDATE todos SET completed = 1"),
+      () => db.prepare("SELECT id FROM todos"),
+      "set all",
+    );
+
+    expect(read).toMatchObject({
+      ok: false,
+      error: { kind: "unavailable", message: "set all: D1_ERROR: Network connection lost." },
+    });
+  });
+
+  it("classifies an error thrown while binding, as it builds the statements inside the try", async () => {
+    const { db, batches } = fakeD1({ throwsOnBind: new Error("D1_TYPE_ERROR: Type 'undefined' not supported") });
+
+    const read = await writeThenQueryAll(
+      db,
+      () => db.prepare("UPDATE todos SET completed = ?1").bind(undefined),
+      () => db.prepare("SELECT id FROM todos"),
+      "set all",
+    );
+
+    expect(read).toMatchObject({ ok: false, error: { kind: "server" } });
+    expect(batches).toEqual([]);
   });
 });

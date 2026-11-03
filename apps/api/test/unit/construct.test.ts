@@ -10,7 +10,8 @@ import { serve } from "../../src/http.ts";
 /**
  * A fake `DbStore` that keeps todos in an array. It reports facts as the
  * real one does: whether a todo was inserted, every todo in order, and a
- * todo as it is after a patch is applied, and whether a todo was deleted.
+ * todo as it is after a patch is applied, every todo after all are set,
+ * and whether a todo was deleted.
  */
 const fakeDbStore = (): DbStore => {
   const todos: Todo[] = [];
@@ -34,6 +35,12 @@ const fakeDbStore = (): DbStore => {
       const updated = { ...found, ...patch };
       todos[index] = updated;
       return ok(updated);
+    },
+    setAllCompleted: async (completed) => {
+      for (const [index, todo] of todos.entries()) {
+        todos[index] = { ...todo, completed };
+      }
+      return ok([...todos]);
     },
     deleteTodo: async (id) => {
       const index = todos.findIndex((todo) => todo.id === id);
@@ -114,6 +121,29 @@ it("a toggle of an id no todo has is refused with not_found", async () => {
 
   expect(refused.status).toBe(404);
   expect(v.parse(Failure, await refused.json()).error.kind).toBe("not_found");
+});
+
+it("mark all completes every todo, then makes every todo active again", async () => {
+  let n = 0;
+  const api = app(() => `id-${++n}`);
+  await api.request("/todos", { method: "POST", body: '{"title":"buy milk"}' });
+  await api.request("/todos", { method: "POST", body: '{"title":"walk dog"}' });
+  const markAll = (completed: boolean) =>
+    api.request("/todos", { method: "PATCH", body: JSON.stringify({ completed }) });
+
+  const done = await markAll(true);
+  expect(done.status).toBe(200);
+  expect(v.parse(envelope(TodoListReply), await done.json())).toEqual({
+    ok: true,
+    data: [
+      { id: "id-1", title: "buy milk", completed: true },
+      { id: "id-2", title: "walk dog", completed: true },
+    ],
+  });
+
+  const active = await markAll(false);
+  const reply = v.parse(envelope(TodoListReply), await active.json());
+  expect(reply.ok && reply.data.map((todo) => todo.completed)).toEqual([false, false]);
 });
 
 it("a deleted todo is not in the next list, and a second delete is refused with not_found", async () => {

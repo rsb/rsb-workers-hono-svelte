@@ -25,6 +25,16 @@ export const PatchTodoBody = v.pipe(
 );
 export type PatchTodoBody = v.InferOutput<typeof PatchTodoBody>;
 
+/**
+ * The body of `PATCH /todos`: the value to set `completed` to on every
+ * todo. It is the value, not "flip it", so sending it twice is safe.
+ * Unknown keys are rejected.
+ */
+export const PatchTodosBody = v.strictObject({
+  completed: v.boolean("completed must be true or false"),
+});
+export type PatchTodosBody = v.InferOutput<typeof PatchTodosBody>;
+
 /** A todo on the wire. */
 export const TodoReply = v.strictObject({
   id: v.string(),
@@ -33,7 +43,7 @@ export const TodoReply = v.strictObject({
 });
 export type TodoReply = v.InferOutput<typeof TodoReply>;
 
-/** The data of `GET /todos`, in creation order. */
+/** The data of `GET /todos` and `PATCH /todos`, in creation order. */
 export const TodoListReply = v.array(TodoReply);
 export type TodoListReply = v.InferOutput<typeof TodoListReply>;
 

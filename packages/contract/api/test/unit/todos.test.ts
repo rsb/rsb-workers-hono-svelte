@@ -1,6 +1,6 @@
 import * as v from "valibot";
 import { describe, expect, it } from "vitest";
-import { AddTodoBody, DeletedReply, PatchTodoBody } from "../../src/index.ts";
+import { AddTodoBody, DeletedReply, PatchTodoBody, PatchTodosBody } from "../../src/index.ts";
 
 /** The issue a body fails with: its first path key and its message. */
 const issue = (body: unknown, schema: v.GenericSchema = AddTodoBody) => {
@@ -66,6 +66,28 @@ describe("PatchTodoBody", () => {
       title: "buy milk",
       completed: true,
     });
+  });
+});
+
+describe("PatchTodosBody", () => {
+  it("rejects completed that is not a boolean", () => {
+    expect(issue({ completed: "true" }, PatchTodosBody)).toEqual({
+      field: "completed",
+      message: "completed must be true or false",
+    });
+  });
+
+  // A missing key gets valibot's own message, as a missing title does for AddTodoBody.
+  it("rejects a body without completed, naming the field", () => {
+    expect(issue({}, PatchTodosBody)?.field).toBe("completed");
+  });
+
+  it("rejects an unknown key", () => {
+    expect(issue({ completed: true, title: "buy milk" }, PatchTodosBody)?.field).toBe("title");
+  });
+
+  it("passes completed through", () => {
+    expect(v.parse(PatchTodosBody, { completed: true })).toEqual({ completed: true });
   });
 });
 

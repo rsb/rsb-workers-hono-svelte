@@ -133,6 +133,44 @@ describe("updateTodo", () => {
   });
 });
 
+describe("setAllCompleted", () => {
+  it("binds completed as 0 or 1, and reads the list in the same batch", async () => {
+    const done = fakeD1();
+    await todoStore(done.db).setAllCompleted(true);
+    const active = fakeD1();
+    await todoStore(active.db).setAllCompleted(false);
+
+    expect(done.batches).toEqual([2]);
+    expect(done.prepared[0]?.bound).toEqual([1]);
+    expect(active.prepared[0]?.bound).toEqual([0]);
+  });
+
+  it("reads every row the batch lists as a todo", async () => {
+    const rows = [
+      { id: "id-1", title: "buy milk", completed: 1 },
+      { id: "id-2", title: "walk dog", completed: 1 },
+    ];
+    const { db } = fakeD1({ rows });
+
+    expect(await todoStore(db).setAllCompleted(true)).toEqual({
+      ok: true,
+      value: [
+        { id: "id-1", title: "buy milk", completed: true },
+        { id: "id-2", title: "walk dog", completed: true },
+      ],
+    });
+  });
+
+  it("passes a D1 failure up, named by the batch", async () => {
+    const { db } = fakeD1({ throws: new Error("D1_ERROR: Network connection lost.") });
+
+    expect(await todoStore(db).setAllCompleted(true)).toMatchObject({
+      ok: false,
+      error: { kind: "unavailable", message: "set all completed: D1_ERROR: Network connection lost." },
+    });
+  });
+});
+
 describe("deleteTodo", () => {
   it("binds the id", async () => {
     const { db, prepared } = fakeD1({ changes: 1 });
