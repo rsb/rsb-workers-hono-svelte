@@ -58,7 +58,7 @@ describe("listTodos", () => {
     ];
     const { db } = fakeD1({ rows });
 
-    expect(await todoStore(db).listTodos()).toEqual({
+    expect(await todoStore(db).listTodos({})).toEqual({
       ok: true,
       value: [
         { id: "id-1", title: "buy milk", completed: false },
@@ -70,17 +70,80 @@ describe("listTodos", () => {
   it("reports an empty list as an empty array", async () => {
     const { db } = fakeD1({ rows: [] });
 
-    expect(await todoStore(db).listTodos()).toEqual({ ok: true, value: [] });
+    expect(await todoStore(db).listTodos({})).toEqual({ ok: true, value: [] });
   });
 
   it("passes a D1 failure up, named by the statement", async () => {
     const { db } = fakeD1({ throws: new Error("D1_ERROR: no such table: todos: SQLITE_ERROR") });
 
-    const listed = await todoStore(db).listTodos();
+    const listed = await todoStore(db).listTodos({});
 
     expect(listed).toMatchObject({
       ok: false,
       error: { kind: "server", message: "select todos: D1_ERROR: no such table: todos: SQLITE_ERROR" },
+    });
+  });
+});
+
+describe("listTodos with a filter", () => {
+  it("lists every todo without binding when the filter is empty", async () => {
+    const { db, prepared } = fakeD1({ rows: [] });
+
+    await todoStore(db).listTodos({});
+
+    expect(prepared[0]?.sql).not.toContain("WHERE");
+    expect(prepared[0]?.bound).toEqual([]);
+  });
+
+  it("binds completed as 0 or 1", async () => {
+    const done = fakeD1({ rows: [] });
+    await todoStore(done.db).listTodos({ completed: true });
+    const active = fakeD1({ rows: [] });
+    await todoStore(active.db).listTodos({ completed: false });
+
+    expect(done.prepared[0]?.sql).toContain("WHERE completed = ?1");
+    expect(done.prepared[0]?.bound).toEqual([1]);
+    expect(active.prepared[0]?.bound).toEqual([0]);
+  });
+
+  it("passes a D1 failure up, named by the statement", async () => {
+    const { db } = fakeD1({ throws: new Error("D1_ERROR: Network connection lost.") });
+
+    const listed = await todoStore(db).listTodos({ completed: true });
+
+    expect(listed).toMatchObject({
+      ok: false,
+      error: { kind: "unavailable", message: "select todos by completed: D1_ERROR: Network connection lost." },
+    });
+  });
+});
+
+describe("countTodos", () => {
+  it("reads the one row as the counts, binding nothing", async () => {
+    const { db, prepared } = fakeD1({ rows: [{ active: 2, completed: 1 }] });
+
+    const counted = await todoStore(db).countTodos();
+
+    expect(counted).toEqual({ ok: true, value: { active: 2, completed: 1 } });
+    expect(prepared[0]?.bound).toEqual([]);
+  });
+
+  it("reports a server failure when no row came back", async () => {
+    const { db } = fakeD1({ rows: [] });
+
+    const counted = await todoStore(db).countTodos();
+
+    expect(counted).toMatchObject({ ok: false, error: { kind: "server", message: "count todos: no row came back" } });
+  });
+
+  it("passes a D1 failure up, named by the statement", async () => {
+    const { db } = fakeD1({ throws: new Error("D1_ERROR: Network connection lost.") });
+
+    const counted = await todoStore(db).countTodos();
+
+    expect(counted).toMatchObject({
+      ok: false,
+      error: { kind: "unavailable", message: "count todos: D1_ERROR: Network connection lost." },
     });
   });
 });

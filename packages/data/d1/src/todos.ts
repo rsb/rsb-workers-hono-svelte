@@ -1,10 +1,13 @@
 import { type Result, err, ok } from "@todo/business/result.ts";
-import type { Todo, TodoPatch } from "@todo/business/todos/todo.ts";
-import type { AnyFail } from "@todo/fail/fail.ts";
+import type { Todo, TodoCounts, TodoFilter, TodoPatch } from "@todo/business/todos/todo.ts";
+import { type AnyFail, serverFault } from "@todo/fail/fail.ts";
 import { execute, queryAll, writeThenQueryAll } from "./driver.ts";
 
 /** How a todo is stored: SQLite has no boolean, so `completed` is 0 or 1. */
 export type Row = { id: string; title: string; completed: 0 | 1 };
+
+/** The one row the counts statement returns. */
+export type CountsRow = { active: number; completed: number };
 
 export const toRow = (todo: Todo): Row => ({
   id: todo.id,
@@ -36,6 +39,21 @@ const insertTodoUnlessFullStmt = (db: D1Database, row: Row, limit: number) => {
 
 const selectTodosStmt = (db: D1Database) => {
   const sql = "SELECT id, title, completed FROM todos ORDER BY seq";
+  return db.prepare(sql);
+};
+
+const selectTodosByCompletedStmt = (db: D1Database, completed: Row["completed"]) => {
+  const sql = "SELECT id, title, completed FROM todos WHERE completed = ?1 ORDER BY seq";
+  return db.prepare(sql).bind(completed);
+};
+
+/** Both counts in one statement, so they are read together. `COUNT` gives 0 on an empty table. */
+const countTodosStmt = (db: D1Database) => {
+  const sql = `
+    SELECT
+      COUNT(*) FILTER (WHERE completed = 0) AS active,
+      COUNT(*) FILTER (WHERE completed = 1) AS completed
+    FROM todos`;
   return db.prepare(sql);
 };
 
@@ -77,6 +95,14 @@ const insertTodoUnlessFullRaw = (db: D1Database, row: Row, limit: number) => {
 
 const selectTodosRaw = (db: D1Database) => {
   return queryAll<Row>(() => selectTodosStmt(db), "select todos");
+};
+
+const selectTodosByCompletedRaw = (db: D1Database, completed: Row["completed"]) => {
+  return queryAll<Row>(() => selectTodosByCompletedStmt(db, completed), "select todos by completed");
+};
+
+const countTodosRaw = (db: D1Database) => {
+  return queryAll<CountsRow>(() => countTodosStmt(db), "count todos");
 };
 
 const updateTodoRaw = (db: D1Database, id: string, title: string | null, completed: Row["completed"] | null) => {
@@ -132,15 +158,45 @@ export const todoStore = (db: D1Database) => ({
     return ok(inserted);
   },
 
-  /** Every todo, in the order they were added. */
-  listTodos: async (): Promise<Result<Todo[], AnyFail>> => {
-    const rows = await selectTodosRaw(db);
+  /**
+   * The todos the filter keeps, in the order they were added. Without
+   * `completed` in the filter, every todo.
+   */
+  listTodos: async (filter: TodoFilter): Promise<Result<Todo[], AnyFail>> => {
+    let rows: Result<Row[], AnyFail>;
+    if (filter.completed === undefined) {
+      rows = await selectTodosRaw(db);
+    } else {
+      let flag: Row["completed"] = 0;
+      if (filter.completed) {
+        flag = 1;
+      }
+      rows = await selectTodosByCompletedRaw(db, flag);
+    }
+
     if (!rows.ok) {
       return err(rows.error);
     }
 
     const todos = rows.value.map(toTodo);
     return ok(todos);
+  },
+
+  /** How many todos are active and how many completed. */
+  countTodos: async (): Promise<Result<TodoCounts, AnyFail>> => {
+    const rows = await countTodosRaw(db);
+    if (!rows.ok) {
+      return err(rows.error);
+    }
+
+    // An aggregate without GROUP BY always returns exactly one row.
+    const [row] = rows.value;
+    if (row === undefined) {
+      return err(serverFault("count todos: no row came back"));
+    }
+
+    const counts = { active: row.active, completed: row.completed };
+    return ok(counts);
   },
 
   /**

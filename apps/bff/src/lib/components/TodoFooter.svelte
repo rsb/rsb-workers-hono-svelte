@@ -1,8 +1,11 @@
 <script lang="ts">
 	import { type SubmitFunction, enhance } from "$app/forms";
 	import { invalidateAll } from "$app/navigation";
+	import type { Filter } from "#lib/filter.ts";
 
 	type Props = {
+		/** The filter the page lists by; its link is marked as current. */
+		filter: Filter;
 		/** How many todos are not completed. */
 		active: number;
 		/** How many todos are completed; Clear completed is shown only when it is not 0. */
@@ -11,7 +14,22 @@
 		clearFailed: string | null;
 	};
 
-	let { active, completed, clearFailed }: Props = $props();
+	let { filter, active, completed, clearFailed }: Props = $props();
+
+	// Real paths (deviation 4), so each filter can be linked to and reloaded.
+	const links: { filter: Filter; href: string; label: string }[] = [
+		{ filter: "all", href: "/", label: "All" },
+		{ filter: "active", href: "/active", label: "Active" },
+		{ filter: "completed", href: "/completed", label: "Completed" },
+	];
+
+	/** `page` on the current filter's link, absent on the others. */
+	const currentFor = (linkFilter: Filter): "page" | undefined => {
+		if (linkFilter === filter) {
+			return "page";
+		}
+		return undefined;
+	};
 
 	// Upstream, Counter: `0 items`, `1 item`, `2 items`.
 	let noun = $derived.by(() => {
@@ -54,9 +72,18 @@
 	};
 </script>
 
-<!-- The filters come with slice 8. Until then Clear completed sits alone in the third column. -->
 <footer class="footer">
 	<p class="count"><strong>{active}</strong> {noun} left</p>
+	<!-- The same page with another filter: focus stays on the link and the page does not scroll. -->
+	<nav aria-label="Filter to-dos" class="filters" data-sveltekit-reset="false">
+		{#each links as link (link.filter)}
+			<a
+				href={link.href}
+				class={["filter", { "is-current": link.filter === filter }]}
+				aria-current={currentFor(link.filter)}>{link.label}</a
+			>
+		{/each}
+	</nav>
 	{#if anyCompleted}
 		<form method="POST" action="?/clearCompleted" class="clear-form" use:enhance={clearCompleted}>
 			<button type="submit" class="clear">Clear completed</button>
@@ -92,6 +119,30 @@
 		font-size: 15px;
 		font-weight: 600;
 		font-variant-numeric: tabular-nums;
+	}
+
+	.filters {
+		grid-column: 2;
+		display: flex;
+		gap: 2px;
+	}
+
+	.filter {
+		color: var(--fg2);
+		text-decoration: none;
+		font-weight: 500;
+		padding: 6px 10px;
+		border-radius: 8px;
+		line-height: 1.2;
+	}
+
+	.filter:hover {
+		color: var(--fg);
+	}
+
+	.filter.is-current {
+		color: var(--fg);
+		background: var(--fill);
 	}
 
 	.clear-form {

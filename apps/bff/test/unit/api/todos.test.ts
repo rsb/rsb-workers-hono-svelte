@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deleteTodos, getTodos, patchTodo, patchTodos, postTodo } from "../../../src/lib/server/api/todos.ts";
+import { deleteTodos, getTodoCounts, getTodos, patchTodo, patchTodos, postTodo } from "../../../src/lib/server/api/todos.ts";
 
 /** A fake binding that answers every call with `reply`. */
 const binding = (reply: () => Promise<Response>) => ({ fetch: reply });
@@ -87,5 +87,38 @@ describe("the API client", () => {
 
     expect(await deleteTodos(api, { completed: "true" })).toEqual({ ok: true, data: [todo] });
     expect(sent).toEqual([{ url: "https://todo-api/todos?completed=true", method: "DELETE" }]);
+  });
+
+  it("lists without a query when none is given, and with completed when it is", async () => {
+    const sent: string[] = [];
+    const api = {
+      fetch: async (url: string) => {
+        sent.push(url);
+        return Response.json({ ok: true, data: [todo] });
+      },
+    };
+
+    await getTodos(api);
+    await getTodos(api, {});
+    await getTodos(api, { completed: "false" });
+
+    expect(sent).toEqual([
+      "https://todo-api/todos",
+      "https://todo-api/todos",
+      "https://todo-api/todos?completed=false",
+    ]);
+  });
+
+  it("asks the counts' path and returns the counts", async () => {
+    const sent: string[] = [];
+    const api = {
+      fetch: async (url: string) => {
+        sent.push(url);
+        return Response.json({ ok: true, data: { active: 1, completed: 2 } });
+      },
+    };
+
+    expect(await getTodoCounts(api)).toEqual({ ok: true, data: { active: 1, completed: 2 } });
+    expect(sent).toEqual(["https://todo-api/todos/counts"]);
   });
 });

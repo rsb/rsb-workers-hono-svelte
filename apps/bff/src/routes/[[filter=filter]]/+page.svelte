@@ -39,7 +39,9 @@
 		}
 		return form.clearCompleted.message;
 	});
-	let hasTodos = $derived(data.todos.length > 0);
+	// From the counts, which cover every todo: on a filter the list can be
+	// empty while todos exist, and the footer and mark all must still show.
+	let hasTodos = $derived(data.active + data.completed > 0);
 	let allDone = $derived(hasTodos && data.active === 0);
 </script>
 
@@ -54,7 +56,7 @@
 
 	{#if hasTodos}
 		<TodoList todos={data.todos} {toggleFailed} {removeFailed} />
-		<TodoFooter active={data.active} completed={data.completed} {clearFailed} />
+		<TodoFooter filter={data.filter} active={data.active} completed={data.completed} {clearFailed} />
 	{:else}
 		<EmptyState error={data.error} />
 	{/if}

@@ -1,5 +1,6 @@
 import { type DbStore, createDbStore } from "@todo/data-d1/store.ts";
 import { type AddTodo, addTodo } from "@todo/operations/todos/add-todo.ts";
+import { type CountTodos, countTodos } from "@todo/operations/todos/count-todos.ts";
 import { type DeleteCompleted, deleteCompleted } from "@todo/operations/todos/delete-completed.ts";
 import { type DeleteTodo, deleteTodo } from "@todo/operations/todos/delete-todo.ts";
 import { type ListTodos, listTodos } from "@todo/operations/todos/list-todos.ts";
@@ -9,6 +10,7 @@ import { notFound, onError, tooLarge } from "./app/handlers/errors/errors.ts";
 import { getHealth } from "./app/handlers/health/health.ts";
 import { deleteTodo as deleteTodoHandler } from "./app/handlers/todos/delete-todo.ts";
 import { deleteTodos } from "./app/handlers/todos/delete-todos.ts";
+import { getTodoCounts } from "./app/handlers/todos/get-todo-counts.ts";
 import { getTodos } from "./app/handlers/todos/get-todos.ts";
 import { patchTodo } from "./app/handlers/todos/patch-todo.ts";
 import { patchTodos } from "./app/handlers/todos/patch-todos.ts";
@@ -28,6 +30,7 @@ export type Infra = { dbStore: DbStore; newId: () => string };
 export type Operations = {
   addTodo: AddTodo;
   listTodos: ListTodos;
+  countTodos: CountTodos;
   updateTodo: UpdateTodo;
   setAllCompleted: SetAllCompleted;
   deleteTodo: DeleteTodo;
@@ -51,16 +54,21 @@ export const constructInfra = (bindings: Bindings): Infra => ({
 export const constructOperations = (infra: Infra): Operations => ({
   addTodo: addTodo({ dbStore: infra.dbStore, newId: infra.newId }),
   listTodos: listTodos({ dbStore: infra.dbStore }),
+  countTodos: countTodos({ dbStore: infra.dbStore }),
   updateTodo: updateTodo({ dbStore: infra.dbStore }),
   setAllCompleted: setAllCompleted({ dbStore: infra.dbStore }),
   deleteTodo: deleteTodo({ dbStore: infra.dbStore }),
   deleteCompleted: deleteCompleted({ dbStore: infra.dbStore }),
 });
 
-/** Each handler with the operation it runs, laid out as routes. */
+/**
+ * Each handler with the operation it runs, laid out as routes. A fixed path
+ * comes before `/todos/:id`, so `counts` is never read as an id.
+ */
 export const constructRoutes = (operations: Operations): Route[] => [
   { method: "GET", path: "/health", handler: getHealth },
   { method: "GET", path: "/todos", handler: getTodos(operations.listTodos) },
+  { method: "GET", path: "/todos/counts", handler: getTodoCounts(operations.countTodos) },
   { method: "POST", path: "/todos", handler: postTodos(operations.addTodo) },
   { method: "PATCH", path: "/todos", handler: patchTodos(operations.setAllCompleted) },
   { method: "PATCH", path: "/todos/:id", handler: patchTodo(operations.updateTodo) },

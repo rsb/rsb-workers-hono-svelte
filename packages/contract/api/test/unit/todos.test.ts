@@ -1,6 +1,14 @@
 import * as v from "valibot";
 import { describe, expect, it } from "vitest";
-import { AddTodoBody, DeleteTodosQuery, DeletedReply, PatchTodoBody, PatchTodosBody } from "../../src/index.ts";
+import {
+  AddTodoBody,
+  DeleteTodosQuery,
+  DeletedReply,
+  GetTodosQuery,
+  PatchTodoBody,
+  PatchTodosBody,
+  TodoCountsReply,
+} from "../../src/index.ts";
 
 /** The issue a body fails with: its first path key and its message. */
 const issue = (body: unknown, schema: v.GenericSchema = AddTodoBody) => {
@@ -111,6 +119,48 @@ describe("DeleteTodosQuery", () => {
 
   it("passes completed through", () => {
     expect(v.parse(DeleteTodosQuery, { completed: "true" })).toEqual({ completed: "true" });
+  });
+});
+
+describe("GetTodosQuery", () => {
+  it("rejects completed that is not true or false", () => {
+    expect(issue({ completed: "yes" }, GetTodosQuery)).toEqual({
+      field: "completed",
+      message: "completed must be true or false",
+    });
+  });
+
+  // An empty value is not "no filter".
+  it("rejects an empty completed", () => {
+    expect(issue({ completed: "" }, GetTodosQuery)?.field).toBe("completed");
+  });
+
+  it("rejects an unknown key", () => {
+    expect(issue({ completed: "true", id: "id-1" }, GetTodosQuery)?.field).toBe("id");
+  });
+
+  it("takes no query", () => {
+    expect(v.parse(GetTodosQuery, {})).toEqual({});
+  });
+
+  it("passes completed through as text", () => {
+    expect(v.parse(GetTodosQuery, { completed: "true" })).toEqual({ completed: "true" });
+    expect(v.parse(GetTodosQuery, { completed: "false" })).toEqual({ completed: "false" });
+  });
+});
+
+describe("TodoCountsReply", () => {
+  it("reads both counts", () => {
+    expect(v.parse(TodoCountsReply, { active: 2, completed: 0 })).toEqual({ active: 2, completed: 0 });
+  });
+
+  it("rejects a count that is not a whole number of 0 or more", () => {
+    expect(v.safeParse(TodoCountsReply, { active: -1, completed: 0 }).success).toBe(false);
+    expect(v.safeParse(TodoCountsReply, { active: 1.5, completed: 0 }).success).toBe(false);
+  });
+
+  it("rejects a missing count", () => {
+    expect(v.safeParse(TodoCountsReply, { active: 1 }).success).toBe(false);
   });
 });
 
