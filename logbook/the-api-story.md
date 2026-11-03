@@ -141,6 +141,16 @@ The decisions behind this story are:
   technical language. Each is realized by exactly one unit, whose doc
   comment cites its path. Its name is a hint and a search key, not the
   unit's name (chapter 6).
+- L26, agreed with the owner in the api spec session (2026-11-03):
+  each api is defined in one markdown spec, `prd/<app>/api.md`,
+  written at design time after the use cases. It defines every
+  endpoint the api serves, probes included, in one form, and each
+  endpoint cites the use case or requirement it serves. The contract
+  and the OpenAPI document are generated from it and committed. This
+  reverses L23 in part: the contract is now generated, while entry
+  points and everything below them are still written by hand. The
+  spec states every rule as data. A data spec for store calls is
+  pending, to be tried (chapters 6, 8 and 11).
 
 After slice 2 (Add and list), the code followed chapters 1–10
 throughout, except for config, which has nothing to hold yet
@@ -711,8 +721,10 @@ A use case is written down before any code, beside the PRD it comes
 from. The work runs in this order:
 
 ```
-PRD → use cases → contract (endpoints, OpenAPI) → code → tests
+PRD → use cases → api spec → contract, OpenAPI (generated) → code → tests
 ```
+
+The api spec is `prd/<app>/api.md` (L26, chapter 11).
 
 - **Where.** `prd/<app>/use-cases/<area>/<name>.md`, filed by area as
   the code is (L22). This extends handoff 00's `prd/<app>.md`. The PRD
@@ -1166,6 +1178,16 @@ root of every failure it meets (chapter 13).
 Data makes no ids and decides no rules. It maps, and it reports facts
 (D13, chapter 6).
 
+**Pending (L26).** A data spec, to be tried after the api spec is
+built. It would state, in markdown, what each store call must
+guarantee and not how: its name and the use cases that use it, its
+input and result in business types, what it keeps atomic, the order
+it returns, and its failures. Nothing would be generated from it. SQL
+stays hand-written, because the engine-specific choices in it are made
+for performance (DB1, DB6). Each store function's doc comment would
+cite its section, and a conformance suite would hold one test per
+guarantee, run against D1 now and Postgres later.
+
 ### The D1 package
 
 `packages/data/d1` is the api's database. It holds the migrations
@@ -1553,7 +1575,8 @@ Today `contract` holds (D1, D4):
 - **runtime decoding**: the same schemas parse the request in the api
   and the reply in the client.
 
-**Target.** It also gets endpoints (A4). An endpoint is plain data:
+**Target.** It also gets endpoints (A4), generated with the rest of
+the contract from the api spec (L26). An endpoint is plain data:
 - method and path;
 - the input schema;
 - the reply schema;
@@ -1569,22 +1592,75 @@ A contract holds no client. A client is the consumer's concrete call,
 so it lives in the consumer's data (chapter 8). The consumer derives
 the types it sends from the schemas (valibot's `InferInput`).
 
-### OpenAPI documents the contract (L23)
+### The api spec defines the api (L26)
+
+An api is defined in markdown before it is coded, in one spec per api:
+`prd/<app>/api.md`, beside the use cases. One spec per api matches one
+contract per api. If an api grows too big for one file, splitting it
+is a recorded change.
+
+The spec defines every endpoint the api serves. A probe is part of the
+api: where its entry chain ends does not change what a caller sees.
+Every endpoint has the same form:
+- method and path;
+- its input: path parameters, query and body;
+- its reply;
+- the error kinds it can return;
+- what it serves: the use case path when it runs a unit, or the
+  requirement when it is a probe (a probe runs no unit, so it has no
+  use case: L20, L25).
+
+The spec also holds the shapes several endpoints share (`Todo`,
+`TodoCounts`) and the envelope's kinds.
+
+The use case and the endpoint do not repeat each other. The use case
+states the input, result, rules and failures in business terms. The
+endpoint states how they look on the wire.
+
+**Rules as data.** The spec's vocabulary states rules as data only,
+for example "at least 1 field". It cannot hold a function. This chapter
+already puts shape in the contract and rules in business, so a rule
+the vocabulary cannot state belongs in business. `PatchTodoBody`'s
+"title, completed or both" was written as a `v.check` function. It is
+shape (which keys the body has), so it becomes valibot's
+`minEntries(1)`.
+
+**Generated from it** (target):
+- the contract, `packages/contract/api/src`: the valibot schemas,
+  their messages and the endpoints (A4);
+- the OpenAPI document, `apps/api/openapi.json`.
+
+Both are committed and carry `x-generated`, which names the script.
+The route table and the BFF's client take method and path from the
+contract's endpoints, so a path is written once, in the spec.
+
+Generation stops at the contract. Entry points, operations, business
+and data are written by hand.
+
+### OpenAPI documents the contract (L23, L26)
 
 The api's contract is documented as OpenAPI. Only backend apis get
-one; the BFF does not. The document is generated from our code, and
-no code is ever generated from it, so our entry points keep the shape
-this story gives them.
+one; the BFF does not. It is generated from the api spec, beside the
+contract (L26). No code is generated from the document itself.
 
 OpenAPI calls a route an *operation*. We do not: a route is an entry
 point at a method and path, as Hono records it, and *operation* is
 only ever a business use case (L14). In the document, `operationId`
 is the entry point's name (`postTodos`) and `x-unit` names the unit it
-runs (`addTodo`). A probe's route has no `x-unit`.
+runs (`addTodo`). A probe's route has no `x-unit`. Neither is in the
+spec. They come from construct, read by the one extractor in
+`tooling/` that also feeds `apps/api/entry-chains.md` (L24).
 
-**Open.** How the document is produced: what it is generated from (the
-endpoints above are a candidate), where it lives, and how the checks
-keep it true to the routes we serve.
+Each failure kind has the status `app/handlers/present.ts` gives it:
+`validation` 422, `not_found` 404, `limit` 409, `too_large` 413 and
+`internal` 500.
+
+**Target.** Checks keep the spec, the generated files and the code in
+step:
+- regenerate and diff: a generated file that differs from its
+  regeneration fails;
+- an api unit test compares the routes Hono registers with the
+  spec's endpoints.
 
 ### Which rules go in a contract
 

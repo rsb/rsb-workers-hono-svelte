@@ -15,14 +15,16 @@ We ground our language in DDD's concepts, with two cautions:
   intent per port, plain types rather than hydrated objects, and one
   translation per boundary.
 
-Decisions L1–L25 were agreed in the language sessions of 2026-11-03:
+Decisions L1–L26 were agreed in the language sessions of 2026-11-03:
 L1–L13 on language, L14–L21 on operations, L22 on package layout, L23
-on OpenAPI, L24 on entry chains, L25 on use cases. They are recorded
+on OpenAPI, L24 on entry chains, L25 on use cases, L26 on the api
+spec. They are recorded
 in [the api story](the-api-story.md).
 
 Status:
 - **locked:** agreed, and the story follows it;
 - **target:** agreed, and the code does not follow it yet;
+- **pending:** agreed as a trial, to be kept or dropped once tried;
 - **not used:** a DDD term we deliberately do without;
 - **retired:** a word we used and no longer use;
 - **open:** still under discussion.
@@ -534,12 +536,36 @@ api is one: its routes serve the contract.
 - **DDD:** open host service.
 - **Status:** locked (L9).
 
+### Api spec
+
+The definition of one api, in markdown, at `prd/<app>/api.md`,
+written at design time after the use cases. It defines every endpoint
+the api serves, probes included, in one form: method and path, input,
+reply, error kinds, and the use case or requirement it serves. It also
+holds the shapes several endpoints share. It states every rule as
+data, never as a function.
+
+The contract and the OpenAPI document are generated from it. Entry
+points and everything below them are written by hand.
+
+- **DDD:** the published language, written down before the code.
+- **Status:** target (L26). The spec is not written yet.
+
+### Data spec
+
+What each store call must guarantee, in markdown: its input and
+result in business types, what it keeps atomic, the order it returns,
+and its failures. Nothing is generated from it. Store functions would
+cite it, and a conformance suite would test each guarantee.
+
+- **Status:** pending (L26), to be tried after the api spec is built.
+
 ### OpenAPI
 
 A document of the api's contract, for backend apis only; the BFF has
-none. It is documentation: generated from our code, and no code is
-ever generated from it, so nothing it produces can take a shape other
-than our entry points'.
+none. It is documentation, generated from the api spec beside the
+contract, and committed at `apps/api/openapi.json`. No code is
+generated from the document itself.
 
 OpenAPI's words map to ours:
 
@@ -550,9 +576,11 @@ OpenAPI's words map to ours:
 | `x-unit` | the unit the entry point runs: `addTodo`, or a process; a probe has none |
 
 We never call a route an operation. Operation means only a business
-use case (L14).
+use case (L14). `operationId` and `x-unit` come from construct, not the
+spec, through the extractor in `tooling/` that also feeds
+`apps/api/entry-chains.md`.
 
-- **Status:** target (L23). How the document is produced is open.
+- **Status:** target (L23, L26).
 
 ## The BFF
 
@@ -583,8 +611,9 @@ To be settled in later sessions:
   data, and our own type for the concept;
 - the workflow story: how a durable process runs on Cloudflare
   Workflows;
-- how the OpenAPI document is produced: what it is generated from,
-  where it lives, and how the checks keep it true to the routes we
-  serve;
-- `tooling/`, the monorepo's scripts, and the generator for
-  `apps/api/entry-chains.md`.
+- the api spec's vocabulary: how a shape, a rule and an endpoint are
+  written so that a script can read them;
+- `tooling/`, the monorepo's scripts: the extractor that reads
+  construct, the generator for `apps/api/entry-chains.md`, and the
+  generators for the contract and the OpenAPI document;
+- whether the data spec earns its place, once tried.
