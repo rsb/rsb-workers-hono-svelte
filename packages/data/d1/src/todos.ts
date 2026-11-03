@@ -1,7 +1,7 @@
 import { type Result, err, ok } from "@todo/business/result.ts";
 import type { Todo, TodoPatch } from "@todo/business/todos/todo.ts";
 import type { AnyFail } from "@todo/fail/fail.ts";
-import { execute, queryAll } from "./driver.ts";
+import { execute, queryAll, writeThenQueryAll } from "./driver.ts";
 
 /** How a todo is stored: SQLite has no boolean, so `completed` is 0 or 1. */
 export type Row = { id: string; title: string; completed: 0 | 1 };
@@ -53,6 +53,11 @@ const updateTodoStmt = (db: D1Database, id: string, title: string | null, comple
   return db.prepare(sql).bind(id, title, completed);
 };
 
+const setAllCompletedStmt = (db: D1Database, completed: Row["completed"]) => {
+  const sql = "UPDATE todos SET completed = ?1";
+  return db.prepare(sql).bind(completed);
+};
+
 const deleteTodoStmt = (db: D1Database, id: string) => {
   const sql = "DELETE FROM todos WHERE id = ?1";
   return db.prepare(sql).bind(id);
@@ -71,6 +76,19 @@ const selectTodosRaw = (db: D1Database) => {
 
 const updateTodoRaw = (db: D1Database, id: string, title: string | null, completed: Row["completed"] | null) => {
   return queryAll<Row>(() => updateTodoStmt(db, id, title, completed), "update todo");
+};
+
+/**
+ * The update and the list as one batch, so the list returned is the one
+ * written: D1 runs a batch as one transaction.
+ */
+const setAllCompletedRaw = (db: D1Database, completed: Row["completed"]) => {
+  return writeThenQueryAll<Row>(
+    db,
+    () => setAllCompletedStmt(db, completed),
+    () => selectTodosStmt(db),
+    "set all completed",
+  );
 };
 
 const deleteTodoRaw = (db: D1Database, id: string) => {
@@ -137,6 +155,22 @@ export const todoStore = (db: D1Database) => ({
     }
 
     return ok(toTodo(row));
+  },
+
+  /** Every todo after `completed` is set on all of them, in the order they were added. */
+  setAllCompleted: async (completed: boolean): Promise<Result<Todo[], AnyFail>> => {
+    let flag: Row["completed"] = 0;
+    if (completed) {
+      flag = 1;
+    }
+
+    const rows = await setAllCompletedRaw(db, flag);
+    if (!rows.ok) {
+      return err(rows.error);
+    }
+
+    const todos = rows.value.map(toTodo);
+    return ok(todos);
   },
 
   /** Whether a todo was deleted. It is not when no todo has that id. */

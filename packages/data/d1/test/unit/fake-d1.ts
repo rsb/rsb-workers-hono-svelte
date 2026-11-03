@@ -10,12 +10,14 @@ export type Answer = {
 };
 
 /**
- * A fake `D1Database` with only `prepare`, recording every statement. It
+ * A fake `D1Database` with only `prepare` and `batch`, recording every
+ * statement and, for each batch, how many statements it ran. It
  * proves what we send to D1 and how we read its answer, never that the SQL
  * is right: the SQL is proven against a real D1 (integration, still open).
  */
 export const fakeD1 = (answer: Answer = {}) => {
   const prepared: Prepared[] = [];
+  const batches: number[] = [];
 
   const prepare = (sql: string) => {
     const record: Prepared = { sql, bound: [] };
@@ -45,7 +47,20 @@ export const fakeD1 = (answer: Answer = {}) => {
     return statement;
   };
 
+  // Every statement in a batch answers alike: the rows and the changes.
+  const batch = async (statements: unknown[]) => {
+    if (answer.throws) {
+      throw answer.throws;
+    }
+    batches.push(statements.length);
+    return statements.map(() => ({
+      success: true,
+      meta: { changes: answer.changes ?? 0 },
+      results: answer.rows ?? [],
+    }));
+  };
+
   // The fake has only what our code calls, so it is cast to the full type.
-  const db = { prepare } as unknown as D1Database;
-  return { db, prepared };
+  const db = { prepare, batch } as unknown as D1Database;
+  return { db, prepared, batches };
 };

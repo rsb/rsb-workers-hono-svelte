@@ -27,7 +27,14 @@
 		}
 		return form.remove;
 	});
+	let markAllFailed = $derived.by(() => {
+		if (form?.markAll === undefined) {
+			return null;
+		}
+		return form.markAll.message;
+	});
 	let hasTodos = $derived(data.todos.length > 0);
+	let allDone = $derived(hasTodos && data.active === 0);
 </script>
 
 <svelte:head>
@@ -37,7 +44,7 @@
 <main>
 	<h1>Todos</h1>
 
-	<NewTodo {failed} />
+	<NewTodo {failed} {hasTodos} {allDone} {markAllFailed} />
 
 	{#if hasTodos}
 		<TodoList todos={data.todos} {toggleFailed} {removeFailed} />

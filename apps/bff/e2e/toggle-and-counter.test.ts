@@ -1,9 +1,10 @@
 import { type Page, expect, test } from "@playwright/test";
 
 // PRD scenarios 3.1–3.5. The API's store is shared by the whole run (D19),
-// and nothing removes a todo yet. So 3.1 and 3.2 toggle a todo they add,
-// and the counter scenarios first complete every todo: from there the
-// count is known. They run in file order: 3.5, then 3.3, then 3.4.
+// and earlier files leave todos in it. These tests were written before a
+// todo could be removed: 3.1 and 3.2 toggle a todo they add, and the
+// counter scenarios first complete every todo, so from there the count is
+// known. They run in file order: 3.5, then 3.3, then 3.4.
 
 const input = (page: Page) => page.getByRole("textbox", { name: "New to-do" });
 const items = (page: Page) => page.getByRole("listitem");
