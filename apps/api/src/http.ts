@@ -3,7 +3,7 @@ import { type Context, type ErrorHandler, type Handler, Hono, type NotFoundHandl
 import { bodyLimit } from "hono/body-limit";
 
 /** One api route: a method, a path, and the entry point aimed at it. */
-export type Route = { method: "GET" | "POST"; path: string; handler: Handler };
+export type Route = { method: "GET" | "POST" | "PATCH"; path: string; handler: Handler };
 
 /** Everything the HTTP layer serves, as construct builds it. */
 export type Api = {

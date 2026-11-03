@@ -10,4 +10,4 @@ export {
 } from "./envelope.ts";
 export { HealthReply } from "./health.ts";
 export { BODY_LIMIT_BYTES } from "./limits.ts";
-export { AddTodoBody, TodoListReply, TodoReply } from "./todos.ts";
+export { AddTodoBody, TodoListReply, TodoReply, ToggleTodoBody } from "./todos.ts";

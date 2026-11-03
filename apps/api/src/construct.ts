@@ -1,9 +1,11 @@
 import { type DbStore, createDbStore } from "@todo/data-d1/store.ts";
 import { type AddTodo, addTodo } from "@todo/operations/todos/add-todo.ts";
 import { type ListTodos, listTodos } from "@todo/operations/todos/list-todos.ts";
+import { type ToggleTodo, toggleTodo } from "@todo/operations/todos/toggle-todo.ts";
 import { notFound, onError, tooLarge } from "./app/handlers/errors/errors.ts";
 import { getHealth } from "./app/handlers/health/health.ts";
 import { getTodos } from "./app/handlers/todos/get-todos.ts";
+import { patchTodo } from "./app/handlers/todos/patch-todo.ts";
 import { postTodos } from "./app/handlers/todos/post-todos.ts";
 import type { Api, Route } from "./http.ts";
 
@@ -17,7 +19,7 @@ export type Bindings = { db: D1Database };
 export type Infra = { dbStore: DbStore; newId: () => string };
 
 /** Every operation, each built with the ports it declares. */
-export type Operations = { addTodo: AddTodo; listTodos: ListTodos };
+export type Operations = { addTodo: AddTodo; listTodos: ListTodos; toggleTodo: ToggleTodo };
 
 /**
  * The only builder that sees the bindings: it passes each to what uses it.
@@ -36,6 +38,7 @@ export const constructInfra = (bindings: Bindings): Infra => ({
 export const constructOperations = (infra: Infra): Operations => ({
   addTodo: addTodo({ dbStore: infra.dbStore, newId: infra.newId }),
   listTodos: listTodos({ dbStore: infra.dbStore }),
+  toggleTodo: toggleTodo({ dbStore: infra.dbStore }),
 });
 
 /** Each handler with the operation it runs, laid out as routes. */
@@ -43,6 +46,7 @@ export const constructRoutes = (operations: Operations): Route[] => [
   { method: "GET", path: "/health", handler: getHealth },
   { method: "GET", path: "/todos", handler: getTodos(operations.listTodos) },
   { method: "POST", path: "/todos", handler: postTodos(operations.addTodo) },
+  { method: "PATCH", path: "/todos/:id", handler: patchTodo(operations.toggleTodo) },
 ];
 
 /** The routes plus the failure handlers, typed by `http.ts`. */

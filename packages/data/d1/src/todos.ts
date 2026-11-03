@@ -39,6 +39,15 @@ const selectTodosStmt = (db: D1Database) => {
   return db.prepare(sql);
 };
 
+/** One statement that updates and reads back, so the todo returned is the one written. */
+const updateCompletedStmt = (db: D1Database, id: string, completed: Row["completed"]) => {
+  const sql = `
+    UPDATE todos SET completed = ?2
+    WHERE id = ?1
+    RETURNING id, title, completed`;
+  return db.prepare(sql).bind(id, completed);
+};
+
 // Raw: runs a statement and deals only in rows. A D1 error becomes the root
 // failure here, named by what the statement does.
 
@@ -48,6 +57,10 @@ const insertTodoUnlessFullRaw = (db: D1Database, row: Row, limit: number) => {
 
 const selectTodosRaw = (db: D1Database) => {
   return queryAll<Row>(() => selectTodosStmt(db), "select todos");
+};
+
+const updateCompletedRaw = (db: D1Database, id: string, completed: Row["completed"]) => {
+  return queryAll<Row>(() => updateCompletedStmt(db, id, completed), "update todo completed");
 };
 
 /**
@@ -78,5 +91,26 @@ export const todoStore = (db: D1Database) => ({
 
     const todos = rows.value.map(toTodo);
     return ok(todos);
+  },
+
+  /** The todo after its `completed` is set, or `null` when no todo has that id. */
+  setCompleted: async (id: string, completed: boolean): Promise<Result<Todo | null, AnyFail>> => {
+    let flag: Row["completed"] = 0;
+    if (completed) {
+      flag = 1;
+    }
+
+    const rows = await updateCompletedRaw(db, id, flag);
+    if (!rows.ok) {
+      return err(rows.error);
+    }
+
+    // The id is unique, so the update returns one row or none.
+    const [row] = rows.value;
+    if (row === undefined) {
+      return ok(null);
+    }
+
+    return ok(toTodo(row));
   },
 });

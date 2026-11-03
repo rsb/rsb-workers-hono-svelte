@@ -84,3 +84,43 @@ describe("listTodos", () => {
     });
   });
 });
+
+describe("setCompleted", () => {
+  it("binds the id and then completed as 0 or 1, in placeholder order", async () => {
+    const { db, prepared } = fakeD1({ rows: [] });
+
+    await todoStore(db).setCompleted("id-1", true);
+    await todoStore(db).setCompleted("id-1", false);
+
+    expect(prepared.map((statement) => statement.bound)).toEqual([
+      ["id-1", 1],
+      ["id-1", 0],
+    ]);
+  });
+
+  it("reads the returned row as the todo it now is", async () => {
+    const { db } = fakeD1({ rows: [{ id: "id-1", title: "buy milk", completed: 1 }] });
+
+    expect(await todoStore(db).setCompleted("id-1", true)).toEqual({
+      ok: true,
+      value: { id: "id-1", title: "buy milk", completed: true },
+    });
+  });
+
+  it("reports no todo when no row came back, without deciding why", async () => {
+    const { db } = fakeD1({ rows: [] });
+
+    expect(await todoStore(db).setCompleted("id-9", true)).toEqual({ ok: true, value: null });
+  });
+
+  it("passes a D1 failure up, named by the statement", async () => {
+    const { db } = fakeD1({ throws: new Error("D1_ERROR: Network connection lost.") });
+
+    const updated = await todoStore(db).setCompleted("id-1", true);
+
+    expect(updated).toMatchObject({
+      ok: false,
+      error: { kind: "unavailable", message: "update todo completed: D1_ERROR: Network connection lost." },
+    });
+  });
+});
