@@ -3,7 +3,7 @@ import { type Page, expect, test } from "@playwright/test";
 // PRD scenarios 2.1–2.8. The API's store is shared by the whole run (D19):
 // 2.1 needs it empty and runs first; the rest assert on the end of the list.
 
-const input = (page: Page) => page.getByRole("textbox", { name: "New todo" });
+const input = (page: Page) => page.getByRole("textbox", { name: "New to-do" });
 const items = (page: Page) => page.getByRole("listitem");
 
 /** Types a title and presses Enter. Returns how many todos were listed before. */
@@ -20,10 +20,13 @@ const add = async (page: Page, title: string) => {
   await expect(items(page)).toHaveCount(before + 1);
 };
 
-test("2.1 given no todos, when I open /, then there is no list and no footer", async ({ page }) => {
+test("2.1 given no todos, when I open /, then there is no list and no footer, and a message points to the input", async ({
+  page,
+}) => {
   await page.goto("/");
 
   await expect(page.getByRole("list")).toHaveCount(0);
+  await expect(page.getByText("Nothing to do yet.")).toBeVisible();
   await expect(page.getByRole("contentinfo")).toHaveCount(0);
 });
 
@@ -61,21 +64,23 @@ test("2.5 when I add a title with spaces around it, then the list shows it trimm
   await expect(items(page).last()).toHaveText("buy milk");
 });
 
-test("2.6 when I press Enter on only spaces, then no todo is added", async ({ page }) => {
+test("2.6 when I press Enter on only spaces, then no todo is added and I see why", async ({ page }) => {
   await page.goto("/");
   const before = await submit(page, "   ");
 
-  await expect(page.getByRole("alert")).toHaveText("title is empty");
+  await expect(input(page)).toHaveAccessibleDescription("Title must be 1 to 256 characters");
   await expect(items(page)).toHaveCount(before);
 });
 
-test("2.7 when I add a title of 257 characters, then no todo is added and I see why", async ({
+test("2.7 when I add a title of 257 characters, then no todo is added, I see why, and the input keeps it", async ({
   page,
 }) => {
   await page.goto("/");
-  const before = await submit(page, "x".repeat(257));
+  const title = "x".repeat(257);
+  const before = await submit(page, title);
 
-  await expect(page.getByRole("alert")).toHaveText("title is longer than 256 characters");
+  await expect(input(page)).toHaveAccessibleDescription("Title must be 1 to 256 characters");
+  await expect(input(page)).toHaveValue(title);
   await expect(items(page)).toHaveCount(before);
 });
 

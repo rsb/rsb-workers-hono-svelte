@@ -1,6 +1,11 @@
 import { TITLE_MAX } from "@todo/business/todos/todo.ts";
 import { describe, expect, it } from "vitest";
 import { addTodo } from "../../../src/lib/server/todos/add-todo.ts";
+import {
+  LIST_FULL,
+  SOMETHING_WENT_WRONG,
+  TITLE_RULE,
+} from "../../../src/lib/server/todos/messages.ts";
 
 const binding = (reply: () => Promise<Response>) => ({ fetch: reply });
 
@@ -15,13 +20,13 @@ const form = (title: string) => {
   return data;
 };
 
-const failure = (kind: string, message: string) =>
-  binding(async () => Response.json({ ok: false, error: { kind, message } }, { status: 409 }));
+const failure = (kind: string, status: number) =>
+  binding(async () => Response.json({ ok: false, error: { kind, message: "for developers" } }, { status }));
 
 describe("addTodo", () => {
   it("rejects a title that is empty after trim", async () => {
     const result = await addTodo(unreached, form("   "));
-    expect(result).toMatchObject({ status: 422, data: { title: "   ", message: "title is empty" } });
+    expect(result).toMatchObject({ status: 422, data: { title: "   ", message: TITLE_RULE } });
   });
 
   it("rejects a title over the limit without asking the API", async () => {
@@ -29,19 +34,35 @@ describe("addTodo", () => {
     const result = await addTodo(unreached, form(title));
     expect(result).toMatchObject({
       status: 422,
-      data: { title, message: "title is longer than 256 characters" },
+      data: { title, message: TITLE_RULE },
     });
   });
 
-  it("answers 409 when the API says the list is full", async () => {
-    const result = await addTodo(failure("limit", "the list is full"), form("buy milk"));
-    expect(result).toMatchObject({ status: 409, data: { message: "the list is full" } });
+  it("answers 409 and says the list is full when the API says so", async () => {
+    const result = await addTodo(failure("limit", 409), form("buy milk"));
+    expect(result).toMatchObject({ status: 409, data: { title: "buy milk", message: LIST_FULL } });
   });
 
-  it("answers 500 when the API cannot be read", async () => {
+  it("answers 500, keeps what was typed and says something went wrong when the API fails", async () => {
+    const result = await addTodo(failure("internal", 500), form("buy milk"));
+    expect(result).toMatchObject({
+      status: 500,
+      data: { title: "buy milk", message: SOMETHING_WENT_WRONG },
+    });
+  });
+
+  it("answers 413 and says something went wrong when the API says the body is too large", async () => {
+    const result = await addTodo(failure("too_large", 413), form("buy milk"));
+    expect(result).toMatchObject({ status: 413, data: { message: SOMETHING_WENT_WRONG } });
+  });
+
+  it("answers 500 and says something went wrong when the API cannot be reached", async () => {
     const api = binding(() => Promise.reject(new Error("binding failed")));
     const result = await addTodo(api, form("buy milk"));
-    expect(result).toMatchObject({ status: 500, data: { message: "the API could not be reached" } });
+    expect(result).toMatchObject({
+      status: 500,
+      data: { title: "buy milk", message: SOMETHING_WENT_WRONG },
+    });
   });
 
   it("sends the trimmed title and presents what was added", async () => {
