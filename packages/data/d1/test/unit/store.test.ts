@@ -11,6 +11,7 @@ it("holds every table's methods, flat", () => {
 
   expect(names).toEqual([
     "addTodoUnlessFull",
+    "countTodos",
     "deleteCompleted",
     "deleteTodo",
     "listTodos",

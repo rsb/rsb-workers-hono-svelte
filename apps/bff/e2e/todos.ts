@@ -11,9 +11,9 @@ export const items = (page: Page) => page.getByRole("listitem");
 export const rowOf = (page: Page, title: string) =>
   items(page).filter({ has: page.getByRole("checkbox", { name: title, exact: true }) });
 
-/** Opens the page and waits until the client has loaded. */
-export const open = async (page: Page) => {
-  await page.goto("/");
+/** Opens the page at `path` (`/` unless given) and waits until the client has loaded. */
+export const open = async (page: Page, path = "/") => {
+  await page.goto(path);
   await page.waitForLoadState("networkidle");
 };
 

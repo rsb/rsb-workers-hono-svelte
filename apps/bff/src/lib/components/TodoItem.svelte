@@ -19,6 +19,24 @@
 	let editErrorId = $derived(`todo-edit-error-${todo.id}`);
 	let removeErrorId = $derived(`todo-remove-error-${todo.id}`);
 
+	// --- Focus ---
+
+	/**
+	 * Where focus goes once this row is gone, after a remove or a toggle
+	 * the filter no longer lists: the next row's title, else the
+	 * previous row's, else the new to-do input when the list is now empty.
+	 */
+	const focusAfterRowGone = (neighbour: Element | null) => {
+		if (neighbour !== null && neighbour.isConnected) {
+			const title = neighbour.querySelector<HTMLButtonElement>("button.title");
+			if (title !== null) {
+				title.focus();
+				return;
+			}
+		}
+		document.getElementById("new-todo")?.focus();
+	};
+
 	// --- Toggle ---
 
 	// From the page without JavaScript. With it, `toggle` sets it from its
@@ -38,11 +56,21 @@
 	// then and never when the page loads.
 	let justDone = $state(false);
 
-	const toggle: SubmitFunction<{ toggled: string }, { toggle: { id: string; message: string } }> = () => {
+	const toggle: SubmitFunction<{ toggled: string }, { toggle: { id: string; message: string } }> = ({
+		formElement,
+	}) => {
 		const next = !checked;
 		pending = next;
 		justDone = next;
 		toggleError = null;
+
+		// Read before the reload: on a filter the toggled row leaves the list.
+		const row = formElement.closest("li");
+		const hadFocus = row !== null && row.contains(document.activeElement);
+		let neighbour: Element | null = null;
+		if (row !== null) {
+			neighbour = row.nextElementSibling ?? row.previousElementSibling;
+		}
 
 		return async ({ result, update }) => {
 			// A failure stays with this row, so the page's `form` is left alone.
@@ -54,6 +82,13 @@
 				await update();
 			}
 			pending = null;
+
+			// The row is gone when the filter no longer lists it; focus moves as
+			// it does after a remove.
+			const rowGone = row !== null && !row.isConnected;
+			if (rowGone && hadFocus) {
+				focusAfterRowGone(neighbour);
+			}
 		};
 	};
 
@@ -180,21 +215,6 @@
 	// own result, so another action's result never clears it.
 	let removeFailure = $derived(removeError);
 
-	/**
-	 * Where focus goes once this row is gone: the next row's title, else the
-	 * previous row's, else the new to-do input when the list is now empty.
-	 */
-	const focusAfterRemove = (neighbour: Element | null) => {
-		if (neighbour !== null && neighbour.isConnected) {
-			const title = neighbour.querySelector<HTMLButtonElement>("button.title");
-			if (title !== null) {
-				title.focus();
-				return;
-			}
-		}
-		document.getElementById("new-todo")?.focus();
-	};
-
 	const remove: SubmitFunction<{ removed: string }, { remove: { id: string; message: string } }> = ({
 		formElement,
 	}) => {
@@ -218,7 +238,7 @@
 
 			await update();
 			if (hadFocus) {
-				focusAfterRemove(neighbour);
+				focusAfterRowGone(neighbour);
 			}
 		};
 	};

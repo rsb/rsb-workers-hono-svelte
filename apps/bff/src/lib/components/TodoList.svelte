@@ -3,7 +3,7 @@
 	import TodoItem from "./TodoItem.svelte";
 
 	type Props = {
-		/** At least one todo; with none there is no list. */
+		/** The todos the filter lists; empty on a filter that lists none. */
 		todos: TodoReply[];
 		/** The last failed toggle without JavaScript: which todo, and why. */
 		toggleFailed: { id: string; message: string } | null;

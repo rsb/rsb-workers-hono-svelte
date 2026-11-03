@@ -45,6 +45,16 @@ export const DeleteTodosQuery = v.strictObject({
 });
 export type DeleteTodosQuery = v.InferOutput<typeof DeleteTodosQuery>;
 
+/**
+ * The query of `GET /todos`: no query lists every todo; `completed=true` or
+ * `completed=false` lists only those. A query's values are text, so the
+ * handler turns the value into a boolean. Unknown keys are rejected.
+ */
+export const GetTodosQuery = v.strictObject({
+  completed: v.exactOptional(v.picklist(["true", "false"], "completed must be true or false")),
+});
+export type GetTodosQuery = v.InferOutput<typeof GetTodosQuery>;
+
 /** A todo on the wire. */
 export const TodoReply = v.strictObject({
   id: v.string(),
@@ -60,3 +70,10 @@ export type TodoListReply = v.InferOutput<typeof TodoListReply>;
 /** The data of `DELETE /todos/:id`: the id of the todo deleted. */
 export const DeletedReply = v.strictObject({ id: v.string() });
 export type DeletedReply = v.InferOutput<typeof DeletedReply>;
+
+/** The data of `GET /todos/counts`: how many todos are active and how many completed. */
+export const TodoCountsReply = v.strictObject({
+  active: v.pipe(v.number(), v.integer(), v.minValue(0)),
+  completed: v.pipe(v.number(), v.integer(), v.minValue(0)),
+});
+export type TodoCountsReply = v.InferOutput<typeof TodoCountsReply>;

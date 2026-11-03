@@ -2,8 +2,10 @@ import {
   type AddTodoBody,
   DeletedReply,
   type DeleteTodosQuery,
+  type GetTodosQuery,
   type PatchTodoBody,
   type PatchTodosBody,
+  TodoCountsReply,
   TodoListReply,
   TodoReply,
 } from "@todo/contract-api";
@@ -11,8 +13,21 @@ import { call } from "./call.ts";
 
 type Api = Pick<Fetcher, "fetch">;
 
-/** `GET /todos`: every todo, in creation order. */
-export const getTodos = (api: Api) => call(api, "/todos", {}, TodoListReply);
+/**
+ * `GET /todos`: every todo, or with `completed` only those, in creation
+ * order. An empty query sends no `?`.
+ */
+export const getTodos = (api: Api, query: GetTodosQuery = {}) => {
+  const search = new URLSearchParams(query).toString();
+  let path = "/todos";
+  if (search !== "") {
+    path = `/todos?${search}`;
+  }
+  return call(api, path, {}, TodoListReply);
+};
+
+/** `GET /todos/counts`: how many todos are active and how many completed. */
+export const getTodoCounts = (api: Api) => call(api, "/todos/counts", {}, TodoCountsReply);
 
 /** `POST /todos`: the added todo. */
 export const postTodo = (api: Api, body: AddTodoBody) =>

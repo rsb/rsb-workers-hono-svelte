@@ -14,8 +14,10 @@ export {
   AddTodoBody,
   DeletedReply,
   DeleteTodosQuery,
+  GetTodosQuery,
   PatchTodoBody,
   PatchTodosBody,
+  TodoCountsReply,
   TodoListReply,
   TodoReply,
 } from "./todos.ts";

@@ -13,6 +13,15 @@ export type NewTodo = { title: string };
  */
 export type TodoPatch = { title?: string; completed?: boolean };
 
+/**
+ * Which todos to list: with `completed` only those with that value, without
+ * it every todo.
+ */
+export type TodoFilter = { completed?: boolean };
+
+/** How many todos are active and how many completed, over every todo. */
+export type TodoCounts = { active: number; completed: number };
+
 /** The longest title, after trim, in UTF-16 code units (PRD deviation 7). */
 export const TITLE_MAX = 256;
 

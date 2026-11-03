@@ -1,4 +1,4 @@
-import { DeletedReply, Failure, TodoListReply, TodoReply, envelope } from "@todo/contract-api";
+import { DeletedReply, Failure, TodoCountsReply, TodoListReply, TodoReply, envelope } from "@todo/contract-api";
 import { ok } from "@todo/business/result.ts";
 import { TODO_LIMIT, type Todo } from "@todo/business/todos/todo.ts";
 import type { DbStore } from "@todo/data-d1/store.ts";
@@ -9,7 +9,8 @@ import { serve } from "../../src/http.ts";
 
 /**
  * A fake `DbStore` that keeps todos in an array. It reports facts as the
- * real one does: whether a todo was inserted, every todo in order, and a
+ * real one does: whether a todo was inserted, the todos a filter keeps in
+ * order, how many are active and completed, a
  * todo as it is after a patch is applied, every todo after all are set,
  * whether a todo was deleted, and the todos left after a clear.
  */
@@ -23,8 +24,17 @@ const fakeDbStore = (): DbStore => {
       todos.push(todo);
       return ok(true);
     },
-    listTodos: async () => {
-      return ok([...todos]);
+    listTodos: async (filter) => {
+      if (filter.completed === undefined) {
+        return ok([...todos]);
+      }
+      const kept = todos.filter((todo) => todo.completed === filter.completed);
+      return ok(kept);
+    },
+    countTodos: async () => {
+      const completed = todos.filter((todo) => todo.completed).length;
+      const active = todos.length - completed;
+      return ok({ active, completed });
     },
     updateTodo: async (id, patch) => {
       const index = todos.findIndex((todo) => todo.id === id);
@@ -184,5 +194,32 @@ it("a clear leaves only the active todos, and the route with no query is refused
   expect(v.parse(envelope(TodoListReply), await cleared.json())).toEqual({
     ok: true,
     data: [{ id: "id-2", title: "walk dog", completed: false }],
+  });
+});
+
+it("a filtered list keeps only the todos asked for, and the counts cover every todo", async () => {
+  let n = 0;
+  const api = app(() => `id-${++n}`);
+  await api.request("/todos", { method: "POST", body: '{"title":"buy milk"}' });
+  await api.request("/todos", { method: "POST", body: '{"title":"walk dog"}' });
+  await api.request("/todos/id-1", { method: "PATCH", body: '{"completed":true}' });
+  const list = async (query: string) => {
+    const response = await api.request(`/todos${query}`);
+    const reply = v.parse(envelope(TodoListReply), await response.json());
+    return reply.ok && reply.data.map((todo) => todo.title);
+  };
+
+  expect(await list("?completed=true")).toEqual(["buy milk"]);
+  expect(await list("?completed=false")).toEqual(["walk dog"]);
+  expect(await list("")).toEqual(["buy milk", "walk dog"]);
+  const refused = await api.request("/todos?completed=yes");
+  expect(refused.status).toBe(422);
+
+  // Routed before `/todos/:id`, so `counts` is not read as an id.
+  const counted = await api.request("/todos/counts");
+  expect(counted.status).toBe(200);
+  expect(v.parse(envelope(TodoCountsReply), await counted.json())).toEqual({
+    ok: true,
+    data: { active: 1, completed: 1 },
   });
 });
