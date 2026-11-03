@@ -11,7 +11,7 @@ import { serve } from "../../src/http.ts";
  * A fake `DbStore` that keeps todos in an array. It reports facts as the
  * real one does: whether a todo was inserted, every todo in order, and a
  * todo as it is after a patch is applied, every todo after all are set,
- * and whether a todo was deleted.
+ * whether a todo was deleted, and the todos left after a clear.
  */
 const fakeDbStore = (): DbStore => {
   const todos: Todo[] = [];
@@ -49,6 +49,11 @@ const fakeDbStore = (): DbStore => {
       }
       todos.splice(index, 1);
       return ok(true);
+    },
+    deleteCompleted: async () => {
+      const left = todos.filter((todo) => !todo.completed);
+      todos.splice(0, todos.length, ...left);
+      return ok([...todos]);
     },
   };
 };
@@ -160,4 +165,24 @@ it("a deleted todo is not in the next list, and a second delete is refused with 
   const again = await remove();
   expect(again.status).toBe(404);
   expect(v.parse(Failure, await again.json()).error.kind).toBe("not_found");
+});
+
+it("a clear leaves only the active todos, and the route with no query is refused, not a delete of all", async () => {
+  let n = 0;
+  const api = app(() => `id-${++n}`);
+  await api.request("/todos", { method: "POST", body: '{"title":"buy milk"}' });
+  await api.request("/todos", { method: "POST", body: '{"title":"walk dog"}' });
+  await api.request("/todos/id-1", { method: "PATCH", body: '{"completed":true}' });
+
+  const refused = await api.request("/todos", { method: "DELETE" });
+  expect(refused.status).toBe(422);
+  const kept = v.parse(envelope(TodoListReply), await (await api.request("/todos")).json());
+  expect(kept.ok && kept.data.length).toBe(2);
+
+  const cleared = await api.request("/todos?completed=true", { method: "DELETE" });
+  expect(cleared.status).toBe(200);
+  expect(v.parse(envelope(TodoListReply), await cleared.json())).toEqual({
+    ok: true,
+    data: [{ id: "id-2", title: "walk dog", completed: false }],
+  });
 });

@@ -204,3 +204,33 @@ describe("deleteTodo", () => {
     });
   });
 });
+
+describe("deleteCompleted", () => {
+  it("deletes and reads the list in the same batch, binding nothing", async () => {
+    const { db, prepared, batches } = fakeD1();
+
+    await todoStore(db).deleteCompleted();
+
+    expect(batches).toEqual([2]);
+    expect(prepared.map((each) => each.bound)).toEqual([[], []]);
+  });
+
+  it("reads every row the batch lists as a todo", async () => {
+    const rows = [{ id: "id-2", title: "walk dog", completed: 0 }];
+    const { db } = fakeD1({ rows });
+
+    expect(await todoStore(db).deleteCompleted()).toEqual({
+      ok: true,
+      value: [{ id: "id-2", title: "walk dog", completed: false }],
+    });
+  });
+
+  it("passes a D1 failure up, named by the batch", async () => {
+    const { db } = fakeD1({ throws: new Error("D1_ERROR: Network connection lost.") });
+
+    expect(await todoStore(db).deleteCompleted()).toMatchObject({
+      ok: false,
+      error: { kind: "unavailable", message: "delete completed: D1_ERROR: Network connection lost." },
+    });
+  });
+});

@@ -13,6 +13,7 @@ export { BODY_LIMIT_BYTES } from "./limits.ts";
 export {
   AddTodoBody,
   DeletedReply,
+  DeleteTodosQuery,
   PatchTodoBody,
   PatchTodosBody,
   TodoListReply,

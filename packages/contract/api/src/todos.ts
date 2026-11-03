@@ -35,6 +35,16 @@ export const PatchTodosBody = v.strictObject({
 });
 export type PatchTodosBody = v.InferOutput<typeof PatchTodosBody>;
 
+/**
+ * The query of `DELETE /todos`: `completed=true`, the only delete of many
+ * there is. Without it the request is refused, never read as "delete all".
+ * Unknown keys are rejected.
+ */
+export const DeleteTodosQuery = v.strictObject({
+  completed: v.literal("true", "completed must be true"),
+});
+export type DeleteTodosQuery = v.InferOutput<typeof DeleteTodosQuery>;
+
 /** A todo on the wire. */
 export const TodoReply = v.strictObject({
   id: v.string(),
@@ -43,7 +53,7 @@ export const TodoReply = v.strictObject({
 });
 export type TodoReply = v.InferOutput<typeof TodoReply>;
 
-/** The data of `GET /todos` and `PATCH /todos`, in creation order. */
+/** The data of `GET /todos`, `PATCH /todos` and `DELETE /todos`, in creation order. */
 export const TodoListReply = v.array(TodoReply);
 export type TodoListReply = v.InferOutput<typeof TodoListReply>;
 
