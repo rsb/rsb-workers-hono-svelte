@@ -15,8 +15,8 @@ We ground our language in DDD's concepts, with two cautions:
   intent per port, plain types rather than hydrated objects, and one
   translation per boundary.
 
-Decisions L1–L21 were agreed in the language sessions of 2026-11-03:
-L1–L13 on language, L14–L21 on operations. They are recorded in
+Decisions L1–L22 were agreed in the language sessions of 2026-11-03:
+L1–L13 on language, L14–L21 on operations, L22 on package layout. They are recorded in
 [the api story](the-api-story.md).
 
 Status:
@@ -140,18 +140,22 @@ A process:
     whole result, but a step after a crash is lost;
   - **durable:** on a runner that keeps each step's result and retries
     (Cloudflare Workflows). Every step runs, but the request cannot
-    wait for all of them;
+    wait for all of them. How it runs there is the workflow story's;
 - receives built operations from construct, so its tests mock
   operations only.
 
 Processes do not call processes.
 
+Lives in `packages/processes`, in the folder of the area whose use
+case triggers it. It imports operations' types only (`import type`),
+and `packages/operations` never imports it.
+
 - **DDD:** process manager (also called a saga).
 - **Not called:** workflow (rsb-workflow and Cloudflare Workflows use
   the word), saga (suggests compensation only), pipeline (suggests a
   straight line).
-- **Status:** target (L18). The todo app's first process is "notify on
-  add".
+- **Status:** target (L18, L22). The todo app's first process is
+  "notify on add".
 
 ### Operation
 
@@ -172,13 +176,15 @@ to go. `listTodos` is one.
 Operations do not call operations. Shared work is entity behaviour or
 a shared action; a sequence of operations is a process.
 
-Lives in `packages/operations`, one file per operation with its ports.
+Lives in `packages/operations`, in its area's folder, one file per
+operation with its ports. It may use any area's business objects: a
+rule that spans two areas' entities is its job.
 
 - **DDD:** application service, and also the job of the aggregate
   (guarding a rule across several entities).
 - **We differ:** it is a function, not a service object, and it holds
   no state.
-- **Status:** locked (L1, L4, L5, L14).
+- **Status:** locked (L1, L4, L5, L14, L22).
 
 ### Spec
 
@@ -222,6 +228,27 @@ facts. It makes no ids and decides no rules.
 
 - **DDD:** infrastructure, repository implementation.
 - **Status:** locked.
+
+### Area
+
+A part of the business inside one system, such as `todos` or `users`.
+It is a folder in each layer, `business`, `operations` and
+`processes`, not a package of its own. Areas share one language and
+one store.
+
+- Siblings never import each other within a layer: no business area
+  imports another, and no operation imports another. Areas meet in an
+  operation or a process, which may use any area's business objects.
+- An entity refers to another area's entity by id.
+- An area becomes its own package only by recorded exception: a
+  second app needs only some areas, a team owns it, or the package's
+  check or test time hurts.
+- Data is split by engine or external system, never by area.
+
+- **DDD:** a module. It is not a bounded context: a bounded context is
+  a whole system with its own language. If two areas start to mean
+  different things by the same word, they have become two systems.
+- **Status:** locked (L22).
 
 ## Effects
 
@@ -373,6 +400,9 @@ the same title are still two todos.
 
 Named plainly, with no suffix: `Todo`, never `TodoEntity`.
 
+An entity refers to an entity of another area by id, never by holding
+it: a `Todo` would hold `assigneeId`, not a `User` (L22).
+
 - **DDD:** entity.
 - **We differ:** a type plus functions beside it, not a class.
 - **Status:** locked (L3). Its package, `business/entity`, is a
@@ -494,4 +524,7 @@ To be settled in later sessions:
 - whether D1 stays for the lab, since it cannot offer a transaction
   scope;
 - the spec's form, and how use cases enter rsb-workflow (parked);
-- the package layout for operations and processes.
+- using another system's business objects: its contract, an ACL in
+  data, and our own type for the concept;
+- the workflow story: how a durable process runs on Cloudflare
+  Workflows.
