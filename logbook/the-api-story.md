@@ -116,6 +116,12 @@ The decisions behind this story are:
   - L21: the BFF never runs a backend operation. Its own operations
     are UI concerns: aggregation, filtering. They wait for the BFF
     story (chapters 6 and 12).
+- L22, agreed with the owner in the layout session (2026-11-03):
+  operations and processes each have one package, with a folder per
+  area. A process imports operations' types only. An area splits into
+  its own package only by recorded exception. Any area's business
+  objects may be used by an operation or process; entities refer to
+  other areas' entities by id (chapters 0, 4, 6 and 9).
 
 After slice 2 (Add and list), the code followed chapters 1–10
 throughout, except for config, which has nothing to hold yet
@@ -152,6 +158,7 @@ apps/api/src/
 └─ app/handlers/       entry points
 packages/
 ├─ operations/         the work
+├─ processes/          compositions of operations (L22, target)
 ├─ business/           types, rules, Result
 ├─ fail/               every failure our code can name (chapter 13)
 └─ data/               one package per real thing
@@ -197,6 +204,7 @@ packages/
 ├─ business/
 ├─ fail/
 ├─ operations/
+├─ processes/             (L22)
 └─ data/
    ├─ d1/                 the api's database, with its migrations
    └─ internal/
@@ -400,6 +408,8 @@ taking the level below as its argument and each exported:
 constructInfra(bindings): Infra             // the DbStore, the id source; later, config too
 constructOperations(infra): Operations      // each operation with the ports it declares
 constructRoutes(operations): Route[]        // each handler with the operation it runs
+// target (L22): constructProcesses(operations): Processes, between the two,
+// and constructRoutes(operations, processes), each handler with its one unit
 constructApi(routes): Api                   // plus the failure handlers, typed by http.ts
 construct(bindings): Api                    // the default chain, which index.ts calls
 ```
@@ -911,7 +921,10 @@ ones never run. So a process has two modes, and its spec chooses:
 - **durable:** the same steps on a runner that keeps each step's
   result and retries, such as Cloudflare Workflows. Every step runs,
   but the request cannot wait for all of them: it returns after the
-  first, or returns "accepted".
+  first, or returns "accepted". How a durable process runs on
+  Cloudflare Workflows is a story of its own, the workflow story, not
+  written yet. The process itself, its spec and its place in the chain
+  belong here.
 
 A process receives built operations from construct, not ports, so its
 tests mock operations only. Processes do not call processes.
@@ -971,9 +984,55 @@ bypassing the api. The rule is that `apps/bff` never lists
 `@todo/operations`, which one `package.json` check enforces. The BFF's
 operations wait for the BFF story (chapter 12).
 
+### Where operations and processes live (L22)
+
+Each layer is one package with a folder per area:
+
+```
+packages/
+├─ business/src/todos/todo.ts
+├─ operations/src/todos/add-todo.ts
+└─ processes/src/todos/add-todo-and-notify.ts
+```
+
+- **Processes are their own package.** `@todo/processes` lists
+  `@todo/operations` and imports it with `import type` only, since
+  construct hands a process its built operations. `@todo/operations`
+  never lists `@todo/processes`, so pnpm refuses an operation that
+  reaches for a process.
+- **A process that spans areas** lives in the area of the use case
+  that triggers it. "Add and notify" is a todos use case, even though
+  it sends email.
+- **Areas are folders, not packages.** An area becomes its own package
+  only when a second app needs only some areas, a team owns it, or
+  the package's check or test time hurts. The split is recorded as an
+  exception with its reason. Moving is cheap: one import segment
+  changes.
+- **Data keeps its own axis:** one package per engine or external
+  system, never per area (chapter 8).
+
+Areas meet in the operation, not in business:
+- An operation or a process may use any area's business objects.
+  Edges across layers reach any depth (chapter 9), so
+  `operations/todos/assign-todo.ts` may import
+  `business/users/user.ts`. A rule that spans two areas' entities is
+  the operation's job (L5).
+- Within a layer, siblings never import each other: no business area
+  imports another, and no operation imports another.
+- An entity refers to another area's entity by id: a `Todo` holds
+  `assigneeId`, not a `User`.
+
+Another system's business objects are a different case: they are its
+language, not ours. They are reached through its contract and an ACL
+in data (L9), never imported. That case is open.
+
+Construct gains one level, between operations and routes:
+`constructOperations → constructProcesses → constructRoutes`
+(chapter 4).
+
 **Open.**
-- The package layout: one `operations` package, or one per area, and
-  where processes live.
+- Using another system's business objects: the contract, the ACL in
+  data, and our own type for the concept.
 - The spec's form, and how use cases enter rsb-workflow (parked).
 - Transaction scope on Postgres: the access route, the isolation each
   operation needs, and its latency from a Worker. It needs
@@ -1295,6 +1354,9 @@ where they are enforced (A1):
   A process imports operations' types only, since construct hands it
   built operations (L18). Handlers and probes both import `app/errors/`
   (L20). Probes import neither operations nor processes.
+  Within `business`, `operations` and `processes`, each area is a
+  sibling folder, so the hierarchy rules keep areas apart; the
+  layers below reach any area (L22).
 - **Within an app**, handlers keep the hierarchy rules as a directory
   tree.
 - **In the BFF**, SvelteKit decides which files are routes. The rules
