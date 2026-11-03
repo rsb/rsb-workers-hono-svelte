@@ -7,18 +7,18 @@ in the code and whether it is settled.
 We ground our language in DDD's concepts, with two cautions:
 - **Its code, not its concepts.** DDD examples are object-oriented:
   repositories, services and aggregates that guard their own state.
-  Our code is functions and types arranged in a chain, so where a DDD
-  term would bring an OO shape with it, we keep the idea and say how
-  we realize it.
+  Our code is functions and types arranged in an entry chain, so where
+  a DDD term would bring an OO shape with it, we keep the idea and say
+  how we realize it.
 - **Performance is a design input (L11).** We take a DDD concept only
   when it costs nothing at run time or pays for what it costs: one
   intent per port, plain types rather than hydrated objects, and one
   translation per boundary.
 
-Decisions L1–L23 were agreed in the language sessions of 2026-11-03:
+Decisions L1–L25 were agreed in the language sessions of 2026-11-03:
 L1–L13 on language, L14–L21 on operations, L22 on package layout, L23
-on OpenAPI. They are recorded in
-[the api story](the-api-story.md).
+on OpenAPI, L24 on entry chains, L25 on use cases. They are recorded
+in [the api story](the-api-story.md).
 
 Status:
 - **locked:** agreed, and the story follows it;
@@ -27,9 +27,9 @@ Status:
 - **retired:** a word we used and no longer use;
 - **open:** still under discussion.
 
-## The chain
+## The entry chain
 
-### Chain
+### Entry chain
 
 The path every request takes:
 startup → entry point → [process →] operation (using business) → port
@@ -41,12 +41,28 @@ needs one.
 - **We differ:** the boundary is kept by the architecture (checked
   imports and tests), not by encapsulation. Each link can be tested on
   its own, with or without a mock, and in every test category.
-- **Status:** locked (L2, L18).
+- **Status:** locked (L2, L18). Called *chain* until L24; in file and
+  identifier names it is `entry-chains`.
+
+An entry chain is written in one line of exported symbols, `→` for a
+direct call and `⇢` across a port, where construct picks the
+implementation:
+
+```
+PATCH /todos/:id → patchTodo → updateTodo ⇢ UpdateStore.updateTodo → d1.updateTodo → queryAll
+```
+
+Every entry point's entry chain, with the file and symbols of each
+link, is listed in `apps/api/entry-chains.md`. The index is generated, never
+written by hand, and checked by regenerating and diffing it. See
+[the api story](the-api-story.md), chapter 9.
+
+- **Status:** target (L24). The generator is open.
 
 ### Boundary
 
-The line between two links of the chain. What may cross it, and in
-which direction, is fixed by `package.json` dependencies and checked
+The line between two links of an entry chain. What may cross it, and
+in which direction, is fixed by `package.json` dependencies and checked
 by tests.
 
 - **DDD:** the line between layers. It is not a bounded context,
@@ -187,6 +203,24 @@ rule that spans two areas' entities is its job.
   no state.
 - **Status:** locked (L1, L4, L5, L14, L22).
 
+### Use case
+
+What the business needs done, written down before any code, at
+`prd/<app>/use-cases/<area>/<name>.md`. It cites the PRD and never
+edits it. It is the spec of the one unit that realizes it, an
+operation or a process, and that unit's doc comment cites its path.
+
+It states the intent and the PRD sentences it serves, the input, the
+rules, what must hold together (under concurrency too), the effects
+and whether each must be delivered, the result and the failures. It is
+written for the developer, so it may speak of databases, transactions,
+concurrency and queues, but it names no code. Its name is a hint and a
+search key, not the unit's name.
+
+- **DDD:** use case, as in application services.
+- **Status:** target (L25). The use cases are written; the units do
+  not cite them yet.
+
 ### Spec
 
 What drives a use case. An operation's spec states its intent, input,
@@ -198,8 +232,8 @@ failure policy for each step, its mode and its result.
 
 A light operation's spec is a few lines.
 
-- **Status:** locked (L14) that a spec drives each use case. Its form,
-  and how specs enter rsb-workflow, are parked.
+- **Status:** locked (L14) that a spec drives each use case. Its form
+  is the use case file (L25). How specs enter rsb-workflow is parked.
 
 ### Port
 
@@ -544,11 +578,13 @@ To be settled in later sessions:
   actions keep their atomic promise there: it needs experiments;
 - whether D1 stays for the lab, since it cannot offer a transaction
   scope;
-- the spec's form, and how use cases enter rsb-workflow (parked);
+- how use cases enter rsb-workflow (parked);
 - using another system's business objects: its contract, an ACL in
   data, and our own type for the concept;
 - the workflow story: how a durable process runs on Cloudflare
   Workflows;
 - how the OpenAPI document is produced: what it is generated from,
   where it lives, and how the checks keep it true to the routes we
-  serve.
+  serve;
+- `tooling/`, the monorepo's scripts, and the generator for
+  `apps/api/entry-chains.md`.
