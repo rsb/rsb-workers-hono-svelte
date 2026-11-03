@@ -9,7 +9,8 @@ import { serve } from "../../src/http.ts";
 
 /**
  * A fake `DbStore` that keeps todos in an array. It reports facts as the
- * real one does: whether a todo was inserted, and every todo in order.
+ * real one does: whether a todo was inserted, every todo in order, and a
+ * todo as it is after its `completed` is set.
  */
 const fakeDbStore = (): DbStore => {
   const todos: Todo[] = [];
@@ -23,6 +24,16 @@ const fakeDbStore = (): DbStore => {
     },
     listTodos: async () => {
       return ok([...todos]);
+    },
+    setCompleted: async (id, completed) => {
+      const index = todos.findIndex((todo) => todo.id === id);
+      const found = todos[index];
+      if (found === undefined) {
+        return ok(null);
+      }
+      const updated = { ...found, completed };
+      todos[index] = updated;
+      return ok(updated);
     },
   };
 };
@@ -64,4 +75,35 @@ it("an add after the limit is refused with limit", async () => {
 
   expect(refused.status).toBe(409);
   expect(v.parse(Failure, await refused.json()).error.kind).toBe("limit");
+});
+
+it("a toggled todo is completed in the next list, and can be made active again", async () => {
+  const api = app();
+  await api.request("/todos", { method: "POST", body: '{"title":"buy milk"}' });
+  const toggle = (completed: boolean) =>
+    api.request("/todos/id-1", { method: "PATCH", body: JSON.stringify({ completed }) });
+
+  const completed = await toggle(true);
+  expect(completed.status).toBe(200);
+  expect(v.parse(envelope(TodoReply), await completed.json())).toEqual({
+    ok: true,
+    data: { id: "id-1", title: "buy milk", completed: true },
+  });
+  const listed = await api.request("/todos");
+  expect(v.parse(envelope(TodoListReply), await listed.json())).toEqual({
+    ok: true,
+    data: [{ id: "id-1", title: "buy milk", completed: true }],
+  });
+
+  const active = await toggle(false);
+  expect(v.parse(envelope(TodoReply), await active.json())).toMatchObject({ data: { completed: false } });
+});
+
+it("a toggle of an id no todo has is refused with not_found", async () => {
+  const api = app();
+
+  const refused = await api.request("/todos/id-9", { method: "PATCH", body: '{"completed":true}' });
+
+  expect(refused.status).toBe(404);
+  expect(v.parse(Failure, await refused.json()).error.kind).toBe("not_found");
 });

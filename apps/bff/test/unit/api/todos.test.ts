@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getTodos, postTodo } from "../../../src/lib/server/api/todos.ts";
+import { getTodos, patchTodo, postTodo } from "../../../src/lib/server/api/todos.ts";
 
 /** A fake binding that answers every call with `reply`. */
 const binding = (reply: () => Promise<Response>) => ({ fetch: reply });
@@ -40,5 +40,23 @@ describe("the API client", () => {
   it("returns the added todo", async () => {
     const api = binding(async () => Response.json({ ok: true, data: todo }, { status: 201 }));
     expect(await postTodo(api, { title: "buy milk" })).toEqual({ ok: true, data: todo });
+  });
+
+  it("sends the toggle to the todo's path, encoded, and returns the todo", async () => {
+    const sent: { url: string; method: string | undefined; body: unknown }[] = [];
+    const api = {
+      fetch: async (url: string, init?: RequestInit) => {
+        sent.push({ url, method: init?.method, body: JSON.parse(String(init?.body)) });
+        return Response.json({ ok: true, data: { ...todo, completed: true } });
+      },
+    };
+
+    expect(await patchTodo(api, "id 1/2", { completed: true })).toEqual({
+      ok: true,
+      data: { ...todo, completed: true },
+    });
+    expect(sent).toEqual([
+      { url: "https://todo-api/todos/id%201%2F2", method: "PATCH", body: { completed: true } },
+    ]);
   });
 });

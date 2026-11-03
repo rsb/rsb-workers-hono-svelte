@@ -7,6 +7,13 @@ import * as v from "valibot";
 export const AddTodoBody = v.strictObject({ title: v.string("title must be text") });
 export type AddTodoBody = v.InferOutput<typeof AddTodoBody>;
 
+/**
+ * The body of `PATCH /todos/:id`, as slice 3 has it: only `completed`.
+ * Unknown keys are rejected, `title` too, until editing comes with slice 4.
+ */
+export const ToggleTodoBody = v.strictObject({ completed: v.boolean("completed must be true or false") });
+export type ToggleTodoBody = v.InferOutput<typeof ToggleTodoBody>;
+
 /** A todo on the wire. */
 export const TodoReply = v.strictObject({
   id: v.string(),

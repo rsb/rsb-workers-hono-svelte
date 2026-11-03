@@ -1,24 +1,8 @@
-import type { ErrorKind } from "@todo/contract-api";
 import { fail } from "@sveltejs/kit";
 import { postTodo } from "../api/todos.ts";
 import { addFailedMessage } from "./messages.ts";
+import { status } from "./status.ts";
 import { validateTitle } from "./validate-title.ts";
-
-/** The BFF's own status for each kind the API can answer with (PRD, Envelope). */
-const status = (kind: ErrorKind): number => {
-  switch (kind) {
-    case "validation":
-      return 422;
-    case "not_found":
-      return 404;
-    case "limit":
-      return 409;
-    case "too_large":
-      return 413;
-    case "internal":
-      return 500;
-  }
-};
 
 /**
  * The `add` action: validate the title, ask the API, turn a failure into

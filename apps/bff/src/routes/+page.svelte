@@ -1,6 +1,7 @@
 <script lang="ts">
 	import EmptyState from "#lib/components/EmptyState.svelte";
 	import NewTodo from "#lib/components/NewTodo.svelte";
+	import TodoFooter from "#lib/components/TodoFooter.svelte";
 	import TodoList from "#lib/components/TodoList.svelte";
 	import type { PageProps } from "./$types";
 
@@ -12,6 +13,12 @@
 			return null;
 		}
 		return { title: form.title, message: form.message };
+	});
+	let toggleFailed = $derived.by(() => {
+		if (form?.toggle === undefined) {
+			return null;
+		}
+		return form.toggle;
 	});
 	let hasTodos = $derived(data.todos.length > 0);
 </script>
@@ -26,7 +33,8 @@
 	<NewTodo {failed} />
 
 	{#if hasTodos}
-		<TodoList todos={data.todos} />
+		<TodoList todos={data.todos} {toggleFailed} />
+		<TodoFooter active={data.active} />
 	{:else}
 		<EmptyState error={data.error} />
 	{/if}
