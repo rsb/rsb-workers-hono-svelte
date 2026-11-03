@@ -1,6 +1,7 @@
 import {
   type AddTodoBody,
   DeletedReply,
+  type DeleteTodosQuery,
   type PatchTodoBody,
   type PatchTodosBody,
   TodoListReply,
@@ -31,4 +32,10 @@ export const patchTodos = (api: Api, body: PatchTodosBody) =>
 export const deleteTodo = (api: Api, id: string) => {
   const path = `/todos/${encodeURIComponent(id)}`;
   return call(api, path, { method: "DELETE" }, DeletedReply);
+};
+
+/** `DELETE /todos?completed=true`: the todos left, in creation order. */
+export const deleteTodos = (api: Api, query: DeleteTodosQuery) => {
+  const path = `/todos?${new URLSearchParams(query)}`;
+  return call(api, path, { method: "DELETE" }, TodoListReply);
 };

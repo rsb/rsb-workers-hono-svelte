@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getTodos, patchTodo, patchTodos, postTodo } from "../../../src/lib/server/api/todos.ts";
+import { deleteTodos, getTodos, patchTodo, patchTodos, postTodo } from "../../../src/lib/server/api/todos.ts";
 
 /** A fake binding that answers every call with `reply`. */
 const binding = (reply: () => Promise<Response>) => ({ fetch: reply });
@@ -74,5 +74,18 @@ describe("the API client", () => {
       data: [{ ...todo, completed: true }],
     });
     expect(sent).toEqual([{ url: "https://todo-api/todos", method: "PATCH", body: { completed: true } }]);
+  });
+
+  it("sends clear completed to the list's path with completed=true and returns the todos left", async () => {
+    const sent: { url: string; method: string | undefined }[] = [];
+    const api = {
+      fetch: async (url: string, init?: RequestInit) => {
+        sent.push({ url, method: init?.method });
+        return Response.json({ ok: true, data: [todo] });
+      },
+    };
+
+    expect(await deleteTodos(api, { completed: "true" })).toEqual({ ok: true, data: [todo] });
+    expect(sent).toEqual([{ url: "https://todo-api/todos?completed=true", method: "DELETE" }]);
   });
 });

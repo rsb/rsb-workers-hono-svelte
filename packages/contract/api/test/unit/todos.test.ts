@@ -1,6 +1,6 @@
 import * as v from "valibot";
 import { describe, expect, it } from "vitest";
-import { AddTodoBody, DeletedReply, PatchTodoBody, PatchTodosBody } from "../../src/index.ts";
+import { AddTodoBody, DeleteTodosQuery, DeletedReply, PatchTodoBody, PatchTodosBody } from "../../src/index.ts";
 
 /** The issue a body fails with: its first path key and its message. */
 const issue = (body: unknown, schema: v.GenericSchema = AddTodoBody) => {
@@ -88,6 +88,29 @@ describe("PatchTodosBody", () => {
 
   it("passes completed through", () => {
     expect(v.parse(PatchTodosBody, { completed: true })).toEqual({ completed: true });
+  });
+});
+
+describe("DeleteTodosQuery", () => {
+  // A query's values are text, so "true" is the only one it takes.
+  it("rejects completed that is not true", () => {
+    expect(issue({ completed: "false" }, DeleteTodosQuery)).toEqual({
+      field: "completed",
+      message: "completed must be true",
+    });
+  });
+
+  // No query is never "delete all".
+  it("rejects a query without completed, naming the field", () => {
+    expect(issue({}, DeleteTodosQuery)?.field).toBe("completed");
+  });
+
+  it("rejects an unknown key", () => {
+    expect(issue({ completed: "true", id: "id-1" }, DeleteTodosQuery)?.field).toBe("id");
+  });
+
+  it("passes completed through", () => {
+    expect(v.parse(DeleteTodosQuery, { completed: "true" })).toEqual({ completed: "true" });
   });
 });
 

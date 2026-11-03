@@ -1,5 +1,6 @@
 import { env } from "cloudflare:workers";
 import { addTodo } from "#lib/server/todos/add-todo.ts";
+import { clearCompletedTodos } from "#lib/server/todos/clear-completed-todos.ts";
 import { editTodo } from "#lib/server/todos/edit-todo.ts";
 import { loadTodos } from "#lib/server/todos/load-todos.ts";
 import { markAllTodos } from "#lib/server/todos/mark-all-todos.ts";
@@ -15,4 +16,5 @@ export const actions = {
   edit: async ({ request }) => editTodo(env.API, await request.formData()),
   markAll: async ({ request }) => markAllTodos(env.API, await request.formData()),
   remove: async ({ request }) => removeTodo(env.API, await request.formData()),
+  clearCompleted: async () => clearCompletedTodos(env.API),
 } satisfies Actions;

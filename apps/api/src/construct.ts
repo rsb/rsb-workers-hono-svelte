@@ -1,5 +1,6 @@
 import { type DbStore, createDbStore } from "@todo/data-d1/store.ts";
 import { type AddTodo, addTodo } from "@todo/operations/todos/add-todo.ts";
+import { type DeleteCompleted, deleteCompleted } from "@todo/operations/todos/delete-completed.ts";
 import { type DeleteTodo, deleteTodo } from "@todo/operations/todos/delete-todo.ts";
 import { type ListTodos, listTodos } from "@todo/operations/todos/list-todos.ts";
 import { type SetAllCompleted, setAllCompleted } from "@todo/operations/todos/set-all-completed.ts";
@@ -7,6 +8,7 @@ import { type UpdateTodo, updateTodo } from "@todo/operations/todos/update-todo.
 import { notFound, onError, tooLarge } from "./app/handlers/errors/errors.ts";
 import { getHealth } from "./app/handlers/health/health.ts";
 import { deleteTodo as deleteTodoHandler } from "./app/handlers/todos/delete-todo.ts";
+import { deleteTodos } from "./app/handlers/todos/delete-todos.ts";
 import { getTodos } from "./app/handlers/todos/get-todos.ts";
 import { patchTodo } from "./app/handlers/todos/patch-todo.ts";
 import { patchTodos } from "./app/handlers/todos/patch-todos.ts";
@@ -29,6 +31,7 @@ export type Operations = {
   updateTodo: UpdateTodo;
   setAllCompleted: SetAllCompleted;
   deleteTodo: DeleteTodo;
+  deleteCompleted: DeleteCompleted;
 };
 
 /**
@@ -51,6 +54,7 @@ export const constructOperations = (infra: Infra): Operations => ({
   updateTodo: updateTodo({ dbStore: infra.dbStore }),
   setAllCompleted: setAllCompleted({ dbStore: infra.dbStore }),
   deleteTodo: deleteTodo({ dbStore: infra.dbStore }),
+  deleteCompleted: deleteCompleted({ dbStore: infra.dbStore }),
 });
 
 /** Each handler with the operation it runs, laid out as routes. */
@@ -60,6 +64,7 @@ export const constructRoutes = (operations: Operations): Route[] => [
   { method: "POST", path: "/todos", handler: postTodos(operations.addTodo) },
   { method: "PATCH", path: "/todos", handler: patchTodos(operations.setAllCompleted) },
   { method: "PATCH", path: "/todos/:id", handler: patchTodo(operations.updateTodo) },
+  { method: "DELETE", path: "/todos", handler: deleteTodos(operations.deleteCompleted) },
   { method: "DELETE", path: "/todos/:id", handler: deleteTodoHandler(operations.deleteTodo) },
 ];
 

@@ -63,6 +63,11 @@ const deleteTodoStmt = (db: D1Database, id: string) => {
   return db.prepare(sql).bind(id);
 };
 
+const deleteCompletedStmt = (db: D1Database) => {
+  const sql = "DELETE FROM todos WHERE completed = 1";
+  return db.prepare(sql);
+};
+
 // Raw: runs a statement and deals only in rows. A D1 error becomes the root
 // failure here, named by what the statement does.
 
@@ -93,6 +98,19 @@ const setAllCompletedRaw = (db: D1Database, completed: Row["completed"]) => {
 
 const deleteTodoRaw = (db: D1Database, id: string) => {
   return execute(() => deleteTodoStmt(db, id), "delete todo");
+};
+
+/**
+ * The delete and the list as one batch, so the list returned is what the
+ * delete left: D1 runs a batch as one transaction.
+ */
+const deleteCompletedRaw = (db: D1Database) => {
+  return writeThenQueryAll<Row>(
+    db,
+    () => deleteCompletedStmt(db),
+    () => selectTodosStmt(db),
+    "delete completed",
+  );
 };
 
 /**
@@ -183,5 +201,16 @@ export const todoStore = (db: D1Database) => ({
     // The id is unique, so the delete changes one row or none.
     const deleted = changes.value === 1;
     return ok(deleted);
+  },
+
+  /** The todos left after every completed one is deleted, in the order they were added. */
+  deleteCompleted: async (): Promise<Result<Todo[], AnyFail>> => {
+    const rows = await deleteCompletedRaw(db);
+    if (!rows.ok) {
+      return err(rows.error);
+    }
+
+    const todos = rows.value.map(toTodo);
+    return ok(todos);
   },
 });

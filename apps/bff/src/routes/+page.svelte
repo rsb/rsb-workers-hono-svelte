@@ -33,6 +33,12 @@
 		}
 		return form.markAll.message;
 	});
+	let clearFailed = $derived.by(() => {
+		if (form?.clearCompleted === undefined) {
+			return null;
+		}
+		return form.clearCompleted.message;
+	});
 	let hasTodos = $derived(data.todos.length > 0);
 	let allDone = $derived(hasTodos && data.active === 0);
 </script>
@@ -48,7 +54,7 @@
 
 	{#if hasTodos}
 		<TodoList todos={data.todos} {toggleFailed} {removeFailed} />
-		<TodoFooter active={data.active} />
+		<TodoFooter active={data.active} completed={data.completed} {clearFailed} />
 	{:else}
 		<EmptyState error={data.error} />
 	{/if}
