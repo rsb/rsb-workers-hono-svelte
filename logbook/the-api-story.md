@@ -122,6 +122,11 @@ The decisions behind this story are:
   its own package only by recorded exception. Any area's business
   objects may be used by an operation or process; entities refer to
   other areas' entities by id (chapters 0, 4, 6 and 9).
+- L23, agreed with the owner in the OpenAPI session (2026-11-03):
+  the api's contract is documented as OpenAPI, for backend apis only.
+  The document is generated from our code, and no code is generated
+  from it. OpenAPI's operation is our route, an entry point at a
+  method and path; we never call it an operation (chapter 11).
 
 After slice 2 (Add and list), the code followed chapters 1–10
 throughout, except for config, which has nothing to hold yet
@@ -1458,6 +1463,23 @@ that a switch on an error kind is exhaustive (review tour §8).
 A contract holds no client. A client is the consumer's concrete call,
 so it lives in the consumer's data (chapter 8). The consumer derives
 the types it sends from the schemas (valibot's `InferInput`).
+
+### OpenAPI documents the contract (L23)
+
+The api's contract is documented as OpenAPI. Only backend apis get
+one; the BFF does not. The document is generated from our code, and
+no code is ever generated from it, so our entry points keep the shape
+this story gives them.
+
+OpenAPI calls a route an *operation*. We do not: a route is an entry
+point at a method and path, as Hono records it, and *operation* is
+only ever a business use case (L14). In the document, `operationId`
+is the entry point's name (`postTodos`) and `x-unit` names the unit it
+runs (`addTodo`). A probe's route has no `x-unit`.
+
+**Open.** How the document is produced: what it is generated from (the
+endpoints above are a candidate), where it lives, and how the checks
+keep it true to the routes we serve.
 
 ### Which rules go in a contract
 

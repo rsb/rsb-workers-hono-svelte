@@ -15,8 +15,9 @@ We ground our language in DDD's concepts, with two cautions:
   intent per port, plain types rather than hydrated objects, and one
   translation per boundary.
 
-Decisions L1–L22 were agreed in the language sessions of 2026-11-03:
-L1–L13 on language, L14–L21 on operations, L22 on package layout. They are recorded in
+Decisions L1–L23 were agreed in the language sessions of 2026-11-03:
+L1–L13 on language, L14–L21 on operations, L22 on package layout, L23
+on OpenAPI. They are recorded in
 [the api story](the-api-story.md).
 
 Status:
@@ -499,6 +500,26 @@ api is one: its routes serve the contract.
 - **DDD:** open host service.
 - **Status:** locked (L9).
 
+### OpenAPI
+
+A document of the api's contract, for backend apis only; the BFF has
+none. It is documentation: generated from our code, and no code is
+ever generated from it, so nothing it produces can take a shape other
+than our entry points'.
+
+OpenAPI's words map to ours:
+
+| OpenAPI | Ours |
+|---|---|
+| operation | route: an entry point at a method and path, as Hono records it (`GET /health` reaches a probe) |
+| `operationId` | the entry point's name: `postTodos`, `patchTodo`, `getHealth` |
+| `x-unit` | the unit the entry point runs: `addTodo`, or a process; a probe has none |
+
+We never call a route an operation. Operation means only a business
+use case (L14).
+
+- **Status:** target (L23). How the document is produced is open.
+
 ## The BFF
 
 ### BFF operation
@@ -527,4 +548,7 @@ To be settled in later sessions:
 - using another system's business objects: its contract, an ACL in
   data, and our own type for the concept;
 - the workflow story: how a durable process runs on Cloudflare
-  Workflows.
+  Workflows;
+- how the OpenAPI document is produced: what it is generated from,
+  where it lives, and how the checks keep it true to the routes we
+  serve.
