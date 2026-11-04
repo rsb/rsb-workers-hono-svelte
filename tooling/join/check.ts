@@ -2,12 +2,14 @@
 // what its route runs, and each state rule a use case is given against a
 // test named by its id in the unit report. It writes nothing.
 //
-//   node tooling/join/check.ts <rules spec> <use cases dir> <api spec> <construct> <unit report> <unit tests dir>
+//   node tooling/join/check.ts <rules spec> <use cases dir> <api spec> <construct> <unit report> <watched dir>...
 //
 // It reads the other tools' inputs with their own readers, and fails when a
 // spec does not read. The unit report is written by `pnpm test:unit`, which
-// runs first; a report older than the tests is refused. Paths are relative
-// to the repo root.
+// runs first; a report older than a file it watches is refused. A watched
+// dir is a tests directory, watched whole, or a package, which stands for
+// its src/ and its workspace dependencies' (see report.ts). Paths are
+// relative to the repo root.
 
 import { readFileSync } from "node:fs";
 import { parse as parseApi } from "../api-spec/parse.ts";
@@ -19,14 +21,14 @@ import { joinProblems } from "./join.ts";
 import { readReport } from "./report.ts";
 
 const USAGE =
-  "usage: node tooling/join/check.ts <rules spec> <use cases dir> <api spec> <construct> <unit report> <unit tests dir>";
+  "usage: node tooling/join/check.ts <rules spec> <use cases dir> <api spec> <construct> <unit report> <watched dir>...";
 
 /** The command that writes the unit report. */
 const RUN = "pnpm test:unit";
 
 const main = async (args: string[]) => {
-  const [rulesPath, useCasesDir, apiPath, constructPath, reportPath, testsDir] = args;
-  if (testsDir === undefined || args.length !== 6) {
+  const [rulesPath, useCasesDir, apiPath, constructPath, reportPath, ...watched] = args;
+  if (watched.length === 0) {
     console.error(USAGE);
     return 2;
   }
@@ -73,7 +75,7 @@ const main = async (args: string[]) => {
     endpoints: api.spec.endpoints,
     constructPath: constructPath as string,
     routes,
-    report: readReport(reportPath as string, testsDir, RUN),
+    report: readReport(reportPath as string, watched, RUN),
   });
   for (const problem of problems) {
     console.error(problem);

@@ -18,6 +18,7 @@ const args = [
   "apps/api/src/construct.ts",
   REPORT,
   "packages/operations/test/unit",
+  "packages/operations",
 ];
 
 describe("join check on the repo", () => {

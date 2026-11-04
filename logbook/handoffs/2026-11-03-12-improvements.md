@@ -31,7 +31,7 @@ suggested order is Claude's; the owner's order replaces it.
 
 | # | Improvement | Size | Closes or unblocks | Needs first | Suggested order |
 | --- | --- | --- | --- | --- | --- |
-| A | The route table as self-describing data | S | entry-chains index (L24), routes-vs-spec test (L26), `operationId`/`x-unit` source | nothing | 1 |
+| A | The route table as self-describing data | S | entry-chains index (L24), routes-vs-spec test (L26), `operationId`/`x-unit` source | nothing | done, stage 13 (`933871e`) |
 | B | The spec's examples as the integration suite | S–M | "example replay" target (chapter 11), the growth of hand-written integration tests | nothing | 2 |
 | C | Statement budgets per entry chain (L11 as a number) | S | gives L11 its sensor; feeds the data spec | nothing | 3 |
 | D | A `log` port and a request id | S | F5 (`console.error` in `serverFailure`), logging open item (chapter 5) | nothing; pairs with auth's middleware | 4 |
@@ -43,8 +43,8 @@ suggested order is Claude's; the owner's order replaces it.
 | J | The data spec | M | pending (L26); the budget's home for C | its form (questions below) | before auth adds tables |
 | K | Evaluate RPC over the service binding | M | nothing; a measured lab variant | the CLI's provider/consumer decision | last |
 | L | `tooling/` is type-checked: a factory that trusts its checkers should compile them (added at stage 17, Q4) | S | "nothing type-checks `tooling/`" (stage 15 and 16 tours); today it runs only under Node's type stripping | nothing | done, stage 18 (`194d666`) |
-| M | `@types/node` in the catalog: `apps/bff` and `tooling/` pin `26.6.6` each, by hand (added at stage 18, Q2) | S | two exact pins that can drift apart | nothing | owner's call |
-| N | The join's unit report is checked for staleness against `packages/operations/src` too, not only the test files (carried since stage 16) | S | a report older than the code it tested passes `check:join` | nothing | owner's call; its own stage |
+| M | `@types/node` in the catalog: `apps/bff` and `tooling/` pin `26.6.6` each, by hand (added at stage 18, Q2) | S | two exact pins that can drift apart | nothing | done, stage 19 (`6879b7a`) |
+| N | The join's unit report is checked for staleness against `packages/operations/src` too, not only the test files (carried since stage 16) | S | a report older than the code it tested passes `check:join` | nothing | done, stage 19 (`28162d1`) |
 
 Two things stay exactly as they are and are not on the list: the store
 reports facts and the operation decides what they mean; generation

@@ -888,7 +888,8 @@ To be settled in later sessions:
   settled. Its generators are plain Node scripts, run from the root
   under Node's type stripping. Since stage 18 `tooling/` is a private
   workspace package, `@todo/tooling`, whose only dependencies are
-  `typescript` and `@types/node`, so that `pnpm check` compiles it:
+  `typescript` and `@types/node`, both from the catalog (stage 19), so
+  that `pnpm check` compiles it:
   - the contract and the OpenAPI document (`tooling/api-spec/`);
   - the extractor that reads construct, and the entry chain index
     (`tooling/entry-chains/`, stage 13);

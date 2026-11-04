@@ -2134,8 +2134,12 @@ operations unit report, and a test named by an id that is not a state
 rule fails, so a misspelling cannot hide. The join never runs a tier:
 `pnpm test:unit` writes the report
 (`packages/operations/test-results/unit.json`), and the join refuses
-it when it is missing or older than the tests. The scorecard runs
-`test:unit` first. The integration test `todos.cap: the 501st todo is
+it when it is missing or older than a file it watches. Since stage 19
+it watches the code the tests ran as well as the tests: the operations
+tests, `packages/operations/src`, and the `src/` of each workspace
+package operations depends on, read from its `package.json`, so today
+business and fail. A new dependency is watched the day it is added.
+The scorecard runs `test:unit` first. The integration test `todos.cap: the 501st todo is
 rejected with limit` is named too; whether the join reads its report
 is open. The BFF's actions call the same validators but stay out of
 the join until the BFF has a spec.
