@@ -5,6 +5,10 @@ import { toTodoPatch } from "../../../src/todos/todo-patch.ts";
 const EMOJI = "😀";
 
 describe("toTodoPatch", () => {
+  it("applies patch.nonempty, title.length, as its rules say", () => {
+    expect(toTodoPatch.rules).toEqual(["patch.nonempty", "title.length"]);
+  });
+
   it("refuses a patch with neither title nor completed as patch.nonempty", () => {
     expect(toTodoPatch({})).toEqual({ ok: false, error: [{ rule: "patch.nonempty", violation: "empty" }] });
   });

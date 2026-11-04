@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 import { toCompleted } from "../../../src/todos/completed.ts";
 
 describe("toCompleted", () => {
+  it("applies no rule, as its rules say", () => {
+    expect(toCompleted.rules).toEqual([]);
+  });
+
   it.each([
     ["missing", undefined],
     ["null", null],

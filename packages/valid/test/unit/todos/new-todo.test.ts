@@ -5,6 +5,10 @@ import { toNewTodo } from "../../../src/todos/new-todo.ts";
 const EMOJI = "😀";
 
 describe("toNewTodo", () => {
+  it("applies title.length, as its rules say", () => {
+    expect(toNewTodo.rules).toEqual(["title.length"]);
+  });
+
   it.each([
     ["missing", undefined],
     ["null", null],

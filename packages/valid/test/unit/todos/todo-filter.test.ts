@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 import { toTodoFilter } from "../../../src/todos/todo-filter.ts";
 
 describe("toTodoFilter", () => {
+  it("applies no rule, as its rules say", () => {
+    expect(toTodoFilter.rules).toEqual([]);
+  });
+
   it.each([
     ["null", null],
     ["a number", 0],

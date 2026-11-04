@@ -292,7 +292,12 @@ export const emitValidator = (spec: Spec, input: Input, source: string, script: 
   const hasOwn = input.fields.some(ownFunction);
   const result = input.type === undefined ? TS_TYPE[input.fields[0]?.type ?? "text"] : input.name;
 
+  // What the validator applies, as data (L33): its input rules, then each
+  // field's in field order, each once. The join reads this list.
+  const applies = [...new Set([...input.rules, ...input.fields.flatMap((field) => field.rules)])];
+
   const imports = ['import { type Result, err, ok } from "@todo/business/result.ts";'];
+  imports.push('import type { RuleId } from "@todo/business/rules.ts";');
   if (input.type !== undefined) {
     imports.push(`import type { ${input.name} } from "@todo/business/${input.type}";`);
   }
@@ -364,7 +369,13 @@ export const emitValidator = (spec: Spec, input: Input, source: string, script: 
       lines.push(`  return ok({ ${only} });`);
     }
   }
-  lines.push("};", "");
+  lines.push(
+    "};",
+    "",
+    `/** The rules \`to${input.name}\` applies, by id: what a route that runs it applies (L33). */`,
+    `to${input.name}.rules = [${applies.map((id) => JSON.stringify(id)).join(", ")}] as const satisfies readonly RuleId[];`,
+    "",
+  );
   return lines.join("\n");
 };
 
