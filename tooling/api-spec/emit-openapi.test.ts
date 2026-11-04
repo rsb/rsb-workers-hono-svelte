@@ -109,7 +109,7 @@ describe("routes against the spec", () => {
   });
 
   it("refuses a route the spec does not list", () => {
-    const more = [...routes, { key: "PUT /todos", name: "putTodos", unit: null }];
+    const more = [...routes, { key: "PUT /todos", name: "putTodos", unit: null, validator: null }];
     assert.throws(() => emitOpenApi(parsed.spec, more, "s", "t"), /construct has a route for PUT \/todos/);
   });
 

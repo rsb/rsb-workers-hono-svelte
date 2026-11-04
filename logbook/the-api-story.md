@@ -341,6 +341,13 @@ Under `data/`, each real thing is its own workspace package. `data/`
 and `data/internal/` are directories, not packages, until something
 must be shared through them (chapter 8).
 
+`tooling/` is a workspace too since stage 18, though neither an app
+nor a package: it holds the generators and checkers (`api-spec`,
+`entry-chains`, `rules`, `join`). It is `@todo/tooling` only so that
+`pnpm check` compiles it and its tests. Nothing imports it, and its
+scripts still run from the root as `node tooling/....ts`, under Node's
+type stripping.
+
 ### Names
 
 The names follow four rules (A9):
@@ -2325,7 +2332,9 @@ Checks keep the spec, the generated files and the code in step:
 
 The scorecard runs `check:api`, `check:entry-chains` and
 `test:tooling` since stage 13, and `check:rules` and `check:join`
-since stage 16.
+since stage 16. Since stage 18, `pnpm check` also compiles `tooling/`
+itself. Before, Node only stripped its types, and a test fixture
+stale since stage 16 went unnoticed.
 
 ### Which rules go in a contract
 
