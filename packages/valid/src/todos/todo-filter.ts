@@ -1,5 +1,6 @@
 // Generated from prd/todo/rules.md by tooling/rules/generate.ts. Do not edit: change the spec and regenerate.
 import { type Result, err, ok } from "@todo/business/result.ts";
+import type { RuleId } from "@todo/business/rules.ts";
 import type { TodoFilter } from "@todo/business/todos/todo.ts";
 import { flag } from "../fields/decode.ts";
 import type { Problems } from "../problem.ts";
@@ -23,3 +24,6 @@ export const toTodoFilter = (candidate: TodoFilterCandidate): Result<TodoFilter,
     ...(completed === undefined ? {} : { completed: completed.value }),
   });
 };
+
+/** The rules `toTodoFilter` applies, by id: what a route that runs it applies (L33). */
+toTodoFilter.rules = [] as const satisfies readonly RuleId[];

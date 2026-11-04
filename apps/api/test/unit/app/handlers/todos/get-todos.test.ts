@@ -7,12 +7,13 @@ import * as v from "valibot";
 import { describe, expect, it, vi } from "vitest";
 import type { ListTodos } from "@todo/operations/todos/list-todos.ts";
 import { getTodos } from "../../../../../src/app/handlers/todos/get-todos.ts";
+import { toTodoFilter } from "@todo/valid/todos/todo-filter.ts";
 
 const get = () => new Context(new Request("https://todo-api/todos"));
 
 /** Sends a GET through the route, with the query given, as it would be served. */
 const list = (listTodos: ListTodos, query: string) => {
-  const app = new Hono().get("/todos", getTodos(listTodos));
+  const app = new Hono().get("/todos", getTodos(listTodos, toTodoFilter));
   return app.request(`/todos${query}`);
 };
 
@@ -102,7 +103,7 @@ describe("getTodos", () => {
       { id: "id-2", title: "walk dog", completed: true },
     ];
 
-    const response = await getTodos(async () => ok(todos))(get());
+    const response = await getTodos(async () => ok(todos), toTodoFilter)(get());
 
     expect(response.status).toBe(200);
     expect(v.parse(envelope(TodoListReply), await response.json())).toEqual({ ok: true, data: todos });
@@ -113,7 +114,7 @@ describe("getTodos", () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     const broken = wrap(serverFault("select todos: D1_ERROR: no such table: todos"), "list todos");
 
-    const response = await getTodos(async () => err(broken))(get());
+    const response = await getTodos(async () => err(broken), toTodoFilter)(get());
 
     expect(response.status).toBe(500);
     expect(v.parse(Failure, await response.json()).error).toEqual({

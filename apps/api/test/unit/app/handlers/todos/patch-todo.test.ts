@@ -7,10 +7,11 @@ import { notFound, unavailable, wrap } from "@todo/fail/fail.ts";
 import { patchTodo } from "../../../../../src/app/handlers/todos/patch-todo.ts";
 import type { TodoPatch } from "@todo/business/todos/todo.ts";
 import type { UpdateTodo } from "@todo/operations/todos/update-todo.ts";
+import { toTodoPatch } from "@todo/valid/todos/todo-patch.ts";
 
 /** Sends a PATCH through one route, so the handler gets its `:id` as it would be served. */
 const patch = (updateTodo: UpdateTodo, id: string, body: string) => {
-  const app = new Hono().patch("/todos/:id", patchTodo(updateTodo));
+  const app = new Hono().patch("/todos/:id", patchTodo(updateTodo, toTodoPatch));
   return app.request(`/todos/${id}`, { method: "PATCH", body });
 };
 

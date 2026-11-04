@@ -1,6 +1,7 @@
 // Reads an api's route table from its construct, as data (L24, L26). It
 // builds the routes with a store that is never called, and keeps only what
-// each route says about itself: its key, its entry point's name and its unit.
+// each route says about itself: its key, its entry point's name, its unit,
+// and its validator's name with the rules that validator carries (L33).
 // This is the one extractor that feeds both the OpenAPI document's
 // `operationId` and `x-unit` and `apps/api/entry-chains.md`.
 //
@@ -14,8 +15,18 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { type RouteLine, fail, importOf, importsOf, operationLinesOf, routeLinesOf } from "./read.ts";
 
-/** One route: its key as the spec writes it, its entry point, and its unit or `null` for a probe. */
-export type RouteRow = { key: string; name: string; unit: string | null };
+/**
+ * One route: its key as the spec writes it, its entry point, its unit or
+ * `null` for a probe, and its validator or `null` when its handler is given
+ * none. The rules are read from the validator the route holds, not written
+ * a second time (L33).
+ */
+export type RouteRow = {
+  key: string;
+  name: string;
+  unit: string | null;
+  validator: { name: string; rules: string[] } | null;
+};
 
 type Construct = {
   constructOperations: (infra: { dbStore: unknown; newId: () => string }) => unknown;
@@ -37,14 +48,25 @@ export const rowOf = (path: string, key: string, route: unknown): RouteRow => {
   if (typeof route !== "object" || route === null) {
     return fail(path, `the route ${key} is not an object`);
   }
-  const { name, unit } = route as { name?: unknown; unit?: unknown };
+  const { name, unit, validator } = route as { name?: unknown; unit?: unknown; validator?: unknown };
   if (typeof name !== "string" || name === "") {
     return fail(path, `the route ${key} has no name`);
   }
   if (unit !== null && (typeof unit !== "string" || unit === "")) {
     return fail(path, `the route ${key} has a unit that is neither a name nor null`);
   }
-  return { key, name, unit };
+  if (validator === null) {
+    return { key, name, unit, validator: null };
+  }
+  const held = validator as { name?: unknown; value?: { rules?: unknown } } | undefined;
+  const rules = held?.value?.rules;
+  if (typeof held?.name !== "string" || held.name === "") {
+    return fail(path, `the route ${key} has a validator that is neither a named validator nor null`);
+  }
+  if (!Array.isArray(rules) || !rules.every((rule) => typeof rule === "string")) {
+    return fail(path, `the route ${key}'s validator ${held.name} carries no rules`);
+  }
+  return { key, name, unit, validator: { name: held.name, rules: [...rules] } };
 };
 
 /** Fails unless the identifier a route's entry point is given is the import of the handler of its name. */
@@ -58,16 +80,18 @@ const checkHandler = (path: string, imports: ReturnType<typeof importsOf>, line:
 /**
  * Fails unless the routes built are the routes written, in order, and each
  * name is the value's own: the entry point is the handler of that name in
- * the app's files, and the unit is the operation of that name, built by the
- * builder of that name.
+ * the app's files, the unit is the operation of that name, built by the
+ * builder of that name, and the validator is the one of that name in `valid`.
  */
 export const checkWritten = (path: string, text: string, rows: RouteRow[]) => {
   const imports = importsOf(text, path);
   const written = routeLinesOf(text, path);
   const operations = operationLinesOf(text, path);
 
-  const asText = (row: { key: string; name: string; unit: string | null }) => `${row.key} ${row.name} ${row.unit}`;
-  if (rows.map(asText).join("\n") !== written.map(asText).join("\n")) {
+  const asText = (row: { key: string; name: string; unit: string | null; validator: string | null }) =>
+    `${row.key} ${row.name} ${row.unit} ${row.validator}`;
+  const built = rows.map((row) => ({ ...row, validator: row.validator?.name ?? null }));
+  if (built.map(asText).join("\n") !== written.map(asText).join("\n")) {
     return fail(path, "the routes constructRoutes builds are not the routes it writes, one per line");
   }
 
@@ -78,6 +102,13 @@ export const checkWritten = (path: string, text: string, rows: RouteRow[]) => {
     }
     names.add(line.name);
     checkHandler(path, imports, line);
+    if (line.validator !== null) {
+      // Written `{ name }`, so the identifier is the name; it must be valid's validator of that name.
+      const validator = importOf(path, imports, line.validator, (specifier) => specifier.startsWith("@todo/valid/"), "a validator");
+      if (validator.local !== line.validator) {
+        return fail(path, `the route ${line.key} is given ${line.validator}, which is not valid's ${line.validator}`);
+      }
+    }
     if (line.unit === null) {
       continue;
     }

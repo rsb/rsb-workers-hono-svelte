@@ -100,6 +100,11 @@ describe("parse", () => {
     assert.ok(parsed.ok, JSON.stringify(!parsed.ok && parsed.problems));
     assert.equal(parsed.spec.endpoints.length, 8);
     assert.deepEqual(parsed.spec.everyKinds, ["too_large", "internal"]);
+    const applies = Object.fromEntries(parsed.spec.endpoints.map((e) => [`${e.method} ${e.path}`, e.applies]));
+    assert.deepEqual(applies["POST /todos"], ["title.length"]);
+    assert.deepEqual(applies["PATCH /todos/{id}"], ["patch.nonempty", "title.length"]);
+    assert.deepEqual(applies["GET /todos"], []);
+    assert.equal(applies["GET /health"], undefined);
   });
 
   it("reads an endpoint's parts and its inline shapes", () => {
@@ -107,6 +112,7 @@ describe("parse", () => {
       spec(`
 ### \`PATCH /todos/{id}\`
 Serves: \`use-cases/todos/change-a-todo.md\`.
+Applies: \`patch.nonempty\`, \`title.length\`
 
 Path:
 - \`id\`: text
@@ -155,6 +161,7 @@ Reply: 404
     assert.ok(parsed.ok, JSON.stringify(!parsed.ok && parsed.problems));
     const [endpoint] = parsed.spec.endpoints;
     assert.equal(endpoint?.serves, "`use-cases/todos/change-a-todo.md`");
+    assert.deepEqual(endpoint?.applies, ["patch.nonempty", "title.length"]);
     assert.deepEqual(endpoint?.params.map((param) => param.name), ["id"]);
     assert.equal(endpoint?.body, "PatchTodoBody");
     assert.equal(endpoint?.status, 200);
@@ -184,9 +191,30 @@ Reply: 404
     assert.deepEqual(found, ["GET /a/{id} names {id} in its path but Path: lists none"]);
   });
 
+  it("reads Applies: none as no rules, and no Applies: as undefined", () => {
+    const none = parse(spec(getA(works).replace("Serves: x.\n", "Serves: x.\nApplies: none\n")));
+    assert.ok(none.ok, JSON.stringify(!none.ok && none.problems));
+    assert.deepEqual(none.spec.endpoints[0]?.applies, []);
+    const absent = parse(spec(getA(works)));
+    assert.ok(absent.ok, JSON.stringify(!absent.ok && absent.problems));
+    assert.equal(absent.spec.endpoints[0]?.applies, undefined);
+  });
+
+  it("refuses an Applies: that is not rule ids in code font", () => {
+    const found = problems(spec(getA(works).replace("Serves: x.\n", "Serves: x.\nApplies: title.length\n")));
+    assert.deepEqual(found, ['Applies: is "none" or rule ids in code font, separated by commas']);
+  });
+
+  it("refuses an Applies: that names a rule twice", () => {
+    const found = problems(
+      spec(getA(works).replace("Serves: x.\n", "Serves: x.\nApplies: `title.length`, `title.length`\n")),
+    );
+    assert.deepEqual(found, ["Applies: names title.length twice"]);
+  });
+
   it("refuses parts out of order", () => {
     const found = problems(spec(`\n### \`GET /a\`\nReply: 200 \`R\`\n- \`ok\`: boolean\n\nServes: x.\n\nErrors: none\n${works}`));
-    assert.deepEqual(found, ["Serves: is out of order; the order is Serves, Path, Query, Body, Reply, Errors, Examples"]);
+    assert.deepEqual(found, ["Serves: is out of order; the order is Serves, Applies, Path, Query, Body, Reply, Errors, Examples"]);
   });
 
   it("refuses a shape that is not defined", () => {

@@ -21,6 +21,7 @@ const files: Record<string, string> = {
   "apps/api/src/construct.ts": [
     'import { createDbStore } from "@todo/data-d1/store.ts";',
     'import { listTodos } from "@todo/operations/todos/list-todos.ts";',
+    'import { toTodoFilter } from "@todo/valid/todos/todo-filter.ts";',
     'import { notFound } from "./app/handlers/errors/errors.ts";',
     'import { getHealth } from "./app/handlers/health/health.ts";',
     'import { getTodos } from "./app/handlers/todos/get-todos.ts";',
@@ -30,7 +31,9 @@ const files: Record<string, string> = {
   "apps/api/src/app/handlers/todos/get-todos.ts": [
     'import { success } from "../present.ts";',
     "",
-    "export const getTodos = (listTodos: ListTodos) => async (c: Context) => success(c, await listTodos());",
+    'import type { toTodoFilter } from "@todo/valid/todos/todo-filter.ts";',
+    "",
+    "export const getTodos = (listTodos: ListTodos, toTodoFilter: ToTodoFilter) => async (c: Context) => success(c, await listTodos());",
     "",
   ].join("\n"),
   "packages/operations/package.json": exportsAll("@todo/operations"),
@@ -48,6 +51,8 @@ const files: Record<string, string> = {
     "",
   ].join("\n"),
   "prd/todo/use-cases/list-todos.md": "# List todos\n",
+  "packages/valid/package.json": exportsAll("@todo/valid"),
+  "packages/valid/src/todos/todo-filter.ts": 'export const toTodoFilter = (candidate: unknown) => candidate;\ntoTodoFilter.rules = [];\n',
   "packages/data/d1/package.json": exportsAll("@todo/data-d1"),
   "packages/data/d1/src/store.ts": [
     'import { todoStore } from "./todos.ts";',
@@ -70,8 +75,8 @@ const files: Record<string, string> = {
 };
 
 const routes: RouteRow[] = [
-  { key: "GET /health", name: "getHealth", unit: null },
-  { key: "GET /todos", name: "getTodos", unit: "listTodos" },
+  { key: "GET /health", name: "getHealth", unit: null, validator: null },
+  { key: "GET /todos", name: "getTodos", unit: "listTodos", validator: { name: "toTodoFilter", rules: [] } },
 ];
 
 /** Writes the fixture, with `changed` over the files above, and runs the test in its root. */
@@ -91,6 +96,18 @@ describe("readChains on a fixture", () => {
     fixture();
     const index = read();
     assert.equal(index.chains[1]?.line, "GET /todos → getTodos → listTodos ⇢ ListStore.listTodos → d1.listTodos");
+  });
+
+  it("reads the rules row from the validator the route is given", () => {
+    fixture();
+    const rules = read().chains[1]?.rows.filter((row) => row.label === "rules");
+    assert.deepEqual(rules, [{ label: "rules", path: "packages/valid/src/todos/todo-filter.ts", symbols: ["toTodoFilter"] }]);
+  });
+
+  it("fails on a handler that imports its validator instead of being given it", () => {
+    const text = files["apps/api/src/app/handlers/todos/get-todos.ts"]?.replace("import type { toTodoFilter }", "import { toTodoFilter }") ?? "";
+    fixture({ "apps/api/src/app/handlers/todos/get-todos.ts": text });
+    assert.throws(read, /get-todos\.ts: imports toTodoFilter from valid; a handler is given its validator by construct/);
   });
 
   it("fails on a handler that does not export the route's name", () => {

@@ -1,14 +1,17 @@
 import { PatchTodoBody } from "@todo/contract-api";
 import type { Context, Env } from "hono";
 import type { UpdateTodo } from "@todo/operations/todos/update-todo.ts";
-import { toTodoPatch } from "@todo/valid/todos/todo-patch.ts";
+import type { toTodoPatch } from "@todo/valid/todos/todo-patch.ts";
 import { invalidOf } from "../messages.ts";
 import { mapFailure, success, userFailure } from "../present.ts";
 import { validateBody } from "../validate.ts";
 import { presentTodo } from "./present.ts";
 
+/** The validator construct gives this handler (L33). */
+type ToTodoPatch = typeof toTodoPatch;
+
 /** `PATCH /todos/:id`: validate the body, make it a patch, update, then present. */
-export const patchTodo = (updateTodo: UpdateTodo) => async (c: Context<Env, "/todos/:id">) => {
+export const patchTodo = (updateTodo: UpdateTodo, toTodoPatch: ToTodoPatch) => async (c: Context<Env, "/todos/:id">) => {
   // Any id is asked for as it is; one no todo has is not found.
   const id = c.req.param("id");
 

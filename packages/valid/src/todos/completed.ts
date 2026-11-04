@@ -1,5 +1,6 @@
 // Generated from prd/todo/rules.md by tooling/rules/generate.ts. Do not edit: change the spec and regenerate.
 import { type Result, err, ok } from "@todo/business/result.ts";
+import type { RuleId } from "@todo/business/rules.ts";
 import { flag } from "../fields/decode.ts";
 import type { Problems } from "../problem.ts";
 
@@ -19,3 +20,6 @@ export const toCompleted = (candidate: CompletedCandidate): Result<boolean, Prob
 
   return ok(completed.value);
 };
+
+/** The rules `toCompleted` applies, by id: what a route that runs it applies (L33). */
+toCompleted.rules = [] as const satisfies readonly RuleId[];

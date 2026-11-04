@@ -1,5 +1,6 @@
 // Generated from prd/todo/rules.md by tooling/rules/generate.ts. Do not edit: change the spec and regenerate.
 import { type Result, err, ok } from "@todo/business/result.ts";
+import type { RuleId } from "@todo/business/rules.ts";
 import type { TodoPatch } from "@todo/business/todos/todo.ts";
 import { flag, text } from "../fields/decode.ts";
 import { problemsFrom } from "../fields/problems.ts";
@@ -52,3 +53,6 @@ export const toTodoPatch = (candidate: TodoPatchCandidate): Result<TodoPatch, Pr
     ...(completed === undefined ? {} : { completed: completed.value }),
   });
 };
+
+/** The rules `toTodoPatch` applies, by id: what a route that runs it applies (L33). */
+toTodoPatch.rules = ["patch.nonempty", "title.length"] as const satisfies readonly RuleId[];

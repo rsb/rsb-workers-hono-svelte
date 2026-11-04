@@ -178,14 +178,19 @@ describe("routeLinesOf", () => {
   it("reads each route and probe, with the value a name is given", () => {
     const text = construct([
       '    "GET /health": probe({ getHealth }),',
-      '    "GET /todos": route({ getTodos }, { listTodos }),',
+      '    "GET /todos": route({ getTodos }, { listTodos }, { toTodoFilter }),',
       '    "DELETE /todos/{id}": route({ deleteTodo: deleteTodoHandler }, { deleteTodo }),',
     ]);
     assert.deepEqual(routeLinesOf(text, "c.ts"), [
-      { key: "GET /health", name: "getHealth", value: "getHealth", unit: null },
-      { key: "GET /todos", name: "getTodos", value: "getTodos", unit: "listTodos" },
-      { key: "DELETE /todos/{id}", name: "deleteTodo", value: "deleteTodoHandler", unit: "deleteTodo" },
+      { key: "GET /health", name: "getHealth", value: "getHealth", unit: null, validator: null },
+      { key: "GET /todos", name: "getTodos", value: "getTodos", unit: "listTodos", validator: "toTodoFilter" },
+      { key: "DELETE /todos/{id}", name: "deleteTodo", value: "deleteTodoHandler", unit: "deleteTodo", validator: null },
     ]);
+  });
+
+  it("fails on a validator given under another name", () => {
+    const text = construct(['    "GET /todos": route({ getTodos }, { listTodos }, { toTodoFilter: toNewTodo }),']);
+    assert.throws(() => routeLinesOf(text, "c.ts"), /c\.ts: a route is written/);
   });
 
   it("fails on a unit given under another name", () => {

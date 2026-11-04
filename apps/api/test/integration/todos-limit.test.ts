@@ -11,7 +11,7 @@ const add = (title: string) =>
 
 // The cap is not imported from the api: integration sees only the wire, and
 // the PRD's number (deviation 9) is what is being proven.
-it("the 501st todo is rejected with limit", async () => {
+it("todos.cap: the 501st todo is rejected with limit", async () => {
   for (let n = 1; n <= 500; n++) expect((await add(`todo ${n}`)).status).toBe(201);
 
   const response = await add("one too many");

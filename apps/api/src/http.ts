@@ -1,14 +1,25 @@
+import type { RuleId } from "@todo/business/rules.ts";
 import { BODY_LIMIT_BYTES, type EndpointKey, endpoints } from "@todo/contract-api";
 import { type Context, type ErrorHandler, type Handler, Hono, type NotFoundHandler } from "hono";
 import { bodyLimit } from "hono/body-limit";
 
+/** A validator from `valid`: it carries the ids of the rules it applies, as data (L33). */
+export type Validator = ((candidate: never) => unknown) & { readonly rules: readonly RuleId[] };
+
 /**
- * One api route as data: the entry point aimed at it, its exported name, and
- * the unit it runs. A probe runs no unit, so its `unit` is `null` (L20). The
- * method and path are not here: they are the route's key, as the spec writes
- * them.
+ * One api route as data: the entry point aimed at it, its exported name, the
+ * unit it runs, and the validator its handler is given, under its name. What
+ * the route applies is read from that validator, so it is written once, by
+ * the generator (L33). A probe runs no unit, so its `unit` is `null` (L20);
+ * a handler given no validator has `validator` `null`. The method and path
+ * are not here: they are the route's key, as the spec writes them.
  */
-export type Route = { name: string; unit: string | null; handler: Handler };
+export type Route = {
+  name: string;
+  unit: string | null;
+  validator: { name: string; value: Validator } | null;
+  handler: Handler;
+};
 
 /**
  * Every route, keyed by its endpoint in the contract. A route the spec does

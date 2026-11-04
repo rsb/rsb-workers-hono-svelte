@@ -285,11 +285,12 @@ export const resolveImport = (from: string, specifier: string, workspaces: Works
 /**
  * One route as construct writes it: its key, the name its entry point is
  * listed under, the identifier that name is given (itself, unless written
- * `{ name: value }`), and its unit's name or `null` for a probe.
+ * `{ name: value }`), its unit's name or `null` for a probe, and its
+ * validator's name or `null` when the handler is given none.
  */
-export type RouteLine = { key: string; name: string; value: string; unit: string | null };
+export type RouteLine = { key: string; name: string; value: string; unit: string | null; validator: string | null };
 
-const ROUTE = /^ {4}"([A-Z]+ [^"]+)": route\(\{ (\w+)(?:: (\w+))? \}, \{ (\w+) \}\),$/;
+const ROUTE = /^ {4}"([A-Z]+ [^"]+)": route\(\{ (\w+)(?:: (\w+))? \}, \{ (\w+) \}(?:, \{ (\w+) \})?\),$/;
 const PROBE = /^ {4}"([A-Z]+ [^"]+)": probe\(\{ (\w+)(?:: (\w+))? \}\),$/;
 
 /**
@@ -297,7 +298,8 @@ const PROBE = /^ {4}"([A-Z]+ [^"]+)": probe\(\{ (\w+)(?:: (\w+))? \}\),$/;
  * `export const constructRoutes = (operations: Operations): Routes => {`,
  * which takes its units as `  const { a, b } = operations;`, then
  * `  return {`, one route per line, `  };`. A unit is always written by its
- * own name, `{ listTodos }`, so it is the operation of that name.
+ * own name, `{ listTodos }`, so it is the operation of that name; so is a
+ * validator, `{ toTodoFilter }`, so it is the import of that name.
  */
 export const routeLinesOf = (text: string, path: string): RouteLine[] => {
   const declared = [...text.matchAll(/^export const constructRoutes = \(operations: Operations\): Routes => \{\n((?:.*\n)*?)\};$/gm)];
@@ -332,16 +334,19 @@ export const routeLinesOf = (text: string, path: string): RouteLine[] => {
       if (!units.includes(unit)) {
         return fail(path, `the route ${routed[1]} runs ${unit}, which constructRoutes does not take from operations`);
       }
-      lines.push({ key: routed[1] ?? "", name, value: routed[3] ?? name, unit });
+      lines.push({ key: routed[1] ?? "", name, value: routed[3] ?? name, unit, validator: routed[5] ?? null });
       continue;
     }
     const probed = PROBE.exec(line);
     if (probed !== null) {
       const name = probed[2] ?? "";
-      lines.push({ key: probed[1] ?? "", name, value: probed[3] ?? name, unit: null });
+      lines.push({ key: probed[1] ?? "", name, value: probed[3] ?? name, unit: null, validator: null });
       continue;
     }
-    return fail(path, `a route is written "    \\"KEY\\": route({ handler }, { unit }),", or probe({ handler }): ${line.trim()}`);
+    return fail(
+      path,
+      `a route is written "    \\"KEY\\": route({ handler }, { unit }),", or route({ handler }, { unit }, { validator }), or probe({ handler }): ${line.trim()}`,
+    );
   }
   if (lines.length === 0) {
     return fail(path, "constructRoutes returns no route written one per line");

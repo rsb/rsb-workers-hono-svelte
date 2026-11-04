@@ -208,9 +208,10 @@ The decisions behind this story are:
   exports its `rules`, and a route declares its validator. A check
   joins them, and a named test per `Given` id proves state rules. This
   refines L27 and stage 13's route helper (chapters 5, 7, 9 and 11).
-  Stage 15 did the rename and the use-case lint; `Applies:`, the
-  validator's `rules`, the route's validator, the join and the named
-  tests are Target until stage 16.
+  Stage 15 did the rename and the use-case lint. Stage 16 built the
+  rest: `Applies:` in `api.md`, the validator's generated `rules`, the
+  route giving the handler its validator, the named tests, and the
+  join, run as `pnpm check:join` in the required check.
 - L34, agreed with the owner in the specs session (2026-11-04): a rules
   spec, `prd/<app>/rules.md`, is the source of inputs, rules,
   constants and violations. The business rule table, the validators
@@ -747,7 +748,7 @@ tells a story: each step is named, each `if` has braces, and a
 comment says why the step is there (review item 36):
 
 ```ts
-export const postTodos = (addTodo: AddTodo) => async (c: Context) => {
+export const postTodos = (addTodo: AddTodo, toNewTodo: ToNewTodo) => async (c: Context) => {
   // The body must be JSON, shaped as the contract says.
   const body = await validateBody(c, AddTodoBody);
   if (!body.ok) {
@@ -791,12 +792,18 @@ The duties are delegated to these places:
     its two problems, is gone (stage 11).
   - A function is named for the problem it solves, not for how it
     works: `readJson` became `validateBody` (review item 39).
-  - **Target (L33).** What an entry point applies becomes data, beside
-    the stage 13 route helper (chapter 4): the endpoint in `api.md`
-    declares `Applies: title.length`, the validator exports the rules
-    it applies (`toNewTodo.rules`), and the route declares its
-    validator, `route({ postTodos }, { addTodo }, { toNewTodo })`. A
-    check joins the three (chapter 11).
+  - **What an entry point applies is data (L33),** beside the stage 13
+    route helper (chapter 4):
+    - the endpoint in `api.md` declares `Applies: title.length`;
+    - the validator carries the rules it applies, generated:
+      `toNewTodo.rules` is `["title.length"]`;
+    - the route gives the handler its validator,
+      `route({ postTodos }, { addTodo }, { toNewTodo })`, so the
+      handler takes it as an argument and imports only its type. The
+      declaration is true by construction: `tsc` refuses a route given
+      no validator, the wrong one, or one its handler does not take.
+
+    `pnpm check:join` joins the three (chapter 11).
 - **Operate:** the operation construct injected. It now returns a
   promise, since the store is a database (chapter 6).
 - **Handle errors:** with one of two calls, chosen by what the
@@ -1856,8 +1863,9 @@ data      packages/data/d1/src/todos.ts                       todoStore.updateTo
   - the driver helpers.
 - A probe's block ends at the probe; it has no unit.
 - The `use case` row is the path the unit cites (L25).
-- The `rules` rows are what the handler imports from `valid` (L27).
-  A handler with no input to build has none.
+- The `rules` rows are the validator the route gives its handler, and
+  the rules it carries (L33). A route given no validator has none, and
+  a handler that imports a validator's value fails the check.
 - The `data` row names the table store and its method
   (`todoStore.updateTodo`): the store is the exported symbol.
 - The index is generated, never written by hand. Its first line says
@@ -1881,8 +1889,6 @@ data      packages/data/d1/src/todos.ts                       todoStore.updateTo
 - The three edges of the triangle are joined there: `api.md`'s
   `Serves:` (route → use case), construct (route → unit) and the unit's
   doc comment (unit → use case). A mismatch fails the check, as drift.
-- The `rules` rows come from the route's declared validator and the
-  `rules` it exports, not from the handler's imports.
 
 **The generator.** `tooling/entry-chains/generate.ts`, run as
 `pnpm gen:entry-chains`, writes the index, and `pnpm check:entry-chains`
@@ -2046,7 +2052,9 @@ Today the api spec's check exists. The use case is bound in part:
 `check:entry-chains` fails when the index drifts, but nothing yet
 checks the triangle (chapter 9). The rules spec's check exists:
 `pnpm check:rules` regenerates and compares, and lints the use cases'
-citations (stage 15). The rest of the use-case lint and the data spec
+citations (stage 15). `pnpm check:join` binds the citations to what
+runs: `Assumes` to `Applies:` to the route's validator, and `Given`
+to a passed test (stage 16). The rest of the use-case lint and the data spec
 are **Target.** A view spec waits for a check.
 
 **Precedence.** When a spec and the code disagree:
@@ -2082,13 +2090,27 @@ states the input, result, rules and failures in business terms, and
 cites rules by id: the input rules it assumes and the state rules it is
 given (L30). The endpoint states how they look on the wire.
 
-**Target (L33).** Each endpoint that serves a use case declares the
-input rules it applies, `Applies: title.length`, and a check joins the
-declarations: `Applies` covers the use case's `Assumes`, the route's
-validator's `rules` equal `Applies`, and every cited id exists. A
-state rule is proven by a named test per `Given` id instead, read from
-the test runner's report. `api.md` has no `Applies:` line until that
-check exists.
+**The join (L33).** Each endpoint whose route runs a unit declares the
+input rules it applies, `Applies: title.length`, or `Applies: none`; a
+probe writes none. `pnpm check:join` (`tooling/join/`) reads the rules
+spec, the use cases, `api.md` and construct with the other tools'
+readers, and fails unless:
+- each id in `Applies` is an input rule of `rules.md`;
+- `Applies` covers every id the served use case `Assumes`;
+- the route's validator's `rules` equal `Applies`, as sets, and a
+  route given no validator applies none.
+
+A state rule is proven by a test instead. Each `Given` id needs a test
+named by it, `todos.cap: names a limit failure…`, that passed in the
+operations unit report, and a test named by an id that is not a state
+rule fails, so a misspelling cannot hide. The join never runs a tier:
+`pnpm test:unit` writes the report
+(`packages/operations/test-results/unit.json`), and the join refuses
+it when it is missing or older than the tests. The scorecard runs
+`test:unit` first. The integration test `todos.cap: the 501st todo is
+rejected with limit` is named too; whether the join reads its report
+is open. The BFF's actions call the same validators but stay out of
+the join until the BFF has a spec.
 
 **Rules as data.** The spec's vocabulary states rules as data only,
 for example "at least 1 field". It cannot hold a function. This chapter
@@ -2149,6 +2171,8 @@ The spec has four sections, in this order:
 
 An endpoint has these parts, in this order, each left out when empty:
 - `Serves:` a use case path, or for a probe the PRD part it serves;
+- `Applies:` the input rule ids its entry point applies, in code font
+  and separated by commas, or `none`; a probe has no `Applies:`;
 - `Path:` a list of fields, one per path parameter;
 - `Query:` a shape;
 - `Body:` a shape;
@@ -2279,7 +2303,8 @@ Checks keep the spec, the generated files and the code in step:
   for a construct not type-checked since the spec changed. Done.
 
 The scorecard runs `check:api`, `check:entry-chains` and
-`test:tooling` since stage 13.
+`test:tooling` since stage 13, and `check:rules` and `check:join`
+since stage 16.
 
 ### Which rules go in a contract
 

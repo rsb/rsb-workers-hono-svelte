@@ -27,7 +27,9 @@ jobs:
       - run: pnpm check
       - run: pnpm check:api
       - run: pnpm check:entry-chains
+      - run: pnpm check:rules
       - run: pnpm test:tooling
       - run: pnpm test:unit
+      - run: pnpm check:join
       - run: pnpm test:integration
       - run: pnpm test:e2e

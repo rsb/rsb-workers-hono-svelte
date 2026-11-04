@@ -1,14 +1,17 @@
 import { GetTodosQuery } from "@todo/contract-api";
 import type { Context } from "hono";
 import type { ListTodos } from "@todo/operations/todos/list-todos.ts";
-import { toTodoFilter } from "@todo/valid/todos/todo-filter.ts";
+import type { toTodoFilter } from "@todo/valid/todos/todo-filter.ts";
 import { invalidOf } from "../messages.ts";
 import { mapFailure, success, userFailure } from "../present.ts";
 import { validateQuery } from "../validate.ts";
 import { presentTodo } from "./present.ts";
 
+/** The validator construct gives this handler (L33). */
+type ToTodoFilter = typeof toTodoFilter;
+
 /** `GET /todos`, `?completed=true` or `?completed=false`: validate the query, make it a filter, list, then present. */
-export const getTodos = (listTodos: ListTodos) => async (c: Context) => {
+export const getTodos = (listTodos: ListTodos, toTodoFilter: ToTodoFilter) => async (c: Context) => {
   // The query must be given once per key, shaped as the contract says.
   const query = validateQuery(c, GetTodosQuery);
   if (!query.ok) {

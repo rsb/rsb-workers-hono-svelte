@@ -85,7 +85,7 @@ describe("rules generate with a custom rule", () => {
     assert.match(result.stderr, /a custom rule's file exports its id: export const id = "title\.plain";/);
   });
 
-  it("generates around the custom rule, applying it after the generated one, and leaves its file alone", () => {
+  it("generates around the custom rule, applying and listing it after the generated one, and leaves its file alone", () => {
     const written = 'export const id = "title.plain";\nexport const titlePlain = () => undefined;\n';
     writeFileSync(customFile, written);
     const result = generate();
@@ -93,6 +93,7 @@ describe("rules generate with a custom rule", () => {
     const validator = readFileSync(join(paths.valid, "src", "todos", "new-todo.ts"), "utf8");
     assert.match(validator, /import \{ titlePlain \} from "\.\.\/rules\/title-plain\.ts";/);
     assert.ok(validator.indexOf('titleLength("title", applied)') < validator.indexOf('titlePlain("title", applied)'));
+    assert.match(validator, /toNewTodo\.rules = \["title\.length", "title\.plain"\] as const satisfies readonly RuleId\[\];/);
     const problem = readFileSync(join(paths.valid, "src", "problem.ts"), "utf8");
     assert.match(problem, /\| \{ field: "title"; rule: "title\.plain"; violation: "markup" \};/);
     assert.equal(readFileSync(customFile, "utf8"), written);
