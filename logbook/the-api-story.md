@@ -208,14 +208,17 @@ The decisions behind this story are:
   exports its `rules`, and a route declares its validator. A check
   joins them, and a named test per `Given` id proves state rules. This
   refines L27 and stage 13's route helper (chapters 5, 7, 9 and 11).
-  Target until stage 15.
+  Stage 15 did the rename and the use-case lint; `Applies:`, the
+  validator's `rules`, the route's validator, the join and the named
+  tests are Target until stage 16.
 - L34, agreed with the owner in the specs session (2026-11-04): a rules
   spec, `prd/<app>/rules.md`, is the source of inputs, rules,
   constants and violations. The business rule table, the validators
   for input rules, the `Problem` union and a rules index are generated
   from it, with `--check`; a rule marked `custom` is hand-written.
-  Generation now stops at the validators and the rule table. Agreed in
-  principle, to be confirmed by stage 15 (chapters 7 and 11).
+  Generation now stops at the validators and the rule table. Built in
+  stage 15: `tooling/rules`, run as `pnpm gen:rules` and
+  `pnpm check:rules` (chapters 7 and 11).
 - L35, agreed with the owner in the specs session (2026-11-04): a
   formalization is a spec level only when it has an address and a
   check. When a spec and the code disagree, the spec wins for
@@ -827,8 +830,8 @@ translates once, and no boundary passes on a word it did not define
 |---|---|---|
 | api data package | a driver error → a failure | D1's text → `unavailable` or `server` |
 | api operation | a fact → a failure | "not inserted" → `limit` |
-| `valid` | a candidate → a problem (rule id) | `"   "` → `title.empty` |
-| each delivery | a problem → its own words | `title.empty` → "title is empty" (api), "Title must be 1 to 256 characters" (BFF) |
+| `valid` | a candidate → a problem (rule id and violation) | `"   "` → `title.length`, `empty` |
+| each delivery | a problem → its own words | `title.length`, `empty` → "title is empty" (api), "Title must be 1 to 256 characters" (BFF) |
 | api handler | failure kind → wire kind | `limit` → `limit`, `invalid` → `validation` |
 | bff-api data client | wire → business | `limit` → `{ kind: "full" }` |
 | bff-api handler | business → page | `full` → a form status and message |
@@ -932,7 +935,10 @@ unit cites (L24).
 
   An agent may propose a rule; it enters a spec only with a citation.
   An uncited rule is a lint failure, not a forbidden thing.
-  **Target.** The use-case lint that fails on it.
+  `pnpm check:rules` fails on a rule in `rules.md` with no `Source:`,
+  and on a use case that cites an id `rules.md` does not define, or
+  cites it in the wrong section for its kind, or glosses it. Whether
+  a source says what the rule claims is not checked.
 
 - **The use case is the root (L32).** An entry point is where a
   delivery attaches to a use case: `POST /todos` and, later, a command
@@ -976,7 +982,7 @@ applies it (L29):
 - **the store keeps them atomic, and provides guarantees:** no other
   request lands inside the operation's decision, the store answers
   with facts, and it keeps promises of its own (`todos.order`,
-  `todo.id`).
+  `todos.unique_id`).
 
 An operation is the only place anything happens to an entity. It
 composes the entity's behaviour (`newTodo`) with its actions to
@@ -1343,7 +1349,7 @@ It holds:
     applied by the operation, with the store keeping the step atomic
     (`todos.cap`, `todo.exists`);
   - a **guarantee** is a promise the store makes (`todos.order`,
-    `todo.id`).
+    `todos.unique_id`).
 
 Anything may import business. Business imports none of our other
 packages, contract included (D1).
@@ -1407,17 +1413,23 @@ them.
 The function names are verbs (`toNewTodo`), so they do not collide
 with the entity behaviour `newTodo(id, input)`.
 
-What it hides, in `fields/`, which the package's `exports` map keeps
-private (chapter 9):
-- **decode:** `unknown` narrowed to text, or to a boolean from `true`,
-  `false`, `"true"` or `"false"`. A spelling a delivery needs is added
-  here, never in the delivery. A checkbox's `"on"` is not accepted;
-  no form sends it.
-- **apply:** the title trimmed, then 1 to `TITLE_MAX` long, counted in
-  UTF-16 code units, in that order;
-- **build:** the input assembled, and the cross-field rule
-  `patch.empty` applied: a form or a command line has no contract to
-  catch an empty patch first.
+The validators, `problem.ts` and `rules/` are generated from
+`prd/todo/rules.md` (L34, chapter 11), and `pnpm check:rules` fails
+when they drift. What they hide, in `fields/` and `rules/`, which the
+package's `exports` map keeps private (chapter 9):
+- **decode,** in `fields/decode.ts`, by hand: `unknown` narrowed to
+  text, or to a boolean from `true`, `false`, `"true"` or `"false"`. A
+  spelling a delivery needs is added here, never in the delivery. A
+  checkbox's `"on"` is not accepted; no form sends it.
+- **apply,** a function per rule in `rules/`: a rule on the whole
+  input first, before any field is decoded, and alone when it fails:
+  `patch.nonempty`, since a form or a command line has no contract to
+  catch an empty patch first. Then the title trimmed, then
+  `title.length`: 1 to `TITLE_MAX` long, counted in UTF-16 code units,
+  in that order. A rule marked `custom` is written by hand there;
+- **build,** in the validator: the input assembled from the values the
+  rules were applied to. `fields/problems.ts` gathers every field's
+  problem, in field order.
 
 Candidate fields are `unknown`, so a delivery fills a candidate in one
 line and does no typing work. Over HTTP the contract has already
@@ -1428,21 +1440,16 @@ A function returns every problem it finds, never only the first. The
 delivery decides how many it shows: the api shows the first, since its
 envelope names one field; the BFF shows one per form.
 
-A problem is `{ field, rule, …params }`. Two kinds of rule:
+A problem is `{ field, rule, violation, …params }`. Two kinds of rule:
 - **decode rules** are generic, named by the type the field needs, with
-  the field beside them: `not_text`, `not_boolean`;
-- **input rules** are named after the business rule they apply:
-  `title.empty` and `title.too_long` (both with `max`), `patch.empty`
-  (no field: it is about the whole candidate). Use cases cite them, so
-  they are fixed. `problem.ts`'s comment still calls them check rules;
-  stage 15 regenerates it.
-
-**Target (L33).** A rule id names the rule, and a problem carries the
-rule and the violation: `title.empty` and `title.too_long` become
-`title.length` with the violation `empty` or `too_long`, and
-`patch.empty` becomes `patch.nonempty`. The use cases already cite the
-new ids; `valid` and both message tables still carry stage 11's.
-Message tables then branch on the violation. Stage 15 does the rename.
+  the field beside them, and have no violation: `not_text`,
+  `not_boolean`. They are not cited;
+- **input rules** are the ones `rules.md` defines (L33): `title.length`
+  with the violation `empty` or `too_long` (both with `max`), and
+  `patch.nonempty` with `empty` (no field: it is about the whole
+  candidate). Use cases cite them by id. Message tables branch on the
+  violation. Stage 15 renamed them from stage 11's one id per
+  violation (`title.empty`, `title.too_long`, `patch.empty`).
 
 A problem carries all of its rule's parameters, not only the ones the
 violation touched. An empty title and a long one are two violations of
@@ -1454,15 +1461,18 @@ rule, but the entry point applies the rule once and everything below
 trusts it (L12). That is lighter than a type with a constructor, and
 just as safe.
 
+**The rule table (L34).** `packages/business/src/rules.ts` holds every
+rule: its statement, its kind, its parameters, its violations and its
+source, with the constants (`TITLE_MAX`, `TODO_LIMIT`) beside it, their
+only home. It is generated from the rules spec, `prd/todo/rules.md`,
+with the rules index, `packages/business/rules-index.md`, which lists
+for each rule the validators that apply it and the use cases that cite
+it. Specs cite a rule by id and never state its wording or number
+(L33).
+
 **Target.**
 - The package becomes `business/entity`, so its name says what it
   holds.
-- **The rule table (L34).** `packages/business/src/rules.ts` is the one
-  place a rule is defined: its words, its numbers, its kind, its
-  violations and its source. It is generated from the rules spec,
-  `prd/<app>/rules.md`, in stage 15, with the constants (`TITLE_MAX`)
-  beside it. Specs cite a rule by id and never state its wording or
-  number (L33).
 
 **Open.**
 - What sits beside entities in `business/entity`: rules, input types
@@ -1497,9 +1507,9 @@ guarantee, run against D1 now and Postgres later.
 
 A guarantee is a rule of kind `guarantee` (L29): a promise the store
 makes, such as `todos.order` (lists come in the order todos were
-added) and `todo.id` (no two todos share an id). A use case lists the
-ones it relies on under Guarantees (L30), and a data spec's entry
-would cite them by the same ids.
+added) and `todos.unique_id` (no two todos share an id). A use case
+lists the ones it relies on under Guarantees (L30), and a data spec's
+entry would cite them by the same ids.
 
 ### The D1 package
 
@@ -2034,8 +2044,10 @@ The levels, and what binds each:
 
 Today the api spec's check exists. The use case is bound in part:
 `check:entry-chains` fails when the index drifts, but nothing yet
-checks the triangle (chapter 9). The use-case lint, the rules spec and
-the data spec are **Target.** A view spec waits for a check.
+checks the triangle (chapter 9). The rules spec's check exists:
+`pnpm check:rules` regenerates and compares, and lints the use cases'
+citations (stage 15). The rest of the use-case lint and the data spec
+are **Target.** A view spec waits for a check.
 
 **Precedence.** When a spec and the code disagree:
 - for a generated artefact, the spec wins, and the artefact is
@@ -2104,19 +2116,17 @@ Now the route table is keyed by the contract's endpoints, so the
 api's paths are written once, in the spec (chapter 4). The BFF's
 client still writes its paths by hand.
 
-Generation stops at the contract. Entry points, operations, business
-and data are written by hand.
-
-**Target (L34).** Generation stops at the validators and the rule
-table. A rules spec, `prd/<app>/rules.md`, in this vocabulary's
-style, is the source of inputs, rules, constants and violations.
-Generated from it: the rule table and constants
+Generation stops at the validators and the rule table (L34, stage
+15). A rules spec, `prd/todo/rules.md`, in this vocabulary's style, is
+the source of inputs, rules, constants and violations. Generated from
+it by `tooling/rules`: the rule table and constants
 (`packages/business/src/rules.ts`), the validators for input rules,
-the `Problem` union, and a rules index, all with `--check`. Still
-written by hand: entity behaviour, operations, stores, the message
-tables, and any rule marked `custom`, which the generator only checks
-exists and exports its id. Stage 15 builds it and regenerates stage
-11's four validators as its proof.
+a function per rule of form `length` or `at least`, the `Problem`
+union, and the rules index, all with `--check`. Still written by hand:
+decode, entity behaviour, operations, stores, the message tables, and
+any rule marked `custom`, which the generator only checks exists and
+exports its id. Stage 11's four validators were regenerated with their
+53 tests unchanged, as the proof.
 
 ### The spec's vocabulary (draft)
 
@@ -2464,12 +2474,12 @@ names the rule a candidate breaks, as a problem with a rule id and its
 parameters, and never words it. Each delivery has a message table
 that does:
 - the api's `handlers/messages.ts` words a problem for the developer
-  who reads the reply: `title.empty` → "title is empty", in the words
-  of `prd/todo/api.md`'s examples;
+  who reads the reply: `title.length`, `empty` → "title is empty", in
+  the words of `prd/todo/api.md`'s examples;
 - the BFF's `messages.ts` words it for the person using the app:
-  `title.empty` → "Title must be 1 to 256 characters", with 256 from
+  `title.length` → "Title must be 1 to 256 characters", with 256 from
   the problem's `max`. Rules the person cannot fix (`not_text`,
-  `not_boolean`, `patch.empty`) are "Something went wrong. Try
+  `not_boolean`, `patch.nonempty`) are "Something went wrong. Try
   again.", since the page never sends them.
 
 A message the BFF shows with no problem in hand has no number. When
