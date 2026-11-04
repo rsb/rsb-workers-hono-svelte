@@ -257,6 +257,7 @@ packages under `packages/` (chapter 0).
 apps/api/src/
 ├─ index.ts            the story
 ├─ construct.ts        builds everything, once per isolate
+├─ route.ts            the helpers construct writes its route table with
 ├─ http.ts             our HTTP module: drives Hono
 └─ app/handlers/       entry points
 packages/
@@ -559,8 +560,9 @@ In the code (`construct.ts`), construct:
   one id source (`crypto.randomUUID`);
 - builds each operation with the dependencies it declares
   (`addTodo({ dbStore, newId })`, `listTodos({ dbStore })`);
-- builds each handler with the unit it runs, keyed by its endpoint
-  (`"POST /todos": route({ postTodos }, { addTodo })`);
+- builds each handler with the unit it runs, and the validator it is
+  given when it takes one, keyed by its endpoint
+  (`"POST /todos": route({ postTodos }, { addTodo }, { toNewTodo })`);
 - returns the route table and the three failure handlers, typed by
   `http.ts`'s `Api`.
 
@@ -584,13 +586,18 @@ registers the route: `http.ts` is the one boundary that knows Hono's
 form. Until stage 13, each route wrote its method and its Hono path by
 hand.
 
-Each route also carries, as data, its entry point's name and the unit
-it runs. Two helpers in construct read both from identifiers and build
-the handler:
+Each route also carries, as data, its entry point's name, the unit it
+runs and the validator it is given (L33). Two helpers read them from
+identifiers and build the handler. They live in `route.ts`, generic
+over the operations a delivery runs, and construct binds them to its
+own: `const { route, probe } = routing<Operations>();`. Construct keeps
+its builders and the table the readers scan; a later delivery's
+construct (the CLI's) can bind the same helpers to its operations.
 
 ```ts
-"POST /todos": route({ postTodos }, { addTodo }),   // postTodos(addTodo): named postTodos, runs addTodo
-"GET /health": probe({ getHealth }),                // a probe runs no unit (L20)
+"GET /todos/counts": route({ getTodoCounts }, { countTodos }),  // getTodoCounts(countTodos)
+"POST /todos": route({ postTodos }, { addTodo }, { toNewTodo }), // postTodos(addTodo, toNewTodo)
+"GET /health": probe({ getHealth }),                             // a probe runs no unit (L20)
 ```
 
 - **The types check the pair.** The unit must be one of `Operations`,
@@ -600,6 +607,19 @@ the handler:
   a handler that takes a unit given to `probe` do not compile. No two
   operations may share a type, or the routes that run them stop
   compiling, so a type names one unit.
+- **The refusals are kept.** `apps/api/test/types/routes.ts` is
+  compiled by `pnpm check` and never run. Each refusal there is a line
+  under `@ts-expect-error`, which fails the check when the line
+  compiles, so a helper that loosens fails CI (stage 17):
+  - a route missing its handler's validator, given another, or given
+    one its handler does not take;
+  - the wrong unit, a unit type no operation has, and a type two
+    operations share, shown by binding the helpers to a record with
+    twins;
+  - a table missing an endpoint, or naming one the contract lacks.
+
+  Accepted calls sit beside them, so a helper that refuses everything
+  fails too.
 - **A clash is named by the key.** The handler for
   `DELETE /todos/{id}` and its unit are both `deleteTodo`, so construct
   writes `route({ deleteTodo: deleteTodoHandler }, { deleteTodo })`.
@@ -801,7 +821,8 @@ The duties are delegated to these places:
       `route({ postTodos }, { addTodo }, { toNewTodo })`, so the
       handler takes it as an argument and imports only its type. The
       declaration is true by construction: `tsc` refuses a route given
-      no validator, the wrong one, or one its handler does not take.
+      no validator, the wrong one, or one its handler does not take,
+      and the type test keeps each refusal (chapter 4).
 
     `pnpm check:join` joins the three (chapter 11).
 - **Operate:** the operation construct injected. It now returns a
