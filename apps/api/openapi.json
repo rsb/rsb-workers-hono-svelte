@@ -15,6 +15,7 @@
   "paths": {
     "/health": {
       "get": {
+        "operationId": "getHealth",
         "description": "Serves: `prd/todo.md`, deviation 13 and scenario 1.",
         "responses": {
           "200": {
@@ -63,6 +64,8 @@
     },
     "/todos": {
       "get": {
+        "operationId": "getTodos",
+        "x-unit": "listTodos",
         "description": "Serves: `use-cases/todos/list-todos.md`.",
         "parameters": [
           {
@@ -197,6 +200,8 @@
         }
       },
       "post": {
+        "operationId": "postTodos",
+        "x-unit": "addTodo",
         "description": "Serves: `use-cases/todos/add-a-todo.md`.",
         "requestBody": {
           "required": true,
@@ -337,6 +342,8 @@
         }
       },
       "patch": {
+        "operationId": "patchTodos",
+        "x-unit": "setAllCompleted",
         "description": "Serves: `use-cases/todos/mark-all-completed.md`.",
         "requestBody": {
           "required": true,
@@ -439,6 +446,8 @@
         }
       },
       "delete": {
+        "operationId": "deleteTodos",
+        "x-unit": "deleteCompleted",
         "description": "Serves: `use-cases/todos/clear-completed.md`.",
         "parameters": [
           {
@@ -536,6 +545,8 @@
     },
     "/todos/counts": {
       "get": {
+        "operationId": "getTodoCounts",
+        "x-unit": "countTodos",
         "description": "Serves: `use-cases/todos/count-todos.md`.",
         "responses": {
           "200": {
@@ -585,6 +596,8 @@
     },
     "/todos/{id}": {
       "patch": {
+        "operationId": "patchTodo",
+        "x-unit": "updateTodo",
         "description": "Serves: `use-cases/todos/change-a-todo.md`.",
         "parameters": [
           {
@@ -730,6 +743,8 @@
         }
       },
       "delete": {
+        "operationId": "deleteTodo",
+        "x-unit": "deleteTodo",
         "description": "Serves: `use-cases/todos/remove-a-todo.md`.",
         "parameters": [
           {

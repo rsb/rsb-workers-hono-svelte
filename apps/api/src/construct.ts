@@ -15,7 +15,7 @@ import { getTodos } from "./app/handlers/todos/get-todos.ts";
 import { patchTodo } from "./app/handlers/todos/patch-todo.ts";
 import { patchTodos } from "./app/handlers/todos/patch-todos.ts";
 import { postTodos } from "./app/handlers/todos/post-todos.ts";
-import type { Api, Route } from "./http.ts";
+import type { Api, Route, Routes } from "./http.ts";
 
 // The app's whole dependency graph, one builder per level (A10). Each level
 // takes the one below, so a caller can enter at any level and replace a piece.
@@ -61,23 +61,63 @@ export const constructOperations = (infra: Infra): Operations => ({
   deleteCompleted: deleteCompleted({ dbStore: infra.dbStore }),
 });
 
+/** The one entry of `{ name: value }`, so that a name is read from its identifier. */
+const named = <T>(single: Record<string, T>, what: string): [string, T] => {
+  const entries = Object.entries(single);
+  const [entry] = entries;
+  if (entries.length !== 1 || entry === undefined) {
+    throw new Error(`construct: ${what} must be one name, given ${entries.length}`);
+  }
+  return entry;
+};
+
 /**
- * Each handler with the operation it runs, laid out as routes. A fixed path
- * comes before `/todos/:id`, so `counts` is never read as an id.
+ * A route whose handler runs one unit (L19). Both are given as `{ name }`, so
+ * the route carries their names as data and the handler is built here:
+ * `route({ postTodos }, { addTodo })` is `postTodos(addTodo)`, named
+ * `postTodos`, running `addTodo`. The unit must be one of `Operations`, and
+ * the handler must take it.
  */
-export const constructRoutes = (operations: Operations): Route[] => [
-  { method: "GET", path: "/health", handler: getHealth },
-  { method: "GET", path: "/todos", handler: getTodos(operations.listTodos) },
-  { method: "GET", path: "/todos/counts", handler: getTodoCounts(operations.countTodos) },
-  { method: "POST", path: "/todos", handler: postTodos(operations.addTodo) },
-  { method: "PATCH", path: "/todos", handler: patchTodos(operations.setAllCompleted) },
-  { method: "PATCH", path: "/todos/:id", handler: patchTodo(operations.updateTodo) },
-  { method: "DELETE", path: "/todos", handler: deleteTodos(operations.deleteCompleted) },
-  { method: "DELETE", path: "/todos/:id", handler: deleteTodoHandler(operations.deleteTodo) },
-];
+const route = <K extends keyof Operations>(
+  handler: Record<string, (unit: Operations[K]) => Route["handler"]>,
+  unit: Pick<Operations, K>,
+): Route => {
+  const [name, build] = named(handler, "a route's handler");
+  const [unitName, built] = named<Operations[K]>(unit, "a route's unit");
+  return { name, unit: unitName, handler: build(built) };
+};
+
+/** A probe's route: it runs no unit (L20). `probe({ getHealth })`. */
+const probe = (handler: Record<string, Route["handler"]>): Route => {
+  const [name, built] = named(handler, "a probe");
+  return { name, unit: null, handler: built };
+};
+
+/**
+ * Each handler with the unit it runs, keyed by its endpoint as the spec
+ * writes it. Every endpoint has exactly one route, or this does not compile.
+ * Routes are registered in this order, so a fixed path comes before
+ * `/todos/{id}` and `counts` is never read as an id.
+ */
+export const constructRoutes = (operations: Operations): Routes => {
+  // The built operations, named as the units they are. Inside this function
+  // they hide the builders of the same name imported above.
+  const { addTodo, listTodos, countTodos, updateTodo, setAllCompleted, deleteTodo, deleteCompleted } = operations;
+
+  return {
+    "GET /health": probe({ getHealth }),
+    "GET /todos": route({ getTodos }, { listTodos }),
+    "GET /todos/counts": route({ getTodoCounts }, { countTodos }),
+    "POST /todos": route({ postTodos }, { addTodo }),
+    "PATCH /todos": route({ patchTodos }, { setAllCompleted }),
+    "PATCH /todos/{id}": route({ patchTodo }, { updateTodo }),
+    "DELETE /todos": route({ deleteTodos }, { deleteCompleted }),
+    "DELETE /todos/{id}": route({ deleteTodo: deleteTodoHandler }, { deleteTodo }),
+  };
+};
 
 /** The routes plus the failure handlers, typed by `http.ts`. */
-export const constructApi = (routes: readonly Route[]): Api => ({
+export const constructApi = (routes: Routes): Api => ({
   routes,
   notFound,
   tooLarge,

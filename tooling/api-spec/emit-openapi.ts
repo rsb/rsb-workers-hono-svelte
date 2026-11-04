@@ -1,10 +1,11 @@
 // Writes an api's OpenAPI 3.1 document from its parsed spec (L26). The
 // document says what the contract says, in OpenAPI's terms: each shape is a
 // schema, each kind a failure schema at its own status, and each example a
-// named example on the request and on the reply it gets.
-//
-// Not here yet: `operationId` and `x-unit`, which come from the construct.
+// named example on the request and on the reply it gets. Each route adds
+// what the spec does not hold: `operationId`, the entry point's name, and
+// `x-unit`, the unit it runs, read from the construct (L23, L24).
 
+import type { RouteRow } from "../entry-chains/routes.ts";
 import type { Endpoint, Example, Field, Shape, Spec, Type } from "./parse.ts";
 
 const VERSION = "3.1.2";
@@ -165,8 +166,13 @@ const parameters = (spec: Spec, endpoint: Endpoint): Json[] => {
   return found;
 };
 
-const operation = (spec: Spec, endpoint: Endpoint): Json => {
-  const op: Json = { description: `Serves: ${endpoint.serves}.` };
+const operation = (spec: Spec, endpoint: Endpoint, route: RouteRow): Json => {
+  const op: Json = { operationId: route.name };
+  // A probe runs no unit, so it has no `x-unit` (L20).
+  if (route.unit !== null) {
+    op["x-unit"] = route.unit;
+  }
+  op.description = `Serves: ${endpoint.serves}.`;
 
   const params = parameters(spec, endpoint);
   if (params.length > 0) {
@@ -207,12 +213,34 @@ const operation = (spec: Spec, endpoint: Endpoint): Json => {
   return op;
 };
 
+/**
+ * Each endpoint's route, by the key the spec writes. Construct's types already
+ * hold one route per endpoint; this says so again for a construct that has
+ * not been type-checked since the spec changed.
+ */
+const routeByKey = (spec: Spec, routes: readonly RouteRow[]) => {
+  const byKey = new Map(routes.map((route) => [route.key, route]));
+  const keys = new Set(spec.endpoints.map((endpoint) => `${endpoint.method} ${endpoint.path}`));
+  const unrouted = [...keys].filter((key) => !byKey.has(key));
+  const unspecified = [...byKey.keys()].filter((key) => !keys.has(key));
+  if (unrouted.length > 0 || unspecified.length > 0) {
+    const lines = [
+      ...unrouted.map((key) => `the spec has ${key}, and construct has no route for it`),
+      ...unspecified.map((key) => `construct has a route for ${key}, and the spec has no such endpoint`),
+    ];
+    throw new Error(lines.join("\n"));
+  }
+  return byKey;
+};
+
 /** `openapi.json`: the whole document, as the text to write. */
-export const emitOpenApi = (spec: Spec, source: string, script: string) => {
+export const emitOpenApi = (spec: Spec, routes: readonly RouteRow[], source: string, script: string) => {
+  const byKey = routeByKey(spec, routes);
   const paths: Record<string, Json> = {};
   for (const endpoint of spec.endpoints) {
+    const route = byKey.get(`${endpoint.method} ${endpoint.path}`) as RouteRow;
     paths[endpoint.path] ??= {};
-    (paths[endpoint.path] as Json)[endpoint.method.toLowerCase()] = operation(spec, endpoint);
+    (paths[endpoint.path] as Json)[endpoint.method.toLowerCase()] = operation(spec, endpoint, route);
   }
 
   const schemas: Json = {};
