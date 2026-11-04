@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { SOMETHING_WENT_WRONG, TITLE_RULE } from "../../../src/lib/server/todos/messages.ts";
+import { SOMETHING_WENT_WRONG } from "../../../src/lib/server/todos/messages.ts";
+
+/** The title rule, as the page shows it. */
+const TITLE_RULE = "Title must be 1 to 256 characters";
 import { editTodo } from "../../../src/lib/server/todos/edit-todo.ts";
 
 const binding = (reply: () => Promise<Response>) => ({ fetch: reply });
@@ -27,6 +30,15 @@ describe("editTodo", () => {
     expect(result).toMatchObject({
       status: 422,
       data: { edit: { id: "", title: "buy bread", message: SOMETHING_WENT_WRONG } },
+    });
+  });
+
+  it("answers 422 without asking the API when the title is missing", async () => {
+    const result = await editTodo(unreached, form({ id: "id-1" }));
+
+    expect(result).toMatchObject({
+      status: 422,
+      data: { edit: { id: "id-1", title: "", message: SOMETHING_WENT_WRONG } },
     });
   });
 

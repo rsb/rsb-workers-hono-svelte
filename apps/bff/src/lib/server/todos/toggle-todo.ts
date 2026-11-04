@@ -1,6 +1,7 @@
 import { fail } from "@sveltejs/kit";
+import { toTodoPatch } from "@todo/valid/todos/todo-patch.ts";
 import { patchTodo } from "../api/todos.ts";
-import { SOMETHING_WENT_WRONG } from "./messages.ts";
+import { SOMETHING_WENT_WRONG, problemMessage } from "./messages.ts";
 import { status } from "./status.ts";
 
 /** A form value as text, or empty when it is missing or a file. */
@@ -21,16 +22,20 @@ const text = (value: FormDataEntryValue | null): string => {
  */
 export async function toggleTodo(api: Pick<Fetcher, "fetch">, form: FormData) {
   const id = text(form.get("id"));
-  const completed = text(form.get("completed"));
 
-  // The page always sends both; anything else did not come from it.
-  const hasId = id !== "";
-  const isBoolean = completed === "true" || completed === "false";
-  if (!hasId || !isBoolean) {
+  // The page always sends an id; a form without one did not come from it.
+  if (id === "") {
     return fail(422, { toggle: { id, message: SOMETHING_WENT_WRONG } });
   }
 
-  const reply = await patchTodo(api, id, { completed: completed === "true" });
+  // completed must be true or false.
+  const patch = toTodoPatch({ completed: form.get("completed") });
+  if (!patch.ok) {
+    const [problem] = patch.error;
+    return fail(422, { toggle: { id, message: problemMessage(problem) } });
+  }
+
+  const reply = await patchTodo(api, id, patch.value);
   if (!reply.ok) {
     const kind = reply.error.kind;
     return fail(status(kind), { toggle: { id, message: SOMETHING_WENT_WRONG } });

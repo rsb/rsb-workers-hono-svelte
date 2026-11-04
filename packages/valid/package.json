@@ -1,10 +1,11 @@
 {
   "name": "@todo/valid",
   "private": true,
-  "description": "Validation rules shared by the apps. Imports business.",
+  "description": "How a candidate becomes a business input: decode, check, build. Returns problems, never words. Imports business only.",
   "type": "module",
   "exports": {
-    "./*": "./src/*"
+    "./problem.ts": "./src/problem.ts",
+    "./todos/*": "./src/todos/*"
   },
   "scripts": {
     "check": "tsc -p tsconfig.json",

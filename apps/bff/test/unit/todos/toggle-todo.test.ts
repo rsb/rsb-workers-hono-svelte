@@ -26,6 +26,11 @@ describe("toggleTodo", () => {
     expect(result).toMatchObject({ status: 422, data: { toggle: { id: "", message: SOMETHING_WENT_WRONG } } });
   });
 
+  it("answers 422 without asking the API when completed is missing", async () => {
+    const result = await toggleTodo(unreached, form({ id: "id-1" }));
+    expect(result).toMatchObject({ status: 422, data: { toggle: { id: "id-1", message: SOMETHING_WENT_WRONG } } });
+  });
+
   it("answers 422 without asking the API when completed is not true or false", async () => {
     const result = await toggleTodo(unreached, form({ id: "id-1", completed: "yes" }));
     expect(result).toMatchObject({ status: 422, data: { toggle: { id: "id-1", message: SOMETHING_WENT_WRONG } } });

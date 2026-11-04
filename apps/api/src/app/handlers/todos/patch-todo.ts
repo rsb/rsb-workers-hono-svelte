@@ -1,13 +1,13 @@
 import { PatchTodoBody } from "@todo/contract-api";
 import type { Context, Env } from "hono";
-import type { TodoPatch } from "@todo/business/todos/todo.ts";
 import type { UpdateTodo } from "@todo/operations/todos/update-todo.ts";
+import { toTodoPatch } from "@todo/valid/todos/todo-patch.ts";
+import { invalidOf } from "../messages.ts";
 import { mapFailure, success, userFailure } from "../present.ts";
 import { validateBody } from "../validate.ts";
 import { presentTodo } from "./present.ts";
-import { validateTitle } from "./validate.ts";
 
-/** `PATCH /todos/:id`: validate the body, validate a title if there is one, update, then present. */
+/** `PATCH /todos/:id`: validate the body, make it a patch, update, then present. */
 export const patchTodo = (updateTodo: UpdateTodo) => async (c: Context<Env, "/todos/:id">) => {
   // Any id is asked for as it is; one no todo has is not found.
   const id = c.req.param("id");
@@ -18,22 +18,14 @@ export const patchTodo = (updateTodo: UpdateTodo) => async (c: Context<Env, "/to
     return userFailure(c, body.error);
   }
 
-  const patch: TodoPatch = {};
-  if (body.value.completed !== undefined) {
-    patch.completed = body.value.completed;
-  }
-
-  // A title, when there is one, must follow the business rules.
-  if (body.value.title !== undefined) {
-    const title = validateTitle({ title: body.value.title });
-    if (!title.ok) {
-      return userFailure(c, title.error);
-    }
-    patch.title = title.value.title;
+  // The patch must follow the business rules: a title's, and completed is true or false.
+  const patch = toTodoPatch({ title: body.value.title, completed: body.value.completed });
+  if (!patch.ok) {
+    return userFailure(c, invalidOf(patch.error));
   }
 
   // Updating can fail for the user (no such todo) or for us (the store).
-  const updated = await updateTodo(id, patch);
+  const updated = await updateTodo(id, patch.value);
   if (!updated.ok) {
     return mapFailure(c, updated.error);
   }
