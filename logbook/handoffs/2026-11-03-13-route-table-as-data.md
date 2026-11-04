@@ -183,6 +183,9 @@ On a branch made from `main`, for example `feat/route-table-data`:
 ## Outcome
 
 Steps 1, 3 and 4 were built on `feat/route-table-data`, in three
-commits: the code, the governance change and the docs. The review
-tour is
+commits: the code, the governance change and the docs. A full review
+of the branch then found names trusted rather than checked, readers
+that skipped lines, untested failure paths and docs that claimed more
+than the code held; a fourth commit fixes all eight findings. The
+review tour, with the findings in its §7, is
 [reports/2026-11-03-13-route-table-review-tour.md](../reports/2026-11-03-13-route-table-review-tour.md).

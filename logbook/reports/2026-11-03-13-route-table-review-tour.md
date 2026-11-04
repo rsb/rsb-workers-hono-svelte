@@ -6,13 +6,17 @@ route table, then the extractor and OpenAPI, then the index, then the
 checks, the governance change and the docs.
 
 The code toured is branch `feat/route-table-data`, made from `main` at
-`1f0e4d2` (PR #33 merged). It has three commits:
+`1f0e4d2` (PR #33 merged). It has four commits:
 - `933871e` `feat(api)`: the code, the tests and the regenerated
   files. 15 files: 8 new, 7 changed.
 - `6eac5cf` `ci`: `scorecard.yml` and `AGENTS.md`, under the rl-0009
   exception recorded in §4.
-- the `docs(logbook)` commit: the story, the glossary, profile notes
+- `f900173` `docs(logbook)`: the story, the glossary, profile notes
   P54–P59, this tour, and handoffs 12 and 13.
+- the `fix(api)` commit: what a full review of the branch found
+  (§7). It makes the route checks and the readers strict, adds their
+  failure tests, and corrects this tour and the docs where they
+  claimed more than the code held.
 
 Checks on the code commit, each tier in a fresh command:
 - `pnpm check` is clean.
@@ -25,7 +29,8 @@ Checks on the code commit, each tier in a fresh command:
   `x-unit`.
 - `pnpm check:entry-chains` exits 0.
 - `test:tooling`: 53, up from 31 (OpenAPI 5 → 10, parse 26, and the
-  new `read.test.ts` 13 and `chains.test.ts` 4).
+  new `read.test.ts` 13 and `chains.test.ts` 4). After the review
+  commit it is 95 (§7).
 
 "Why" cites the questions of
 [handoff 13](../handoffs/2026-11-03-13-route-table-as-data.md) as
@@ -65,6 +70,11 @@ export type Routes = Record<EndpointKey, Route>;
   - `route({ getTodos }, { countTodos })` failed with `TS2322
     'CountTodos' is not assignable to type 'ListTodos'`.
 
+  That last case failed only because `CountTodos` returns another
+  type. `route({ getTodos }, { deleteCompleted })` compiled, since a
+  unit with fewer arguments is assignable. The review found this, and
+  the `route` below is the corrected one (§7).
+
 `apps/api/src/construct.ts`:
 
 ```ts
@@ -80,14 +90,23 @@ export const constructRoutes = (operations: Operations): Routes => {
 };
 ```
 
-- `route` takes `<K extends keyof Operations>`. The handler is
-  `Record<string, (unit: Operations[K]) => Route["handler"]>`, and the
-  unit is `Pick<Operations, K>`. TypeScript infers `K` from the unit's
-  key, and then checks that the handler takes that unit.
+- `route` takes `<K extends keyof Operations, U>`. The handler is
+  `Record<string, (unit: U) => Route["handler"]>`, and the unit is
+  `Pick<Operations, K> & Runs<K, U>`. TypeScript infers `K` from the
+  unit's key and `U` from the handler's parameter. `Runs` is `unknown`
+  when `K` is the one operation whose type is exactly `U`; otherwise
+  it is an object with a property no argument has, so the call does
+  not compile and the error names the rule. So a unit with fewer
+  arguments, no unit, two units, and two operations of one type all
+  fail `tsc`.
+- `probe` takes `(c: Context) => Response | Promise<Response>`, so a
+  handler that takes a unit does not compile there.
 - `named` reads the one entry of `{ name: value }`. It throws at
   construct time when an object has more or fewer than one key. The
-  types do not stop a two-key object, but every test that builds the
-  routes would fail on one.
+  types now reject both for `route`'s unit; `named` stays as the
+  runtime guard for the handler side.
+- Types cannot see a name: `{ getTodoCounts: getTodos }` is a valid
+  record. The extractor checks the names against the text (§2).
 - Q2: names are read from identifiers. The one clash, the
   `deleteTodo` handler and the `deleteTodo` unit, is named by an
   explicit key.
@@ -105,14 +124,28 @@ runs through the new `serve` there too.
   handoff 13 did.
 - It builds the operations on a `Proxy` store whose every method
   throws, then the routes.
-- It returns `{ key, name, unit }` for each route.
+- It returns `{ key, name, unit }` for each route, and fails on a
+  route whose `name` is missing or whose `unit` is neither a name nor
+  `null` (`rowOf`).
+- It reads construct's text and fails when a name is not its value's
+  own (`checkWritten`):
+  - `routeLinesOf`: one route per line, `route({ handler }, { unit })`
+    or `probe({ handler })`, and the unit written by its own name,
+    taken from the `const { … } = operations;` line;
+  - a handler given as `{ name: value }` must be construct's import of
+    the handler `name`;
+  - `operationLinesOf`: one `name: builder({ … }),` per line, and the
+    builder must be construct's import of the operation `name`;
+  - the routes built are the routes written, in order, and no two
+    share an entry point's name.
 
 `tooling/api-spec/emit-openapi.ts`:
 - `emitOpenApi(spec, routes, source, script)` writes `operationId`
   first, then `x-unit` when the route has a unit, then the existing
   description.
 - `routeByKey` fails when the routes and the spec's endpoints differ
-  in either direction. The compiler already holds this. The check is
+  in either direction, and when two routes share an `operationId`.
+  The compiler already holds the first. The check is
   for a construct not type-checked since the spec changed, and it is
   one map lookup. It is not the dropped step 2 test: it runs only when
   the document is generated.
@@ -123,22 +156,26 @@ runs through the new `serve` there too.
   `check:api` pass `apps/api/src/construct.ts`.
 - It writes, or under `--check` compares, the four contract files
   first, then loads construct, then the OpenAPI document.
-- A mismatch is reported against both sources: "differs from what
-  prd/todo/api.md and apps/api/src/construct.ts generates".
+- A mismatch is reported against both sources and names the command:
+  "differs from what prd/todo/api.md and apps/api/src/construct.ts
+  generate; run pnpm gen:api".
+- A `ChainError` from the extractor is printed as it is; only the
+  routes-against-spec failures are prefixed with the construct's path.
 - `main` is now async.
 
-Tests (`emit-openapi.test.ts`, 5 → 10):
+Tests (`emit-openapi.test.ts`, 5 → 11):
 - `operationId` equals each route's name, and `x-unit` its unit;
 - every `operationId` is different;
 - the probe has no `x-unit`;
-- an endpoint with no route, and a route with no endpoint, each throw.
+- an endpoint with no route, a route with no endpoint, and two routes
+  with one `operationId` each throw.
 
 ## 3. The index
 
 ```
 tooling/entry-chains/
-├─ routes.ts       the extractor (§2)
-├─ read.ts         the readers: imports, the use case line, the two patterns, package resolution
+├─ routes.ts       the extractor and its check against construct's text (§2)
+├─ read.ts         the readers: imports, the use case line, the two patterns, construct's routes and operations, package resolution
 ├─ chains.ts       follows each route; collects the shared links
 ├─ emit.ts         writes the markdown
 └─ generate.ts     the CLI: gen:entry-chains, check:entry-chains
@@ -165,16 +202,30 @@ How one chain is followed (`chains.ts`):
    two table stores may not share a method name. Each table file's
    `./driver.ts` imports become the shared `driver` row.
 
+Each form is read whole, so a line the patterns do not read fails
+rather than being skipped:
+- `importsOf`: every line starting `import` is a named, namespace or
+  bare import ending in `;`, and every item is a bare name. A comment
+  between the braces, a default import beside named ones, or a
+  missing `;` fails. Before the review each was misread or dropped.
+- `tableStoreOf`: every line at the store's own depth is a method,
+  `},` or a comment. `  updateTodo(id) {` fails.
+- `spreadsOf`: every line of `createDbStore` is `  ...xStore(db),`.
+  An `updateTodo:` entry beside the spreads would replace the table's
+  method, so it fails.
+- Construct imports its failure handlers from exactly one file.
+
 Package imports resolve through each workspace's `exports` map, so
 `@todo/valid/fields/*` does not resolve, just as it does not for
-`tsc`.
+`tsc`. When patterns overlap, an exact key wins, then the pattern with
+the longest part before its `*`, as Node picks.
 
 Every failure is a `ChainError` carrying the file's path and what it
 lacks, for example
 `apps/api/src/construct.ts: imports removeTodo as an entry point 0 times; it must import it once`.
 That message came from a scratch copy whose route key was renamed.
 With a line appended to the index, `--check` reported
-`apps/api/entry-chains.md differs from what apps/api/src/construct.ts generates`.
+`apps/api/entry-chains.md differs from what apps/api/src/construct.ts generates; run pnpm gen:entry-chains`.
 
 The output is `apps/api/entry-chains.md`:
 - Its first line names the source and the script, and says not to
@@ -187,15 +238,26 @@ The output is `apps/api/entry-chains.md`:
   does `chains.test.ts`.
 
 Tests:
-- `read.test.ts` (13) covers each reader and each failure. A port
+- `read.test.ts` (29) covers each reader and each failure. A port
   written as a property (`method: (…) =>`) fails rather than being
-  skipped. So does a store written as a `function`, and a package path
-  that is not exported.
-- `chains.test.ts` (4):
+  skipped. So do a store written as a `function`, a package path that
+  is not exported, and each form in the list above.
+- `routes.test.ts` (10): `checkWritten` and `rowOf`, each name check
+  passing once and failing once.
+- `chains.test.ts` (4), on the real repo:
   - one chain per route, in construct's order;
   - the PATCH line;
   - the probe ends at the probe;
   - the driver is listed once and in no chain.
+- `chains-fixture.test.ts` (7): `readChains` on a small repo written to
+  a temporary directory, one change per test: a handler that does not
+  export the name, a cited use case that does not exist, a port method
+  with no data method, a method in two table stores, a unit imported
+  twice, no failure handlers.
+- `emit.test.ts` (3): `emitIndex`'s first line, columns and blocks.
+- `generate.test.ts` (5): both generators' `--check`, run as CI runs
+  them, passing on the committed files and failing on a stale or
+  missing one.
 
 ## 4. Checks and the governance change (rl-0009 exception)
 
@@ -281,9 +343,82 @@ gave none.
   file construct imports must stay strippable: no `enum`, no
   `namespace`, no parameter properties. `tsc` accepts all three, so
   only `check:api` and `check:entry-chains` would catch one, failing
-  with Node's error.
+  with Node's error. Nor may anything construct imports, directly or
+  through a package, import a `cloudflare:*` module, which Node cannot
+  load. `index.ts` imports `cloudflare:workers` and construct does not
+  import `index.ts`; keep it so.
+
+### Not done in this round
+
+- `AGENTS.md`'s Commands list does not name `gen:api`, `check:api`,
+  `gen:entry-chains`, `check:entry-chains` or `test:tooling`, and its
+  regeneration line does not mention the operations in construct.
+  Changing it needs another rl-0009 exception; the owner left it for
+  a later round.
+- `tooling/` is not type-checked in CI. `tsc` over its 17 files was
+  clean when checked by hand for this commit.
+- The three generator steps could run before the Playwright install,
+  to fail sooner. That is a `scorecard.yml` change, so rl-0009 again.
 
 ### Housekeeping
 
 - The root dotfiles stay untracked and unignored, as before.
 - Nothing is pushed. The owner pushes and opens the PR.
+
+## 7. The full review, and what it changed
+
+At the owner's request, a separate agent reviewed the whole branch,
+reading every file it touches in full rather than the diff, and tried
+each doubt on a scratch copy. It found no blocker and every check
+green, and these, all fixed in the `fix(api)` commit:
+
+1. **Names were trusted, not checked.** The generators read each name
+   from an object key. `route({ patchTodos }, { setAllCompleted:
+   deleteCompleted })`, `route({ getTodoCounts: getTodos }, { listTodos
+   })` and `setAllCompleted: deleteCompleted({ … })` each type-checked
+   and generated a wrong chain or `operationId`, exit 0. Now
+   `checkWritten` fails on all three, and `emitOpenApi` refuses a
+   repeated `operationId` (§2).
+2. **A wrong pair type-checked when the unit takes fewer arguments.**
+   `route({ getTodos }, { deleteCompleted })` and `route({ getTodos },
+   {})` compiled, and `probe` took any handler. Now the handler must
+   take exactly the unit's type (`Runs`), and `probe` takes the request
+   (§1). Branding each operation type was the other way. It was not
+   taken: the handler tests pass plain fakes,
+   `getTodos(async () => ok(todos))`, and every one would need a cast.
+3. **`spreadsOf` searched for spreads** and missed any other entry in
+   `createDbStore`. Now it reads the whole body (§3).
+4. **`tableStoreOf` skipped method lines it could not read.** Now it
+   fails on them (§3).
+5. **`importsOf` misread or dropped** an import with a comment between
+   the braces, a default import beside named ones, or no `;`. Now each
+   fails (§3).
+6. **`readRoutes` did not check what it was given.** A route with no
+   `name` dropped its `operationId`. Now `rowOf` fails on it (§2).
+7. **The failure paths were untested.** 42 tests were added (§2, §3):
+   53 → 95.
+8. **The docs claimed more than the code held:** "the names cannot
+   drift" and "the handler must take it" (story chapter 4), "nothing is
+   guessed" (chapter 9), P55, P58, and this tour's §1–§3. Each now says
+   what is checked, and by what.
+
+Smaller fixes in the same commit:
+- both generators name `pnpm gen:api` or `pnpm gen:entry-chains`;
+- "generates" → "generate" after two sources;
+- every `fail` in `chains.ts` is returned, and `fail` is defined once,
+  in `read.ts`;
+- the shared rows sort by plain comparison, not `localeCompare`, so
+  the index does not depend on the locale;
+- the `errors` row lists value imports only.
+
+Proof, each with the change made and then reverted in the real files:
+- the three name cases fail both `check:entry-chains` and `check:api`,
+  each with the construct's path and the line or name at fault;
+- an `updateTodo:` entry in `createDbStore` fails `check:entry-chains`;
+- `tsc` rejects `route({ getTodos }, { deleteCompleted })`,
+  `route({ getTodos }, {})`, two units, `probe({ getTodos })`, and a
+  second operation typed `ListTodos`;
+- `pnpm check` is clean; `check:api` and `check:entry-chains` exit 0
+  with both generated files unchanged; `tsc` over `tooling/` is clean;
+- `test:tooling` 95, `test:unit` 327, `test:integration` 29 and
+  `test:e2e` 41, each in a fresh command, the last three unchanged.

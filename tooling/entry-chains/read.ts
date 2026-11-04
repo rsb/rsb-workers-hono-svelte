@@ -9,21 +9,36 @@ import { dirname, join, normalize } from "node:path";
 /** A failure the generator reports as it is: a file and what it lacks. */
 export class ChainError extends Error {}
 
-const fail = (path: string, message: string): never => {
+/** Fails with the file and what it lacks. */
+export const fail = (path: string, message: string): never => {
   throw new ChainError(`${path}: ${message}`);
 };
 
 /** One named import: the name the module exports, and the name it is used by here. */
 export type Imported = { name: string; local: string; typeOnly: boolean };
 
-/** One `import { ... } from "..."` statement. Namespace and default imports are not read. */
+/**
+ * One `import { ... } from "..."` statement. A namespace import, `import * as
+ * x from "..."`, and a bare `import "...";` are known and not read: no link
+ * is imported that way.
+ */
 export type Import = { from: string; names: Imported[] };
 
-/** Every named import in a file, in order, across as many lines as each takes. */
-export const importsOf = (text: string): Import[] => {
+/** An import's item: `name`, `name as local`, either after `type`. */
+const ITEM = /^(type\s+)?(\w+)(?:\s+as\s+(\w+))?$/;
+
+/**
+ * Every named import in a file, in order, across as many lines as each
+ * takes. Every line that starts with `import` must be one of the three forms
+ * and end in `;`, and every item must be a bare name: a default import, a
+ * comment between the braces or a missing `;` fails rather than drop a link.
+ */
+export const importsOf = (text: string, path: string): Import[] => {
   const found: Import[] = [];
-  const statement = /^import\s+(type\s+)?\{([^}]*)\}\s+from\s+"([^"]+)";/gm;
-  for (const match of text.matchAll(statement)) {
+  const read = new Set<number>();
+  const named = /^import\s+(type\s+)?\{([^}]*)\}\s+from\s+"([^"]+)";$/gm;
+  for (const match of text.matchAll(named)) {
+    read.add(match.index);
     const allTypes = match[1] !== undefined;
     const list = match[2] ?? "";
     const from = match[3] ?? "";
@@ -33,16 +48,27 @@ export const importsOf = (text: string): Import[] => {
       if (item === "") {
         continue;
       }
-      const typeOnly = allTypes || item.startsWith("type ");
-      const bare = item.replace(/^type\s+/, "");
-      const [name = "", alias] = bare.split(/\s+as\s+/);
-      let local = name;
-      if (alias !== undefined) {
-        local = alias;
+      const parts = ITEM.exec(item);
+      if (parts === null) {
+        return fail(path, `the import from ${from} has an item that is not a bare name: ${item}`);
       }
-      names.push({ name, local, typeOnly });
+      const name = parts[2] ?? "";
+      let local = name;
+      if (parts[3] !== undefined) {
+        local = parts[3];
+      }
+      names.push({ name, local, typeOnly: allTypes || parts[1] !== undefined });
     }
     found.push({ from, names });
+  }
+  const unread = /^import\s+(\*\s+as\s+\w+\s+from\s+)?"[^"]+";$/gm;
+  for (const match of text.matchAll(unread)) {
+    read.add(match.index);
+  }
+  for (const match of text.matchAll(/^import\b.*$/gm)) {
+    if (!read.has(match.index)) {
+      return fail(path, `an import is not written "import { ... } from \"...\";": ${match[0]}`);
+    }
   }
   return found;
 };
@@ -113,16 +139,51 @@ export const tableStoreOf = (text: string, path: string): TableStore => {
   const [store] = declared;
   const name = store?.[1] ?? "";
   const body = store?.[2] ?? "";
-  const methods = [...body.matchAll(/^ {2}(\w+): async \(/gm)].map((method) => method[1] ?? "");
+  const methods: string[] = [];
+  for (const line of body.split("\n")) {
+    // Only the lines at the store's own depth: what is inside a method is not read.
+    if (!/^ {2}\S/.test(line)) {
+      continue;
+    }
+    const method = /^ {2}(\w+): async \(/.exec(line);
+    if (method !== null) {
+      methods.push(method[1] ?? "");
+      continue;
+    }
+    if (line === "  }," || line.startsWith("  /**") || line.startsWith("  //")) {
+      continue;
+    }
+    return fail(path, `${name} has a line that is not "  method: async (", "  }," or a comment: ${line.trim()}`);
+  }
   if (methods.length === 0) {
     return fail(path, `${name} has no method written "  method: async ("`);
   }
   return { name, methods };
 };
 
-/** The table stores a `DbStore` spreads, by their local names: `  ...todoStore(db),`. */
+/**
+ * The table stores a `DbStore` spreads, by their local names: exactly one
+ * `export const createDbStore = (db: D1Database) => ({`, closed by `});`,
+ * whose every line is `  ...<name>(db),`. Any other entry could replace a
+ * table's method, so it fails.
+ */
 export const spreadsOf = (text: string, path: string): string[] => {
-  const spread = [...text.matchAll(/^ {2}\.\.\.(\w+)\(db\),$/gm)].map((match) => match[1] ?? "");
+  const declared = [...text.matchAll(/^export const createDbStore = \(db: D1Database\) => \(\{\n((?:.*\n)*?)\}\);$/gm)];
+  if (declared.length !== 1) {
+    return fail(path, `a DbStore is built by exactly one "export const createDbStore = (db: D1Database) => ({"; found ${declared.length}`);
+  }
+  const body = declared[0]?.[1] ?? "";
+  const spread: string[] = [];
+  for (const line of body.split("\n")) {
+    if (line === "") {
+      continue;
+    }
+    const entry = /^ {2}\.\.\.(\w+)\(db\),$/.exec(line);
+    if (entry === null) {
+      return fail(path, `createDbStore has a line that is not "  ...<name>Store(db),": ${line.trim()}`);
+    }
+    spread.push(entry[1] ?? "");
+  }
   if (spread.length === 0) {
     return fail(path, `a DbStore spreads each table's store as "  ...<name>Store(db),"; found none`);
   }
@@ -158,7 +219,7 @@ export const workspacesIn = (root: string): Workspace[] => {
 };
 
 /** A subpath against one `exports` key: exact, or a pattern with one `*`. */
-const matchExport = (key: string, target: string, subpath: string): string | undefined => {
+export const matchExport = (key: string, target: string, subpath: string): string | undefined => {
   const star = key.indexOf("*");
   if (star === -1) {
     if (key === subpath) {
@@ -173,6 +234,29 @@ const matchExport = (key: string, target: string, subpath: string): string | und
   }
   const middle = subpath.slice(before.length, subpath.length - after.length);
   return target.replace("*", middle);
+};
+
+/** The target a subpath resolves to in an `exports` map, as Node picks it, or `undefined`. */
+export const exportTarget = (exports: Record<string, string>, subpath: string): string | undefined => {
+  const exact = exports[subpath];
+  if (exact !== undefined && !subpath.includes("*")) {
+    return exact;
+  }
+  let best: { prefix: number; target: string } | undefined;
+  for (const [key, target] of Object.entries(exports)) {
+    const star = key.indexOf("*");
+    if (star === -1) {
+      continue;
+    }
+    const resolved = matchExport(key, target, subpath);
+    if (resolved === undefined) {
+      continue;
+    }
+    if (best === undefined || star > best.prefix) {
+      best = { prefix: star, target: resolved };
+    }
+  }
+  return best?.target;
 };
 
 /** The file an import names, from the file that imports it, as a path from the repo root. */
@@ -190,11 +274,129 @@ export const resolveImport = (from: string, specifier: string, workspaces: Works
   if (specifier !== workspace.name) {
     subpath = `.${specifier.slice(workspace.name.length)}`;
   }
-  for (const [key, target] of Object.entries(workspace.exports)) {
-    const resolved = matchExport(key, target, subpath);
-    if (resolved !== undefined) {
-      return normalize(join(workspace.dir, resolved));
+  // As Node picks: an exact key first, then the pattern with the longest part before its `*`.
+  const target = exportTarget(workspace.exports, subpath);
+  if (target === undefined) {
+    return fail(from, `${specifier} is not in the exports of ${workspace.name}`);
+  }
+  return normalize(join(workspace.dir, target));
+};
+
+/**
+ * One route as construct writes it: its key, the name its entry point is
+ * listed under, the identifier that name is given (itself, unless written
+ * `{ name: value }`), and its unit's name or `null` for a probe.
+ */
+export type RouteLine = { key: string; name: string; value: string; unit: string | null };
+
+const ROUTE = /^ {4}"([A-Z]+ [^"]+)": route\(\{ (\w+)(?:: (\w+))? \}, \{ (\w+) \}\),$/;
+const PROBE = /^ {4}"([A-Z]+ [^"]+)": probe\(\{ (\w+)(?:: (\w+))? \}\),$/;
+
+/**
+ * The routes `constructRoutes` writes, in order: exactly one
+ * `export const constructRoutes = (operations: Operations): Routes => {`,
+ * which takes its units as `  const { a, b } = operations;`, then
+ * `  return {`, one route per line, `  };`. A unit is always written by its
+ * own name, `{ listTodos }`, so it is the operation of that name.
+ */
+export const routeLinesOf = (text: string, path: string): RouteLine[] => {
+  const declared = [...text.matchAll(/^export const constructRoutes = \(operations: Operations\): Routes => \{\n((?:.*\n)*?)\};$/gm)];
+  if (declared.length !== 1) {
+    return fail(path, `exactly one "export const constructRoutes = (operations: Operations): Routes => {"; found ${declared.length}`);
+  }
+  const body = declared[0]?.[1] ?? "";
+  const taken = [...body.matchAll(/^ {2}const \{ ([\w, ]+) \} = operations;$/gm)];
+  if (taken.length !== 1) {
+    return fail(path, `constructRoutes takes its units once, as "  const { a, b } = operations;"; found ${taken.length}`);
+  }
+  const units = (taken[0]?.[1] ?? "").split(",").map((unit) => unit.trim());
+
+  const lines: RouteLine[] = [];
+  let inside = false;
+  for (const line of body.split("\n")) {
+    if (line === "  return {") {
+      inside = true;
+      continue;
+    }
+    if (line === "  };") {
+      inside = false;
+      continue;
+    }
+    if (!inside) {
+      continue;
+    }
+    const routed = ROUTE.exec(line);
+    if (routed !== null) {
+      const name = routed[2] ?? "";
+      const unit = routed[4] ?? "";
+      if (!units.includes(unit)) {
+        return fail(path, `the route ${routed[1]} runs ${unit}, which constructRoutes does not take from operations`);
+      }
+      lines.push({ key: routed[1] ?? "", name, value: routed[3] ?? name, unit });
+      continue;
+    }
+    const probed = PROBE.exec(line);
+    if (probed !== null) {
+      const name = probed[2] ?? "";
+      lines.push({ key: probed[1] ?? "", name, value: probed[3] ?? name, unit: null });
+      continue;
+    }
+    return fail(path, `a route is written "    \\"KEY\\": route({ handler }, { unit }),", or probe({ handler }): ${line.trim()}`);
+  }
+  if (lines.length === 0) {
+    return fail(path, "constructRoutes returns no route written one per line");
+  }
+  return lines;
+};
+
+/** One operation as `constructOperations` writes it: its name and the builder it calls. */
+export type OperationLine = { name: string; builder: string };
+
+/**
+ * The operations construct builds: exactly one
+ * `export const constructOperations = (infra: Infra): Operations => ({`,
+ * closed by `});`, one `  name: builder({ ... }),` per line.
+ */
+export const operationLinesOf = (text: string, path: string): OperationLine[] => {
+  const declared = [...text.matchAll(/^export const constructOperations = \(infra: Infra\): Operations => \(\{\n((?:.*\n)*?)\}\);$/gm)];
+  if (declared.length !== 1) {
+    return fail(path, `exactly one "export const constructOperations = (infra: Infra): Operations => ({"; found ${declared.length}`);
+  }
+  const lines: OperationLine[] = [];
+  for (const line of (declared[0]?.[1] ?? "").split("\n")) {
+    if (line === "") {
+      continue;
+    }
+    const built = /^ {2}(\w+): (\w+)\(\{ .* \}\),$/.exec(line);
+    if (built === null) {
+      return fail(path, `an operation is written "  name: builder({ ... }),": ${line.trim()}`);
+    }
+    lines.push({ name: built[1] ?? "", builder: built[2] ?? "" });
+  }
+  return lines;
+};
+
+/** The import of `name` whose specifier passes `where`, which must be exactly one, value not type. */
+export const importOf = (
+  path: string,
+  imports: Import[],
+  name: string,
+  where: (specifier: string) => boolean,
+  what: string,
+): { from: string; local: string } => {
+  const matches: { from: string; local: string }[] = [];
+  for (const statement of imports) {
+    if (!where(statement.from)) {
+      continue;
+    }
+    for (const imported of statement.names) {
+      if (imported.name === name && !imported.typeOnly) {
+        matches.push({ from: statement.from, local: imported.local });
+      }
     }
   }
-  return fail(from, `${specifier} is not in the exports of ${workspace.name}`);
+  if (matches.length !== 1) {
+    return fail(path, `imports ${name} as ${what} ${matches.length} times; it must import it once`);
+  }
+  return matches[0] as { from: string; local: string };
 };

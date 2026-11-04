@@ -14,19 +14,22 @@
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
-import { readRoutes } from "../entry-chains/routes.ts";
+import { ChainError } from "../entry-chains/read.ts";
+import { type RouteRow, readRoutes } from "../entry-chains/routes.ts";
 import { emitEndpoints, emitExamples, emitKinds, emitMessages } from "./emit-contract.ts";
 import { emitOpenApi } from "./emit-openapi.ts";
 import { parse } from "./parse.ts";
 
 const SCRIPT = "tooling/api-spec/generate.ts";
 
+const REGENERATE = "pnpm gen:api";
+
 const USAGE = "usage: node tooling/api-spec/generate.ts <spec> <contract src dir> <openapi file> <construct file> [--check]";
 
 type File = { path: string; text: string };
 
 /** Writes each file, or with `check` compares it to the committed one. Returns how many differ. */
-const settle = (files: File[], check: boolean, source: string) => {
+const settle = (files: File[], check: boolean, source: string, verb: string) => {
   let stale = 0;
   for (const file of files) {
     const path = file.path;
@@ -42,7 +45,7 @@ const settle = (files: File[], check: boolean, source: string) => {
       committed = "";
     }
     if (committed !== file.text) {
-      console.error(`${path} differs from what ${source} generates; run ${SCRIPT}`);
+      console.error(`${path} differs from what ${source} ${verb}; run ${REGENERATE}`);
       stale += 1;
     }
   }
@@ -72,18 +75,28 @@ const main = async (args: string[]) => {
     { path: join(contractDir, "endpoints.ts"), text: emitEndpoints(parsed.spec, source, SCRIPT) },
     { path: join(contractDir, "examples.ts"), text: emitExamples(parsed.spec, source, SCRIPT) },
   ];
-  let stale = settle(contract, check, source);
+  let stale = settle(contract, check, source, "generates");
 
-  const routes = await readRoutes(constructPath);
+  let routes: RouteRow[] = [];
+  try {
+    routes = await readRoutes(constructPath);
+  } catch (error) {
+    if (error instanceof ChainError) {
+      console.error(error.message);
+      return 1;
+    }
+    throw error;
+  }
   let openApi = "";
   try {
     openApi = emitOpenApi(parsed.spec, routes, source, SCRIPT);
   } catch (error) {
+    // The routes against the spec: the construct's routes are what is wrong.
     console.error(`${constructPath}: ${(error as Error).message}`);
     return 1;
   }
   const both = `${source} and ${relative(process.cwd(), constructPath)}`;
-  stale += settle([{ path: openApiPath, text: openApi }], check, both);
+  stale += settle([{ path: openApiPath, text: openApi }], check, both, "generate");
 
   if (stale > 0) {
     return 1;

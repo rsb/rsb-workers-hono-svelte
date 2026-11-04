@@ -537,13 +537,30 @@ the handler:
 "GET /health": probe({ getHealth }),                // a probe runs no unit (L20)
 ```
 
-- **The names cannot drift from what runs.** `route` reads each name
-  from its object key and builds the handler from the same pair.
 - **The types check the pair.** The unit must be one of `Operations`,
-  and the handler must take it.
+  and the handler must take exactly its type, not only a type it is
+  assignable to. A unit with fewer arguments than the handler's
+  (`route({ getTodos }, { deleteCompleted })`), no unit, two units, or
+  a handler that takes a unit given to `probe` do not compile. No two
+  operations may share a type, or the routes that run them stop
+  compiling, so a type names one unit.
 - **A clash is named by the key.** The handler for
   `DELETE /todos/{id}` and its unit are both `deleteTodo`, so construct
   writes `route({ deleteTodo: deleteTodoHandler }, { deleteTodo })`.
+- **The names are checked against the text.** A name is only an object
+  key: `route({ getTodoCounts: getTodos }, { listTodos })` type-checks,
+  is named `getTodoCounts` and runs `getTodos`. Types cannot see that,
+  so the extractor reads construct's text as well and fails when a
+  name is not its value's own:
+  - each route is one line, `route({ handler }, { unit })`, and the
+    unit is written by its own name;
+  - a handler given under another name (`{ deleteTodo:
+    deleteTodoHandler }`) must be the import of the handler of that
+    name;
+  - each operation is one line, `name: builder({ ... })`, and the
+    builder is the import of that operation's builder;
+  - the routes built are the routes written, in order, and no two
+    share an entry point's name.
 
 To read the units by name, `constructRoutes` destructures the
 operations. Inside it, those names hide the builders of the same name
@@ -552,8 +569,11 @@ imported at the top of the file.
 The names feed the OpenAPI document's `operationId` and `x-unit`
 (chapter 11) and the entry chain index (chapter 9). Both read them
 through one extractor, `tooling/entry-chains/routes.ts`. It builds the
-routes with a store whose methods are never called, and keeps each
-route's key, name and unit.
+routes with a store whose methods are never called, keeps each
+route's key, name and unit, fails on a route with no name, and checks
+the names against the text as above. Node loads construct to do this,
+so nothing construct imports, directly or through a package, may
+import a `cloudflare:*` module: Node cannot load one.
 
 ### The composition root
 
@@ -1705,8 +1725,19 @@ to the index. The generator reads:
     (`export const todoStore = (db: D1Database) => ({`), written
     `method: async (`.
 
-A file that does not match fails the generator with its path and what
-it lacks. Nothing is guessed.
+Each pattern is read whole, not searched for:
+- every `import` line is a named import, a namespace import or a bare
+  import, ending in `;`, and every item is a bare name;
+- every line at a table store's own depth is a method, `},` or a
+  comment;
+- every line of `createDbStore` is a spread, since any other entry
+  could replace a table's method.
+
+A file that does not match fails the generator with its path and the
+line it could not read, rather than skip the line. What the generator
+cannot see is said here: it reads the forms above, not TypeScript, so
+it holds only while the code is written in them. Code written another
+way fails the generator; it is not read wrongly.
 
 **Open.**
 - A port with more than one method. The generator fails on one rather
@@ -1854,7 +1885,8 @@ shape (which keys the body has), so it becomes valibot's
   `tooling/api-spec/generate.ts`;
 - the OpenAPI document, `apps/api/openapi.json`. Done, by the same
   script, with each route's `operationId` and `x-unit` read from
-  construct.
+  construct and checked against its text (chapter 4). Two routes
+  with one `operationId` fail it.
 
 Both are committed and name the script that wrote them: the
 contract's files in their first line, the document in

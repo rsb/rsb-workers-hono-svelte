@@ -216,7 +216,8 @@ const operation = (spec: Spec, endpoint: Endpoint, route: RouteRow): Json => {
 /**
  * Each endpoint's route, by the key the spec writes. Construct's types already
  * hold one route per endpoint; this says so again for a construct that has
- * not been type-checked since the spec changed.
+ * not been type-checked since the spec changed. No two routes may share an
+ * entry point's name, since it is their `operationId`.
  */
 const routeByKey = (spec: Spec, routes: readonly RouteRow[]) => {
   const byKey = new Map(routes.map((route) => [route.key, route]));
@@ -229,6 +230,15 @@ const routeByKey = (spec: Spec, routes: readonly RouteRow[]) => {
       ...unspecified.map((key) => `construct has a route for ${key}, and the spec has no such endpoint`),
     ];
     throw new Error(lines.join("\n"));
+  }
+  // OpenAPI requires each `operationId` to be unique in the document.
+  const named = new Map<string, string>();
+  for (const route of routes) {
+    const other = named.get(route.name);
+    if (other !== undefined) {
+      throw new Error(`${other} and ${route.key} have the same operationId, ${route.name}; each route names its own entry point`);
+    }
+    named.set(route.name, route.key);
   }
   return byKey;
 };

@@ -27,9 +27,9 @@ const main = async (args: string[]) => {
   }
 
   const source = relative(process.cwd(), constructPath);
-  const routes = await readRoutes(constructPath);
   let text = "";
   try {
+    const routes = await readRoutes(constructPath);
     const chains = readChains(source, routes);
     text = emitIndex(chains, source, SCRIPT);
   } catch (error) {
@@ -52,7 +52,7 @@ const main = async (args: string[]) => {
     committed = "";
   }
   if (committed !== text) {
-    console.error(`${indexPath} differs from what ${source} generates; run ${SCRIPT}`);
+    console.error(`${indexPath} differs from what ${source} generates; run pnpm gen:entry-chains`);
     return 1;
   }
   return 0;

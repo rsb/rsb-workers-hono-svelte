@@ -9,10 +9,11 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import type { RouteRow } from "./routes.ts";
 import {
-  ChainError,
   type Import,
   type Workspace,
   exports,
+  fail,
+  importOf,
   importsOf,
   portOf,
   resolveImport,
@@ -31,36 +32,7 @@ export type Chain = { key: string; line: string; rows: Row[] };
 /** The whole index: the links every chain shares, then each entry point. */
 export type Chains = { shared: Row[]; chains: Chain[] };
 
-const fail = (path: string, message: string): never => {
-  throw new ChainError(`${path}: ${message}`);
-};
-
 const read = (path: string) => readFileSync(path, "utf8");
-
-/** The import of `name` whose file passes `where`, which must be exactly one. */
-const importOf = (
-  path: string,
-  imports: Import[],
-  name: string,
-  where: (specifier: string) => boolean,
-  what: string,
-): { from: string; local: string } => {
-  const matches: { from: string; local: string }[] = [];
-  for (const statement of imports) {
-    if (!where(statement.from)) {
-      continue;
-    }
-    for (const imported of statement.names) {
-      if (imported.name === name && !imported.typeOnly) {
-        matches.push({ from: statement.from, local: imported.local });
-      }
-    }
-  }
-  if (matches.length !== 1) {
-    return fail(path, `imports ${name} as ${what} ${matches.length} times; it must import it once`);
-  }
-  return matches[0] as { from: string; local: string };
-};
 
 /** Adds a file's symbols to a shared row, keeping each symbol once. */
 const share = (shared: Map<string, Row>, label: string, path: string, symbols: string[]) => {
@@ -109,7 +81,7 @@ const dataMethods = (constructPath: string, constructImports: Import[], workspac
   );
   const storePath = resolveImport(constructPath, builder.from, workspaces);
   const storeText = read(storePath);
-  const storeImports = importsOf(storeText);
+  const storeImports = importsOf(storeText, storePath);
   const packageName = /^packages\/data\/([^/]+)\//.exec(storePath)?.[1];
   if (packageName === undefined) {
     return fail(storePath, "a DbStore is built in a package under packages/data/");
@@ -127,7 +99,7 @@ const dataMethods = (constructPath: string, constructImports: Import[], workspac
       }
       methods.set(method, { path: tablePath, store: store.name, packageName });
     }
-    for (const helper of relativeImports(tablePath, importsOf(tableText), workspaces)) {
+    for (const helper of relativeImports(tablePath, importsOf(tableText, tablePath), workspaces)) {
       if (helper.path.endsWith("/driver.ts")) {
         share(shared, "driver", helper.path, helper.names);
       }
@@ -140,20 +112,23 @@ const dataMethods = (constructPath: string, constructImports: Import[], workspac
 export const readChains = (constructPath: string, routes: readonly RouteRow[], root = "."): Chains => {
   const workspaces = workspacesIn(root);
   const constructText = read(constructPath);
-  const constructImports = importsOf(constructText);
+  const constructImports = importsOf(constructText, constructPath);
   const shared = new Map<string, Row>();
 
   // What startup imports from the HTTP module, and the failure handlers construct hands it.
   const indexPath = join(dirname(constructPath), "index.ts");
-  for (const imported of relativeImports(indexPath, importsOf(read(indexPath)), workspaces)) {
+  for (const imported of relativeImports(indexPath, importsOf(read(indexPath), indexPath), workspaces)) {
     if (imported.path.endsWith("/http.ts")) {
       share(shared, "http", imported.path, imported.names);
     }
   }
-  const failures = constructImports.find((statement) => statement.from.includes("/handlers/errors/"));
-  if (failures !== undefined) {
-    const failuresPath = resolveImport(constructPath, failures.from, workspaces);
-    share(shared, "errors", failuresPath, failures.names.map((imported) => imported.name));
+  const failures = constructImports.filter((statement) => statement.from.includes("/handlers/errors/"));
+  if (failures.length !== 1) {
+    return fail(constructPath, `imports the failure handlers from one file under handlers/errors/; found ${failures.length}`);
+  }
+  for (const statement of failures) {
+    const values = statement.names.filter((imported) => !imported.typeOnly).map((imported) => imported.name);
+    share(shared, "errors", resolveImport(constructPath, statement.from, workspaces), values);
   }
 
   const methods = dataMethods(constructPath, constructImports, workspaces, shared);
@@ -166,9 +141,9 @@ export const readChains = (constructPath: string, routes: readonly RouteRow[], r
     const handlerPath = resolveImport(constructPath, handler.from, workspaces);
     const handlerText = read(handlerPath);
     if (!exports(handlerText, route.name)) {
-      fail(handlerPath, `does not export ${route.name}, the name construct gives the route ${route.key}`);
+      return fail(handlerPath, `does not export ${route.name}, the name construct gives the route ${route.key}`);
     }
-    const handlerImports = importsOf(handlerText);
+    const handlerImports = importsOf(handlerText, handlerPath);
     for (const helper of relativeImports(handlerPath, handlerImports, workspaces)) {
       share(shared, "handlers", helper.path, helper.names);
     }
@@ -208,15 +183,15 @@ export const readChains = (constructPath: string, routes: readonly RouteRow[], r
     const unitPath = resolveImport(constructPath, unit.from, workspaces);
     const unitText = read(unitPath);
     if (!exports(unitText, route.unit)) {
-      fail(unitPath, `does not export ${route.unit}, the unit construct gives the route ${route.key}`);
+      return fail(unitPath, `does not export ${route.unit}, the unit construct gives the route ${route.key}`);
     }
     const useCase = useCaseOf(unitText, unitPath);
     if (!existsSync(join(root, useCase))) {
-      fail(unitPath, `cites ${useCase}, which does not exist`);
+      return fail(unitPath, `cites ${useCase}, which does not exist`);
     }
     const port = portOf(unitText, unitPath);
     if (port.methods.length !== 1) {
-      fail(unitPath, `${port.name} has ${port.methods.length} methods; the index writes a chain through one`);
+      return fail(unitPath, `${port.name} has ${port.methods.length} methods; the index writes a chain through one`);
     }
     const portMethod = port.methods[0] as string;
     const data = methods.get(portMethod);
@@ -248,7 +223,13 @@ export const readChains = (constructPath: string, routes: readonly RouteRow[], r
     if (byLabel !== 0) {
       return byLabel;
     }
-    return a.path.localeCompare(b.path);
+    if (a.path < b.path) {
+      return -1;
+    }
+    if (a.path > b.path) {
+      return 1;
+    }
+    return 0;
   });
   for (const row of sharedRows) {
     row.symbols.sort();

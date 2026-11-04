@@ -112,4 +112,14 @@ describe("routes against the spec", () => {
     const more = [...routes, { key: "PUT /todos", name: "putTodos", unit: null }];
     assert.throws(() => emitOpenApi(parsed.spec, more, "s", "t"), /construct has a route for PUT \/todos/);
   });
+
+  it("refuses two routes with one operationId", () => {
+    const twice = routes.map((route) => {
+      if (route.key === "GET /todos/counts") {
+        return { ...route, name: "getTodos" };
+      }
+      return route;
+    });
+    assert.throws(() => emitOpenApi(parsed.spec, twice, "s", "t"), /GET \/todos and GET \/todos\/counts have the same operationId, getTodos/);
+  });
 });
