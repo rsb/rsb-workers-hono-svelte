@@ -10,7 +10,6 @@ import { toCompleted } from "@todo/valid/todos/completed.ts";
 import { toNewTodo } from "@todo/valid/todos/new-todo.ts";
 import { toTodoFilter } from "@todo/valid/todos/todo-filter.ts";
 import { toTodoPatch } from "@todo/valid/todos/todo-patch.ts";
-import type { Context } from "hono";
 import { notFound, onError, tooLarge } from "./app/handlers/errors/errors.ts";
 import { getHealth } from "./app/handlers/health/health.ts";
 import { deleteTodo as deleteTodoHandler } from "./app/handlers/todos/delete-todo.ts";
@@ -20,7 +19,8 @@ import { getTodos } from "./app/handlers/todos/get-todos.ts";
 import { patchTodo } from "./app/handlers/todos/patch-todo.ts";
 import { patchTodos } from "./app/handlers/todos/patch-todos.ts";
 import { postTodos } from "./app/handlers/todos/post-todos.ts";
-import type { Api, Route, Routes, Validator } from "./http.ts";
+import type { Api, Routes } from "./http.ts";
+import { routing } from "./route.ts";
 
 // The app's whole dependency graph, one builder per level (A10). Each level
 // takes the one below, so a caller can enter at any level and replace a piece.
@@ -66,84 +66,8 @@ export const constructOperations = (infra: Infra): Operations => ({
   deleteCompleted: deleteCompleted({ dbStore: infra.dbStore }),
 });
 
-/** The one entry of `{ name: value }`, so that a name is read from its identifier. */
-const named = <T>(single: Record<string, T>, what: string): [string, T] => {
-  const entries = Object.entries(single);
-  const [entry] = entries;
-  if (entries.length !== 1 || entry === undefined) {
-    throw new Error(`construct: ${what} must be one name, given ${entries.length}`);
-  }
-  return entry;
-};
-
-/** `true` when `A` and `B` are the same type, not only assignable one way. */
-type Same<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
-
-/** The operations whose type is exactly `U`. */
-type UnitsTyped<U> = {
-  [P in keyof Operations]: Same<Operations[P], U> extends true ? P : never;
-}[keyof Operations];
-
-/**
- * Nothing when a handler that takes `U` may run the unit `K`; otherwise a
- * property no argument has, so the call does not compile. The handler must
- * take exactly the unit's type, and no other operation may have that type:
- * a unit that takes fewer arguments than the handler's, or none, or several
- * units, do not compile.
- */
-type Runs<K extends keyof Operations, U> = Same<UnitsTyped<U>, K> extends true
-  ? unknown
-  : { "the handler does not take exactly this unit's type, or another operation has the same type": K };
-
-/** What a handler is given and gives: its unit, then its validator if it takes one. */
-type Builds = (unit: never, validator: never) => Route["handler"];
-
-/**
- * A route whose handler runs one unit (L19), and builds its input with one
- * validator when it takes one (L33). Each is given as `{ name }`, so the
- * route carries their names as data and the handler is built here:
- * `route({ postTodos }, { addTodo }, { toNewTodo })` is
- * `postTodos(addTodo, toNewTodo)`, named `postTodos`, running `addTodo` and
- * applying what `toNewTodo` applies. The unit must be one of `Operations`,
- * and the handler must take exactly its type (`Runs`). The validator is the
- * one the handler is given, so what the route says it applies is what runs:
- * a handler that takes a validator is not built without one, and one that
- * takes none is not given one. That the names are the values' own is
- * checked by `pnpm check:entry-chains`, which reads this file.
- */
-function route<K extends keyof Operations, U>(
-  handler: Record<string, (unit: U) => Route["handler"]>,
-  unit: Pick<Operations, K> & Runs<K, U>,
-): Route;
-function route<K extends keyof Operations, H extends Builds>(
-  handler: Record<string, H>,
-  unit: Pick<Operations, K> & Runs<K, Parameters<H>[0]>,
-  validator: Record<string, Parameters<H>[1] & Validator>,
-): Route;
-function route(
-  handler: Record<string, Builds>,
-  unit: Record<string, unknown>,
-  validator?: Record<string, Validator>,
-): Route {
-  const [name, build] = named(handler, "a route's handler");
-  const [unitName, built] = named(unit, "a route's unit");
-  if (validator === undefined) {
-    return { name, unit: unitName, validator: null, handler: build(built as never, undefined as never) };
-  }
-  const [validatorName, value] = named(validator, "a route's validator");
-  return {
-    name,
-    unit: unitName,
-    validator: { name: validatorName, value },
-    handler: build(built as never, value as never),
-  };
-}
-
-/** A probe's route: its entry point takes the request and runs no unit (L20). `probe({ getHealth })`. */
-const probe = (handler: Record<string, (c: Context) => Response | Promise<Response>>): Route => {
-  const [name, built] = named(handler, "a probe");
-  return { name, unit: null, validator: null, handler: built };
-};
+/** The route helpers, bound to these operations. */
+const { route, probe } = routing<Operations>();
 
 /**
  * Each handler with the unit it runs and the validator it is given, keyed
