@@ -1,17 +1,10 @@
 import * as v from "valibot";
-
-/** Every kind except `validation`: these carry no `field`. */
-export const OtherKind = v.picklist(["not_found", "limit", "too_large", "internal"]);
-export type OtherKind = v.InferOutput<typeof OtherKind>;
-
-/** Every kind an API error can have (PRD, Envelope). */
-export const ErrorKind = v.picklist(["validation", ...OtherKind.options]);
-export type ErrorKind = v.InferOutput<typeof ErrorKind>;
+import { FieldKind, OtherKind } from "./kinds.ts";
 
 /** `field` is present when the kind is `validation`, and only then. */
 export const ApiError = v.variant("kind", [
   v.strictObject({
-    kind: v.literal("validation"),
+    kind: FieldKind,
     message: v.string(),
     field: v.string(),
   }),

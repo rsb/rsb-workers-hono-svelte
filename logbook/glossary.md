@@ -542,7 +542,8 @@ The definition of one api, in markdown, at `prd/<app>/api.md`,
 written at design time after the use cases. It defines every endpoint
 the api serves, probes included, in one form: method and path, input,
 reply, error kinds, and the use case or requirement it serves. It also
-holds the shapes several endpoints share. It states every rule as
+holds the shapes several endpoints share, and worked examples: each
+endpoint's requests and the replies they get. It states every rule as
 data, never as a function.
 
 The contract and the OpenAPI document are generated from it. Entry
@@ -550,8 +551,8 @@ points and everything below them are written by hand.
 
 - **DDD:** the published language, written down before the code.
 - **Status:** target (L26). `prd/todo/api.md` is written, in the
-  draft vocabulary (story, chapter 11); nothing is generated from it
-  yet.
+  draft vocabulary (story, chapter 11). The contract and the OpenAPI
+  document are generated from it by `tooling/api-spec/generate.ts`.
 
 ### Data spec
 
@@ -582,7 +583,9 @@ use case (L14). `operationId` and `x-unit` come from construct, not the
 spec, through the extractor in `tooling/` that also feeds
 `apps/api/entry-chains.md`.
 
-- **Status:** target (L23, L26).
+- **Status:** target (L23, L26). The document is generated (OpenAPI
+  3.1), with the spec's examples; `operationId` and `x-unit` wait for
+  the extractor.
 
 ## The BFF
 
@@ -614,8 +617,10 @@ To be settled in later sessions:
 - the workflow story: how a durable process runs on Cloudflare
   Workflows;
 - the api spec's vocabulary: drafted in the story (chapter 11) and
-  used by `prd/todo/api.md`; settled once a parser reads it;
+  used by `prd/todo/api.md` and read by `tooling/api-spec/parse.ts`;
+  waiting to be settled;
 - `tooling/`, the monorepo's scripts: the extractor that reads
-  construct, the generator for `apps/api/entry-chains.md`, and the
-  generators for the contract and the OpenAPI document;
+  construct and the generator for `apps/api/entry-chains.md`. The
+  generator for the contract and the OpenAPI document is written:
+  plain Node scripts with no dependencies, outside the workspace;
 - whether the data spec earns its place, once tried.

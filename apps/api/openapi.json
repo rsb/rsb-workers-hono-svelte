@@ -1,0 +1,1172 @@
+{
+  "openapi": "3.1.2",
+  "x-generated": "Generated from prd/todo/api.md by tooling/api-spec/generate.ts. Do not edit: change the spec and regenerate.",
+  "info": {
+    "title": "Todo api",
+    "version": "0.0.0",
+    "description": "- Every reply is in the envelope (PRD, Envelope): the reply below is\n  its `data`.\n- Every object is closed: a field not listed is refused.\n- Any request whose body is over `BODY_LIMIT_BYTES` (8192) is refused\n  before routing: `too_large`.\n- Any request can fail on the server: `internal`.\n- A method and path not listed here: `not_found`.\n\n\nThe errors under each endpoint are the ones it adds to these."
+  },
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "security": [],
+  "paths": {
+    "/health": {
+      "get": {
+        "description": "Serves: `prd/todo.md`, deviation 13 and scenario 1.",
+        "responses": {
+          "200": {
+            "description": "`HealthReply` in the success envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/HealthReply"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                },
+                "examples": {
+                  "the-api-is-up": {
+                    "summary": "the api is up",
+                    "value": {
+                      "ok": true,
+                      "data": {
+                        "ok": true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "500": {
+            "$ref": "#/components/responses/Internal"
+          }
+        }
+      }
+    },
+    "/todos": {
+      "get": {
+        "description": "Serves: `use-cases/todos/list-todos.md`.",
+        "parameters": [
+          {
+            "name": "completed",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ],
+              "x-message": "completed must be true or false"
+            },
+            "examples": {
+              "lists-the-completed-todos": {
+                "summary": "lists the completed todos",
+                "value": "true"
+              },
+              "completed-is-not-true-or-false": {
+                "summary": "completed is not true or false",
+                "value": "yes"
+              },
+              "completed-is-given-twice": {
+                "summary": "completed is given twice",
+                "value": [
+                  "true",
+                  "false"
+                ]
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "`TodoListReply` in the success envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/TodoListReply"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                },
+                "examples": {
+                  "lists-every-todo": {
+                    "summary": "lists every todo",
+                    "value": {
+                      "ok": true,
+                      "data": [
+                        {
+                          "id": "0b6f4c1e-8a7d-4b51-9e0a-3c2d1f5e7a90",
+                          "title": "Buy milk",
+                          "completed": false
+                        },
+                        {
+                          "id": "5d2a9c7e-1f3b-4e8a-b6d4-7c9e0a1f2b3c",
+                          "title": "Post the letter",
+                          "completed": true
+                        }
+                      ]
+                    }
+                  },
+                  "lists-the-completed-todos": {
+                    "summary": "lists the completed todos",
+                    "value": {
+                      "ok": true,
+                      "data": [
+                        {
+                          "id": "5d2a9c7e-1f3b-4e8a-b6d4-7c9e0a1f2b3c",
+                          "title": "Post the letter",
+                          "completed": true
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "422": {
+            "description": "`validation`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationFailure"
+                },
+                "examples": {
+                  "completed-is-not-true-or-false": {
+                    "summary": "completed is not true or false",
+                    "value": {
+                      "ok": false,
+                      "error": {
+                        "kind": "validation",
+                        "message": "completed must be true or false",
+                        "field": "completed"
+                      }
+                    }
+                  },
+                  "completed-is-given-twice": {
+                    "summary": "completed is given twice",
+                    "value": {
+                      "ok": false,
+                      "error": {
+                        "kind": "validation",
+                        "message": "completed must be given once",
+                        "field": "completed"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/Internal"
+          }
+        }
+      },
+      "post": {
+        "description": "Serves: `use-cases/todos/add-a-todo.md`.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddTodoBody"
+              },
+              "examples": {
+                "adds-a-todo": {
+                  "summary": "adds a todo",
+                  "value": {
+                    "title": "Buy milk"
+                  }
+                },
+                "the-title-is-not-text": {
+                  "summary": "the title is not text",
+                  "value": {
+                    "title": 3
+                  }
+                },
+                "the-title-is-empty": {
+                  "summary": "the title is empty",
+                  "value": {
+                    "title": ""
+                  }
+                },
+                "the-list-is-full": {
+                  "summary": "the list is full",
+                  "value": {
+                    "title": "Buy milk"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "`TodoReply` in the success envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/TodoReply"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                },
+                "examples": {
+                  "adds-a-todo": {
+                    "summary": "adds a todo",
+                    "value": {
+                      "ok": true,
+                      "data": {
+                        "id": "0b6f4c1e-8a7d-4b51-9e0a-3c2d1f5e7a90",
+                        "title": "Buy milk",
+                        "completed": false
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`limit`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LimitFailure"
+                },
+                "examples": {
+                  "the-list-is-full": {
+                    "summary": "the list is full",
+                    "value": {
+                      "ok": false,
+                      "error": {
+                        "kind": "limit",
+                        "message": "the list is full"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "422": {
+            "description": "`validation`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationFailure"
+                },
+                "examples": {
+                  "the-title-is-not-text": {
+                    "summary": "the title is not text",
+                    "value": {
+                      "ok": false,
+                      "error": {
+                        "kind": "validation",
+                        "message": "title must be text",
+                        "field": "title"
+                      }
+                    }
+                  },
+                  "the-title-is-empty": {
+                    "summary": "the title is empty",
+                    "value": {
+                      "ok": false,
+                      "error": {
+                        "kind": "validation",
+                        "message": "title is empty",
+                        "field": "title"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/Internal"
+          }
+        }
+      },
+      "patch": {
+        "description": "Serves: `use-cases/todos/mark-all-completed.md`.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchTodosBody"
+              },
+              "examples": {
+                "marks-every-todo-completed": {
+                  "summary": "marks every todo completed",
+                  "value": {
+                    "completed": true
+                  }
+                },
+                "completed-is-not-a-boolean": {
+                  "summary": "completed is not a boolean",
+                  "value": {
+                    "completed": "yes"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "`TodoListReply` in the success envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/TodoListReply"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                },
+                "examples": {
+                  "marks-every-todo-completed": {
+                    "summary": "marks every todo completed",
+                    "value": {
+                      "ok": true,
+                      "data": [
+                        {
+                          "id": "0b6f4c1e-8a7d-4b51-9e0a-3c2d1f5e7a90",
+                          "title": "Buy milk",
+                          "completed": true
+                        },
+                        {
+                          "id": "5d2a9c7e-1f3b-4e8a-b6d4-7c9e0a1f2b3c",
+                          "title": "Post the letter",
+                          "completed": true
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "422": {
+            "description": "`validation`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationFailure"
+                },
+                "examples": {
+                  "completed-is-not-a-boolean": {
+                    "summary": "completed is not a boolean",
+                    "value": {
+                      "ok": false,
+                      "error": {
+                        "kind": "validation",
+                        "message": "completed must be true or false",
+                        "field": "completed"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/Internal"
+          }
+        }
+      },
+      "delete": {
+        "description": "Serves: `use-cases/todos/clear-completed.md`.",
+        "parameters": [
+          {
+            "name": "completed",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "true",
+              "x-message": "completed must be true"
+            },
+            "examples": {
+              "clears-the-completed-todos": {
+                "summary": "clears the completed todos",
+                "value": "true"
+              },
+              "completed-is-not-true": {
+                "summary": "completed is not true",
+                "value": "false"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "`TodoListReply` in the success envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/TodoListReply"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                },
+                "examples": {
+                  "clears-the-completed-todos": {
+                    "summary": "clears the completed todos",
+                    "value": {
+                      "ok": true,
+                      "data": [
+                        {
+                          "id": "0b6f4c1e-8a7d-4b51-9e0a-3c2d1f5e7a90",
+                          "title": "Buy milk",
+                          "completed": false
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "422": {
+            "description": "`validation`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationFailure"
+                },
+                "examples": {
+                  "completed-is-not-true": {
+                    "summary": "completed is not true",
+                    "value": {
+                      "ok": false,
+                      "error": {
+                        "kind": "validation",
+                        "message": "completed must be true",
+                        "field": "completed"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/Internal"
+          }
+        }
+      }
+    },
+    "/todos/counts": {
+      "get": {
+        "description": "Serves: `use-cases/todos/count-todos.md`.",
+        "responses": {
+          "200": {
+            "description": "`TodoCountsReply` in the success envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/TodoCountsReply"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                },
+                "examples": {
+                  "counts-the-todos": {
+                    "summary": "counts the todos",
+                    "value": {
+                      "ok": true,
+                      "data": {
+                        "active": 1,
+                        "completed": 1
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "500": {
+            "$ref": "#/components/responses/Internal"
+          }
+        }
+      }
+    },
+    "/todos/{id}": {
+      "patch": {
+        "description": "Serves: `use-cases/todos/change-a-todo.md`.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "examples": {
+              "renames-a-todo": {
+                "summary": "renames a todo",
+                "value": "0b6f4c1e-8a7d-4b51-9e0a-3c2d1f5e7a90"
+              },
+              "the-body-is-empty": {
+                "summary": "the body is empty",
+                "value": "0b6f4c1e-8a7d-4b51-9e0a-3c2d1f5e7a90"
+              },
+              "no-todo-has-the-id": {
+                "summary": "no todo has the id",
+                "value": "missing"
+              }
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchTodoBody"
+              },
+              "examples": {
+                "renames-a-todo": {
+                  "summary": "renames a todo",
+                  "value": {
+                    "title": "Buy oat milk"
+                  }
+                },
+                "the-body-is-empty": {
+                  "summary": "the body is empty",
+                  "value": {}
+                },
+                "no-todo-has-the-id": {
+                  "summary": "no todo has the id",
+                  "value": {
+                    "completed": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "`TodoReply` in the success envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/TodoReply"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                },
+                "examples": {
+                  "renames-a-todo": {
+                    "summary": "renames a todo",
+                    "value": {
+                      "ok": true,
+                      "data": {
+                        "id": "0b6f4c1e-8a7d-4b51-9e0a-3c2d1f5e7a90",
+                        "title": "Buy oat milk",
+                        "completed": false
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundFailure"
+                },
+                "examples": {
+                  "no-todo-has-the-id": {
+                    "summary": "no todo has the id",
+                    "value": {
+                      "ok": false,
+                      "error": {
+                        "kind": "not_found",
+                        "message": "no todo has id missing"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "422": {
+            "description": "`validation`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationFailure"
+                },
+                "examples": {
+                  "the-body-is-empty": {
+                    "summary": "the body is empty",
+                    "value": {
+                      "ok": false,
+                      "error": {
+                        "kind": "validation",
+                        "message": "body must have title, completed or both",
+                        "field": "body"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/Internal"
+          }
+        }
+      },
+      "delete": {
+        "description": "Serves: `use-cases/todos/remove-a-todo.md`.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "examples": {
+              "removes-a-todo": {
+                "summary": "removes a todo",
+                "value": "0b6f4c1e-8a7d-4b51-9e0a-3c2d1f5e7a90"
+              },
+              "no-todo-has-the-id": {
+                "summary": "no todo has the id",
+                "value": "missing"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "`DeletedReply` in the success envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/DeletedReply"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                },
+                "examples": {
+                  "removes-a-todo": {
+                    "summary": "removes a todo",
+                    "value": {
+                      "ok": true,
+                      "data": {
+                        "id": "0b6f4c1e-8a7d-4b51-9e0a-3c2d1f5e7a90"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundFailure"
+                },
+                "examples": {
+                  "no-todo-has-the-id": {
+                    "summary": "no todo has the id",
+                    "value": {
+                      "ok": false,
+                      "error": {
+                        "kind": "not_found",
+                        "message": "no todo has id missing"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "500": {
+            "$ref": "#/components/responses/Internal"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "TodoReply": {
+        "description": "A todo on the wire.",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "completed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "completed"
+        ],
+        "additionalProperties": false
+      },
+      "TodoListReply": {
+        "description": "Todos in creation order.",
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/TodoReply"
+        }
+      },
+      "HealthReply": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      },
+      "GetTodosQuery": {
+        "type": "object",
+        "properties": {
+          "completed": {
+            "type": "string",
+            "enum": [
+              "true",
+              "false"
+            ],
+            "x-message": "completed must be true or false"
+          }
+        },
+        "additionalProperties": false
+      },
+      "TodoCountsReply": {
+        "type": "object",
+        "properties": {
+          "active": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "completed": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "active",
+          "completed"
+        ],
+        "additionalProperties": false
+      },
+      "AddTodoBody": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "x-message": "title must be text"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "additionalProperties": false
+      },
+      "PatchTodosBody": {
+        "type": "object",
+        "properties": {
+          "completed": {
+            "type": "boolean",
+            "x-message": "completed must be true or false"
+          }
+        },
+        "required": [
+          "completed"
+        ],
+        "additionalProperties": false
+      },
+      "PatchTodoBody": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "x-message": "title must be text"
+          },
+          "completed": {
+            "type": "boolean",
+            "x-message": "completed must be true or false"
+          }
+        },
+        "additionalProperties": false,
+        "minProperties": 1,
+        "x-message": "body must have title, completed or both"
+      },
+      "DeleteTodosQuery": {
+        "type": "object",
+        "properties": {
+          "completed": {
+            "type": "string",
+            "const": "true",
+            "x-message": "completed must be true"
+          }
+        },
+        "required": [
+          "completed"
+        ],
+        "additionalProperties": false
+      },
+      "DeletedReply": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "ValidationFailure": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": false
+          },
+          "error": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "validation"
+              },
+              "message": {
+                "type": "string"
+              },
+              "field": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "message",
+              "field"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "ok",
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "NotFoundFailure": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": false
+          },
+          "error": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "not_found"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "message"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "ok",
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "LimitFailure": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": false
+          },
+          "error": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "limit"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "message"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "ok",
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "TooLargeFailure": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": false
+          },
+          "error": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "too_large"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "message"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "ok",
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "InternalFailure": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": false
+          },
+          "error": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "internal"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "message"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "ok",
+          "error"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "responses": {
+      "TooLarge": {
+        "description": "`too_large`, which every endpoint can return.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/TooLargeFailure"
+            },
+            "examples": {
+              "a-body-over-the-limit": {
+                "summary": "a body over the limit",
+                "value": {
+                  "ok": false,
+                  "error": {
+                    "kind": "too_large",
+                    "message": "request body too large"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "Internal": {
+        "description": "`internal`, which every endpoint can return.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/InternalFailure"
+            },
+            "examples": {
+              "the-server-fails": {
+                "summary": "the server fails",
+                "value": {
+                  "ok": false,
+                  "error": {
+                    "kind": "internal",
+                    "message": "internal error"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
