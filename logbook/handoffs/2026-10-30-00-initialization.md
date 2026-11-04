@@ -42,6 +42,11 @@ stage, not at the end.
   Handoffs are named `YYYY-MM-DD-NN-<stage>.md`: the date, a two-digit
   sequence across the whole series, the stage name. A correction to a
   merged handoff goes in by its own small PR before the context is cleared.
+- **Story delta.** Every stage's docs commit includes a story delta in
+  its tour: the chapters of `logbook/the-api-story.md` and the glossary
+  it changed, or why none were. A stage that changes behaviour the
+  story describes and leaves the story alone is not done (added in
+  stage 14).
 - **Commits.** Conventional commits, no Co-Authored-By or any
   attribution. Claude never pushes.
 - **Not factory work.** No tickets, no agent-box, no Gauge, no spec ids.
