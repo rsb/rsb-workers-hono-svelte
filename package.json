@@ -14,6 +14,8 @@
     "check:api": "node tooling/api-spec/generate.ts prd/todo/api.md packages/contract/api/src apps/api/openapi.json apps/api/src/construct.ts --check",
     "gen:entry-chains": "node tooling/entry-chains/generate.ts apps/api/src/construct.ts apps/api/entry-chains.md",
     "check:entry-chains": "node tooling/entry-chains/generate.ts apps/api/src/construct.ts apps/api/entry-chains.md --check",
+    "gen:rules": "node tooling/rules/generate.ts prd/todo/rules.md prd/todo/use-cases packages/business packages/valid",
+    "check:rules": "node tooling/rules/generate.ts prd/todo/rules.md prd/todo/use-cases packages/business packages/valid --check",
     "test:unit": "pnpm -r --if-present test:unit",
     "test:integration": "pnpm -r --if-present test:integration",
     "test:e2e": "pnpm --filter @todo/bff test:e2e",

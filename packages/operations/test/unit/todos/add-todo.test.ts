@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { type Result, err, ok } from "@todo/business/result.ts";
-import { TODO_LIMIT, type Todo } from "@todo/business/todos/todo.ts";
+import { TODO_LIMIT } from "@todo/business/rules.ts";
+import type { Todo } from "@todo/business/todos/todo.ts";
 import { type AnyFail, rootOf, unavailable } from "@todo/fail/fail.ts";
 import { addTodo } from "../../../src/todos/add-todo.ts";
 

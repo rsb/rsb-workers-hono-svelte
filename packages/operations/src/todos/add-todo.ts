@@ -1,5 +1,6 @@
 import { type Result, err, ok } from "@todo/business/result.ts";
-import { type NewTodo, TODO_LIMIT, type Todo, newTodo } from "@todo/business/todos/todo.ts";
+import { TODO_LIMIT } from "@todo/business/rules.ts";
+import { type NewTodo, type Todo, newTodo } from "@todo/business/todos/todo.ts";
 import { type AnyFail, limitReached, wrap } from "@todo/fail/fail.ts";
 
 /**

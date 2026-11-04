@@ -62,8 +62,9 @@ such as `BODY_LIMIT_BYTES`, a closed object or a query given once, are
 
 ### How a rule is written
 - A heading: its id, `<subject>.<property>`. Each part is lower-case
-  words joined by `_`. The subject is `todo` for one todo and `todos`
-  for the list.
+  words joined by `_`. The subject is what the rule is about: a field
+  (`title`), an input (`patch`, for a `TodoPatch`), `todo` for one todo
+  or `todos` for the list.
 - A line, the rule's statement.
 - `Kind:` one of `input`, `state` or `guarantee` (L29).
 - `Form:` (input rules only) how it is applied:

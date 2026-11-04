@@ -22,12 +22,6 @@ export type TodoFilter = { completed?: boolean };
 /** How many todos are active and how many completed, over every todo. */
 export type TodoCounts = { active: number; completed: number };
 
-/** The longest title, after trim, in UTF-16 code units (PRD deviation 7). */
-export const TITLE_MAX = 256;
-
-/** The most todos the list holds (PRD deviation 9). */
-export const TODO_LIMIT = 500;
-
 /** A new todo is not completed. Its title was already validated by a handler. */
 export const newTodo = (id: string, input: NewTodo): Todo => {
   return { id, title: input.title, completed: false };

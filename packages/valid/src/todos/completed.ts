@@ -1,20 +1,21 @@
+// Generated from prd/todo/rules.md by tooling/rules/generate.ts. Do not edit: change the spec and regenerate.
 import { type Result, err, ok } from "@todo/business/result.ts";
 import { flag } from "../fields/decode.ts";
 import type { Problems } from "../problem.ts";
 
-/**
- * What a delivery read for the `completed` every todo should take, not yet
- * decoded. The input has no named type: it is the boolean
- * `setAllCompleted` takes.
- */
+/** What a delivery read for a `Completed`, not yet decoded. */
 export type CompletedCandidate = { completed: unknown };
 
-/** The `completed` every todo should take: a boolean. */
+/**
+ * A `Completed` from what a delivery read. The `completed` every todo should
+ * take. Gives every problem it finds, as prd/todo/rules.md › Every input says.
+ */
 export const toCompleted = (candidate: CompletedCandidate): Result<boolean, Problems> => {
-  const decoded = flag("completed", candidate.completed);
-  if (!decoded.ok) {
-    return err([decoded.error]);
+  const completed = flag("completed", candidate.completed);
+
+  if (!completed.ok) {
+    return err([completed.error]);
   }
 
-  return ok(decoded.value);
+  return ok(completed.value);
 };
