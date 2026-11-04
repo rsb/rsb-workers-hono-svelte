@@ -14,7 +14,7 @@ Append a new, active todo to the list.
 - A fresh id from the id source (D13).
 
 ## Given
-- `todos.cap`: the list holds fewer than `TODO_LIMIT` todos.
+- `todos.cap`
 
 ## Effects
 One todo is stored: active, with the given id, last in creation order.
@@ -29,8 +29,8 @@ The stored todo.
   stored is not known to the caller.
 
 ## Guarantees
-- `todos.order`: lists are in the order todos were added.
-- `todo.id`: no two todos share an id.
+- `todos.order`
+- `todos.unique_id`
 
 ## Atomic
 The count and the insert are one step: two adds at 499 cannot both

@@ -13,7 +13,7 @@ Remove one todo for good.
 - An id: which todo.
 
 ## Given
-- `todo.exists`: a todo has the id.
+- `todo.exists`
 
 ## Effects
 That todo is deleted; every other stays. No external effects.
