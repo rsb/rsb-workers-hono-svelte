@@ -25,7 +25,7 @@ describe("deleteTodo", () => {
     expect(dbStore.asked).toEqual(["id-1"]);
   });
 
-  it("names a not_found failure when the store deleted nothing", async () => {
+  it("todo.exists: names a not_found failure when the store deleted nothing", async () => {
     const deleted = await deleteTodo({ dbStore: fakeStore(ok(false)) })("id-9");
 
     expect(deleted).toMatchObject({

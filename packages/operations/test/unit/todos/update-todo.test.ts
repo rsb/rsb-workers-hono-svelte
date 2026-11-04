@@ -27,7 +27,7 @@ describe("updateTodo", () => {
     expect(dbStore.asked).toEqual([{ id: "id-1", patch: { title: "buy bread", completed: true } }]);
   });
 
-  it("names a not_found failure when the store has no such todo", async () => {
+  it("todo.exists: names a not_found failure when the store has no such todo", async () => {
     const updated = await updateTodo({ dbStore: fakeStore(ok(null)) })("id-9", { completed: true });
 
     expect(updated).toMatchObject({

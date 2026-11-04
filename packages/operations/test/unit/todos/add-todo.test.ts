@@ -27,7 +27,7 @@ describe("addTodo", () => {
     expect(dbStore.asked).toEqual([{ todo, limit: TODO_LIMIT }]);
   });
 
-  it("names a limit failure when the store did not insert", async () => {
+  it("todos.cap: names a limit failure when the store did not insert", async () => {
     const add = addTodo({ dbStore: fakeStore(ok(false)), newId: () => "id-1" });
 
     const added = await add({ title: "buy milk" });
