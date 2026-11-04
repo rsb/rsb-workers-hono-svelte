@@ -6,10 +6,11 @@ import { err, ok } from "@todo/business/result.ts";
 import { unavailable, wrap } from "@todo/fail/fail.ts";
 import { patchTodos } from "../../../../../src/app/handlers/todos/patch-todos.ts";
 import type { SetAllCompleted } from "@todo/operations/todos/set-all-completed.ts";
+import { toCompleted } from "@todo/valid/todos/completed.ts";
 
 /** Sends a PATCH through the route, as it would be served. */
 const patch = (setAllCompleted: SetAllCompleted, body: string) => {
-  const app = new Hono().patch("/todos", patchTodos(setAllCompleted));
+  const app = new Hono().patch("/todos", patchTodos(setAllCompleted, toCompleted));
   return app.request("/todos", { method: "PATCH", body });
 };
 

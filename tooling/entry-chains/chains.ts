@@ -160,16 +160,25 @@ export const readChains = (constructPath: string, routes: readonly RouteRow[], r
       continue;
     }
 
-    // The rules: what the entry point takes from `valid` to build its input (L27).
-    const rules: Row[] = [];
+    // The rules: the validator construct gives the entry point to build its
+    // input (L27, L33). A handler that imports one itself would apply rules
+    // the route does not say it applies.
     for (const statement of handlerImports) {
-      if (!statement.from.startsWith("@todo/valid/")) {
-        continue;
+      const values = statement.names.filter((imported) => !imported.typeOnly);
+      if (statement.from.startsWith("@todo/valid/") && values.length > 0) {
+        return fail(handlerPath, `imports ${values.map((imported) => imported.name).join(", ")} from valid; a handler is given its validator by construct`);
       }
-      const names = statement.names.filter((imported) => !imported.typeOnly).map((imported) => imported.name);
-      if (names.length > 0) {
-        rules.push({ label: "rules", path: resolveImport(handlerPath, statement.from, workspaces), symbols: names });
-      }
+    }
+    const rules: Row[] = [];
+    if (route.validator !== null) {
+      const validator = importOf(
+        constructPath,
+        constructImports,
+        route.validator.name,
+        (specifier) => specifier.startsWith("@todo/valid/"),
+        "a validator",
+      );
+      rules.push({ label: "rules", path: resolveImport(constructPath, validator.from, workspaces), symbols: [route.validator.name] });
     }
 
     // The unit: imported by construct from operations, under the name the route gives it.

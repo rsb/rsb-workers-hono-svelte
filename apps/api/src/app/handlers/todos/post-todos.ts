@@ -1,14 +1,17 @@
 import { AddTodoBody } from "@todo/contract-api";
 import type { Context } from "hono";
 import type { AddTodo } from "@todo/operations/todos/add-todo.ts";
-import { toNewTodo } from "@todo/valid/todos/new-todo.ts";
+import type { toNewTodo } from "@todo/valid/todos/new-todo.ts";
 import { invalidOf } from "../messages.ts";
 import { created, mapFailure, userFailure } from "../present.ts";
 import { validateBody } from "../validate.ts";
 import { presentTodo } from "./present.ts";
 
+/** The validator construct gives this handler (L33). */
+type ToNewTodo = typeof toNewTodo;
+
 /** `POST /todos`: validate the body, make it a new todo, add, then present. */
-export const postTodos = (addTodo: AddTodo) => async (c: Context) => {
+export const postTodos = (addTodo: AddTodo, toNewTodo: ToNewTodo) => async (c: Context) => {
   // The body must be JSON, shaped as the contract says.
   const body = await validateBody(c, AddTodoBody);
   if (!body.ok) {
