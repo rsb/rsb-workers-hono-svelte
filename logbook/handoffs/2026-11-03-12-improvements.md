@@ -42,6 +42,7 @@ suggested order is Claude's; the owner's order replaces it.
 | I | The CLI delivery (stage 12) | M–L | handoff 11, Q7–Q12 | the owner's answers to Q7–Q12 | owner's call |
 | J | The data spec | M | pending (L26); the budget's home for C | its form (questions below) | before auth adds tables |
 | K | Evaluate RPC over the service binding | M | nothing; a measured lab variant | the CLI's provider/consumer decision | last |
+| L | `tooling/` is type-checked: a factory that trusts its checkers should compile them (added at stage 17, Q4) | S | "nothing type-checks `tooling/`" (stage 15 and 16 tours); today it runs only under Node's type stripping | nothing | owner's call; its own stage |
 
 Two things stay exactly as they are and are not on the list: the store
 reports facts and the operation decides what they mean; generation
