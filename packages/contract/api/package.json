@@ -4,7 +4,8 @@
   "description": "The api's contract. Published by apps/api, consumed by apps/bff.",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./examples": "./src/examples.ts"
   },
   "scripts": {
     "check": "tsc -p tsconfig.json",
