@@ -1,26 +1,48 @@
-import { BODY_LIMIT_BYTES } from "@todo/contract-api";
+import { BODY_LIMIT_BYTES, type EndpointKey, endpoints } from "@todo/contract-api";
 import { type Context, type ErrorHandler, type Handler, Hono, type NotFoundHandler } from "hono";
 import { bodyLimit } from "hono/body-limit";
 
-/** One api route: a method, a path, and the entry point aimed at it. */
-export type Route = { method: "GET" | "POST" | "PATCH" | "DELETE"; path: string; handler: Handler };
+/**
+ * One api route as data: the entry point aimed at it, its exported name, and
+ * the unit it runs. A probe runs no unit, so its `unit` is `null` (L20). The
+ * method and path are not here: they are the route's key, as the spec writes
+ * them.
+ */
+export type Route = { name: string; unit: string | null; handler: Handler };
+
+/**
+ * Every route, keyed by its endpoint in the contract. A route the spec does
+ * not list, or an endpoint with no route, does not compile: the path is
+ * written once, in the spec.
+ */
+export type Routes = Record<EndpointKey, Route>;
 
 /** Everything the HTTP layer serves, as construct builds it. */
 export type Api = {
-  routes: readonly Route[];
+  routes: Routes;
   notFound: NotFoundHandler;
   tooLarge: (c: Context) => Response;
   onError: ErrorHandler;
 };
 
+/** The spec writes a path parameter in braces, `/todos/{id}`; Hono reads `/todos/:id`. */
+const honoPath = (specPath: string) => {
+  const translated = specPath.replace(/\{(\w+)\}/g, ":$1");
+  return translated;
+};
+
 /**
  * Wires the api to Hono, once per isolate. On each request the body limit
  * runs first, before routing; then the route's entry point takes over.
+ * Routes are registered in the order construct lists them.
  */
 export const serve = (api: Api): Hono => {
   const app = new Hono();
   app.use(bodyLimit({ maxSize: BODY_LIMIT_BYTES, onError: api.tooLarge }));
-  for (const route of api.routes) app.on(route.method, route.path, route.handler);
+  for (const [key, route] of Object.entries(api.routes)) {
+    const endpoint = endpoints[key as EndpointKey];
+    app.on(endpoint.method, honoPath(endpoint.path), route.handler);
+  }
   app.notFound(api.notFound);
   app.onError(api.onError);
   return app;

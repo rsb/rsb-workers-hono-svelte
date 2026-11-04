@@ -1,12 +1,14 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
+import { readRoutes } from "../entry-chains/routes.ts";
 import { emitOpenApi } from "./emit-openapi.ts";
 import { parse } from "./parse.ts";
 
 const parsed = parse(readFileSync("prd/todo/api.md", "utf8"));
 assert.ok(parsed.ok);
-const doc = JSON.parse(emitOpenApi(parsed.spec, "prd/todo/api.md", "test"));
+const routes = await readRoutes("apps/api/src/construct.ts");
+const doc = JSON.parse(emitOpenApi(parsed.spec, routes, "prd/todo/api.md", "test"));
 
 type Node = Record<string, unknown>;
 
@@ -73,5 +75,51 @@ describe("the OpenAPI document", () => {
         assert.ok(Object.keys((content.examples as Node | undefined) ?? {}).length > 0, `${key} ${status}`);
       }
     }
+  });
+
+  it("names each operation by its entry point, and each unit it runs", () => {
+    for (const route of routes) {
+      const found = operations.find((operation) => operation.key === route.key);
+      assert.ok(found, route.key);
+      assert.equal(found.op.operationId, route.name, route.key);
+      if (route.unit === null) {
+        assert.equal("x-unit" in found.op, false, route.key);
+      } else {
+        assert.equal(found.op["x-unit"], route.unit, route.key);
+      }
+    }
+  });
+
+  it("gives every operation a different operationId", () => {
+    const ids = operations.map((operation) => operation.op.operationId);
+    assert.equal(new Set(ids).size, ids.length);
+  });
+
+  it("has no x-unit on the probe", () => {
+    const health = operations.find((operation) => operation.key === "GET /health");
+    assert.equal(health?.op.operationId, "getHealth");
+    assert.equal(health !== undefined && "x-unit" in health.op, false);
+  });
+});
+
+describe("routes against the spec", () => {
+  it("refuses an endpoint with no route", () => {
+    const fewer = routes.filter((route) => route.key !== "POST /todos");
+    assert.throws(() => emitOpenApi(parsed.spec, fewer, "s", "t"), /the spec has POST \/todos, and construct has no route/);
+  });
+
+  it("refuses a route the spec does not list", () => {
+    const more = [...routes, { key: "PUT /todos", name: "putTodos", unit: null }];
+    assert.throws(() => emitOpenApi(parsed.spec, more, "s", "t"), /construct has a route for PUT \/todos/);
+  });
+
+  it("refuses two routes with one operationId", () => {
+    const twice = routes.map((route) => {
+      if (route.key === "GET /todos/counts") {
+        return { ...route, name: "getTodos" };
+      }
+      return route;
+    });
+    assert.throws(() => emitOpenApi(parsed.spec, twice, "s", "t"), /GET \/todos and GET \/todos\/counts have the same operationId, getTodos/);
   });
 });

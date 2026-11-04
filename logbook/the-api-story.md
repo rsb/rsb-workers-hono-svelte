@@ -134,6 +134,9 @@ The decisions behind this story are:
   written in one line of symbols, `→` for a call and `⇢` across a
   port. Every entry point's entry chain is listed in
   `apps/api/entry-chains.md`, which is generated only (chapter 9).
+  Stage 13 built the generator. An entry chain ends at the data
+  method: private symbols are not links, and the driver helpers every
+  chain shares are listed once (chapter 9).
 - L25, agreed with the owner in the use case session (2026-11-03):
   a use case is written before the code, at
   `prd/<app>/use-cases/<area>/<name>.md`, extending handoff 00's
@@ -356,12 +359,14 @@ Hono is not the vocabulary of the story. `http.ts`, our own module,
 offers `serve(api)`, which takes everything construct built and drives
 Hono's configuration behind it:
 1. registers the per-request middleware;
-2. registers each route from the route table;
+2. registers each route from the route table, at the method and path
+   the contract gives its key, with the spec's `{id}` written as
+   Hono's `:id`;
 3. registers the not-found handler;
 4. registers the error handler.
 
-`http.ts` also exports the types `Api` and `Route`, which describe
-what construct must hand it.
+`http.ts` also exports the types `Api`, `Route` and `Routes`, which
+describe what construct must hand it (chapter 4).
 
 Today the story has two steps, because there is no config. The
 bindings come from `cloudflare:workers`, and construct takes them as
@@ -456,7 +461,7 @@ taking the level below as its argument and each exported:
 ```ts
 constructInfra(bindings): Infra             // the DbStore, the id source; later, config too
 constructOperations(infra): Operations      // each operation with the ports it declares
-constructRoutes(operations): Route[]        // each handler with the operation it runs
+constructRoutes(operations): Routes         // each handler with the unit it runs, keyed by endpoint
 // target (L22): constructProcesses(operations): Processes, between the two,
 // and constructRoutes(operations, processes), each handler with its one unit
 constructApi(routes): Api                   // plus the failure handlers, typed by http.ts
@@ -498,8 +503,8 @@ In the code (`construct.ts`), construct:
   one id source (`crypto.randomUUID`);
 - builds each operation with the dependencies it declares
   (`addTodo({ dbStore, newId })`, `listTodos({ dbStore })`);
-- builds each handler with the operation it runs
-  (`postTodos(addTodo)`);
+- builds each handler with the unit it runs, keyed by its endpoint
+  (`"POST /todos": route({ postTodos }, { addTodo })`);
 - returns the route table and the three failure handlers, typed by
   `http.ts`'s `Api`.
 
@@ -510,6 +515,65 @@ owner decided it: the memory store was deleted).
 The same `DbStore` goes to every operation. That is how an add is seen
 by the next list (D15). Construct may import `http.ts` for types only,
 so a typo in the route table fails here (D3).
+
+### The route table is data
+
+`constructRoutes` returns `Routes`, a `Record` keyed by the contract's
+`EndpointKey`, the endpoint as the spec writes it
+(`"PATCH /todos/{id}"`). A route the spec does not list, or an
+endpoint with no route, does not compile. So the path is written once,
+in the spec. `serve` takes each route's method and path from the
+contract's `endpoints` and writes `{id}` as Hono's `:id` when it
+registers the route: `http.ts` is the one boundary that knows Hono's
+form. Until stage 13, each route wrote its method and its Hono path by
+hand.
+
+Each route also carries, as data, its entry point's name and the unit
+it runs. Two helpers in construct read both from identifiers and build
+the handler:
+
+```ts
+"POST /todos": route({ postTodos }, { addTodo }),   // postTodos(addTodo): named postTodos, runs addTodo
+"GET /health": probe({ getHealth }),                // a probe runs no unit (L20)
+```
+
+- **The types check the pair.** The unit must be one of `Operations`,
+  and the handler must take exactly its type, not only a type it is
+  assignable to. A unit with fewer arguments than the handler's
+  (`route({ getTodos }, { deleteCompleted })`), no unit, two units, or
+  a handler that takes a unit given to `probe` do not compile. No two
+  operations may share a type, or the routes that run them stop
+  compiling, so a type names one unit.
+- **A clash is named by the key.** The handler for
+  `DELETE /todos/{id}` and its unit are both `deleteTodo`, so construct
+  writes `route({ deleteTodo: deleteTodoHandler }, { deleteTodo })`.
+- **The names are checked against the text.** A name is only an object
+  key: `route({ getTodoCounts: getTodos }, { listTodos })` type-checks,
+  is named `getTodoCounts` and runs `getTodos`. Types cannot see that,
+  so the extractor reads construct's text as well and fails when a
+  name is not its value's own:
+  - each route is one line, `route({ handler }, { unit })`, and the
+    unit is written by its own name;
+  - a handler given under another name (`{ deleteTodo:
+    deleteTodoHandler }`) must be the import of the handler of that
+    name;
+  - each operation is one line, `name: builder({ ... })`, and the
+    builder is the import of that operation's builder;
+  - the routes built are the routes written, in order, and no two
+    share an entry point's name.
+
+To read the units by name, `constructRoutes` destructures the
+operations. Inside it, those names hide the builders of the same name
+imported at the top of the file.
+
+The names feed the OpenAPI document's `operationId` and `x-unit`
+(chapter 11) and the entry chain index (chapter 9). Both read them
+through one extractor, `tooling/entry-chains/routes.ts`. It builds the
+routes with a store whose methods are never called, keeps each
+route's key, name and unit, fails on a route with no name, and checks
+the names against the text as above. Node loads construct to do this,
+so nothing construct imports, directly or through a package, may
+import a `cloudflare:*` module: Node cannot load one.
 
 ### The composition root
 
@@ -1579,8 +1643,9 @@ All three hold at stage 11.
 Any entry chain can be followed from its entry point to the driver
 without a search. Two things keep it so, and they are rules, not side
 effects:
-- **Construct is the map.** Each route in `constructRoutes` names its
-  method and path, its handler and the unit the handler runs.
+- **Construct is the map.** Each route in `constructRoutes` is keyed
+  by its endpoint, and names its handler and the unit the handler runs
+  (chapter 4).
 - **A path names its layer and area.** `handlers/todos/patch-todo.ts`
   → `operations/src/todos/update-todo.ts` → `data/d1/src/todos.ts`.
   An operation's port is declared in the operation's file.
@@ -1588,12 +1653,24 @@ effects:
 An entry chain is written in one line of exported symbols:
 
 ```
-PATCH /todos/:id → patchTodo → updateTodo ⇢ UpdateStore.updateTodo → d1.updateTodo → queryAll
+PATCH /todos/{id} → patchTodo → updateTodo ⇢ UpdateStore.updateTodo → d1.updateTodo
 ```
 
 - `→` is a direct call.
 - `⇢` crosses a port: the caller sees the interface, and construct
   picks the implementation.
+
+**The chain ends at the data method.** Below it, the store's private
+Raw and Stmt functions (chapter 8) run a statement through a driver
+helper: `queryAll`, `execute` or `writeThenQueryAll`.
+- Private symbols are not links, since an entry chain is a line of
+  exported symbols. The Raw functions are not exported for the index.
+- The driver helpers are shared links, as `present.ts` and
+  `mapFailure` are, so the index lists them once, at the top.
+
+L24's first example ended `→ d1.updateTodo → queryAll`, and wrote the
+path with Hono's `:id`. Stage 13 changed both: the chain now stops at
+the data method, and the key is the spec's `{id}`.
 
 Each name is a symbol, so the line can be grepped as written. One
 Mermaid diagram may draw the layers once; entry chains themselves are
@@ -1604,32 +1681,70 @@ block each, starting with its entry chain in the shorthand, then one row per
 link: the file and the symbols it exports, with no line numbers.
 
 ```
-## PATCH /todos/:id
-PATCH /todos/:id → patchTodo → updateTodo ⇢ UpdateStore.updateTodo → d1.updateTodo → queryAll
+## PATCH /todos/{id}
+PATCH /todos/{id} → patchTodo → updateTodo ⇢ UpdateStore.updateTodo → d1.updateTodo
 
 use case  prd/todo/use-cases/todos/change-a-todo.md
-route     apps/api/src/construct.ts                       constructRoutes
-handler   apps/api/src/app/handlers/todos/patch-todo.ts   patchTodo
-rules     packages/valid/src/todos/todo-patch.ts          toTodoPatch
-op        packages/operations/src/todos/update-todo.ts    updateTodo, UpdateStore
-data      packages/data/d1/src/todos.ts                   updateTodo
-driver    packages/data/d1/src/driver.ts                  queryAll
+route     apps/api/src/construct.ts                           constructRoutes
+handler   apps/api/src/app/handlers/todos/patch-todo.ts       patchTodo
+rules     packages/valid/src/todos/todo-patch.ts              toTodoPatch
+op        packages/operations/src/todos/update-todo.ts        updateTodo, UpdateStore
+data      packages/data/d1/src/todos.ts                       todoStore.updateTodo
 ```
 
-- Links every entry chain shares (`present.ts`, `mapFailure`, the body
-  limit in `http.ts`) are listed once, at the top.
+- The links every entry chain shares are listed once, at the top:
+  - `serve` in `http.ts`, with the body limit;
+  - the failure handlers;
+  - the handlers' shared helpers (`present.ts` with `mapFailure`,
+    `validate.ts`, `messages.ts`);
+  - the driver helpers.
 - A probe's block ends at the probe; it has no unit.
 - The `use case` row is the path the unit cites (L25).
+- The `rules` rows are what the handler imports from `valid` (L27).
+  A handler with no input to build has none.
+- The `data` row names the table store and its method
+  (`todoStore.updateTodo`): the store is the exported symbol.
 - The index is generated, never written by hand. Its first line says
   so, names the script and says not to edit it. Its name is lowercase
   to mark it as an output.
 - It is checked by regenerating it and diffing the result.
 
+**The generator.** `tooling/entry-chains/generate.ts`, run as
+`pnpm gen:entry-chains`, writes the index, and `pnpm check:entry-chains`
+diffs it. The scorecard runs the check, and `AGENTS.md` points agents
+to the index. The generator reads:
+- the route table, through the extractor (chapter 4);
+- the imports of construct and of each handler, which give the
+  handler's, the unit's and the rules' files;
+- the `Use case:` line in the unit's doc comment;
+- two strict patterns, with no parser and no compiler:
+  - the port is declared in the operation's own file, as exactly one
+    `export type <Name>Store = {` with one `method(` per line;
+  - the data method carries the port method's name. It is found in
+    the table store the `DbStore` spreads
+    (`export const todoStore = (db: D1Database) => ({`), written
+    `method: async (`.
+
+Each pattern is read whole, not searched for:
+- every `import` line is a named import, a namespace import or a bare
+  import, ending in `;`, and every item is a bare name;
+- every line at a table store's own depth is a method, `},` or a
+  comment;
+- every line of `createDbStore` is a spread, since any other entry
+  could replace a table's method.
+
+A file that does not match fails the generator with its path and the
+line it could not read, rather than skip the line. What the generator
+cannot see is said here: it reads the forms above, not TypeScript, so
+it holds only while the code is written in them. Code written another
+way fails the generator; it is not read wrongly.
+
 **Open.**
-- The generator. It belongs with the monorepo's scripts in `tooling/`,
-  which waits for its own discussion.
-- Pointing to the index from `AGENTS.md`, which may need a recorded
-  exception (rl-0009).
+- A port with more than one method. The generator fails on one rather
+  than guess how to write the chain. The form waits for the first such
+  port, most likely a transaction scope (L16).
+- Processes (L18). The index follows a unit that is an operation.
+  A process's chain gets its form when the first process exists.
 
 ## 10. Object style
 
@@ -1721,9 +1836,10 @@ writes them (`"PATCH /todos/{id}"`):
 
 Narrowing the kinds lets a consumer switch on them exhaustively:
 `POST /todos` can fail with `validation` or `limit`, and TypeScript
-says so (`EndpointErrors<"POST /todos">`). The endpoints exist, but
-both sides still hard-code the path `"/todos"`, and nothing yet
-checks that a switch on an error kind is exhaustive (review tour §8).
+says so (`EndpointErrors<"POST /todos">`). Since stage 13 the api's
+route table is keyed by the endpoints (chapter 4). The BFF still
+hard-codes the path `"/todos"`, and nothing yet checks that a switch
+on an error kind is exhaustive (review tour §8).
 
 A contract holds no client. A client is the consumer's concrete call,
 so it lives in the consumer's data (chapter 8). The consumer derives
@@ -1768,14 +1884,18 @@ shape (which keys the body has), so it becomes valibot's
   their messages, the kinds and the endpoints (A4). Done, by
   `tooling/api-spec/generate.ts`;
 - the OpenAPI document, `apps/api/openapi.json`. Done, by the same
-  script.
+  script, with each route's `operationId` and `x-unit` read from
+  construct and checked against its text (chapter 4). Two routes
+  with one `operationId` fail it.
 
 Both are committed and name the script that wrote them: the
 contract's files in their first line, the document in
 `x-generated`. `generate.ts --check` writes nothing and fails when a
 committed file differs from what the spec generates.
-The route table and the BFF's client take method and path from the
-contract's endpoints, so a path is written once, in the spec.
+Until stage 13 the api's routes wrote their method and path by hand.
+Now the route table is keyed by the contract's endpoints, so the
+api's paths are written once, in the spec (chapter 4). The BFF's
+client still writes its paths by hand.
 
 Generation stops at the contract. Entry points, operations, business
 and data are written by hand.
@@ -1895,6 +2015,12 @@ runs (`addTodo`). A probe's route has no `x-unit`. Neither is in the
 spec. They come from construct, read by the one extractor in
 `tooling/` that also feeds `apps/api/entry-chains.md` (L24).
 
+So `openapi.json` depends on construct as well as on the spec. A
+route's name or unit that changes without a regeneration fails
+`check:api`. `generate.ts` writes the contract before it loads
+construct, since construct imports the contract. Under `--check`,
+construct reads the committed contract, the same one the run compares.
+
 Each failure kind's status is in the spec's Errors section. The
 contract carries it as `KIND_STATUS`, and `app/handlers/present.ts`
 replies with it.
@@ -1919,8 +2045,13 @@ Checks keep the spec, the generated files and the code in step:
 - **target:** a pinned OpenAPI linter, such as Redocly, run with
   `npx` so the lockfile does not change;
 - **target:** an api test replays each example against the api;
-- **target:** an api unit test compares the routes Hono registers with
-  the spec's endpoints.
+- every endpoint has exactly one route, and every route an endpoint.
+  The compiler holds this: construct's `Routes` is a `Record` over the
+  contract's `EndpointKey` (chapter 4). `emitOpenApi` checks it again
+  for a construct not type-checked since the spec changed. Done.
+
+The scorecard runs `check:api`, `check:entry-chains` and
+`test:tooling` since stage 13.
 
 ### Which rules go in a contract
 
