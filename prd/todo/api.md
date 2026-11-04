@@ -15,6 +15,8 @@ this file.
 - Any request can fail on the server: `internal`.
 - A method and path not listed here: `not_found`.
 
+Errors: `too_large`, `internal`
+
 The errors under each endpoint are the ones it adds to these.
 
 ## Errors

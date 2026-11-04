@@ -1,6 +1,7 @@
 {
   "name": "rsb-workers-hono-svelte",
   "private": true,
+  "type": "module",
   "packageManager": "pnpm@12.5.1",
   "engines": {
     "node": "26.13.0",
@@ -9,9 +10,12 @@
   "scripts": {
     "dev": "pnpm --parallel --filter \"./apps/*\" dev",
     "check": "pnpm -r check",
+    "gen:api": "node tooling/api-spec/generate.ts prd/todo/api.md packages/contract/api/src",
+    "check:api": "node tooling/api-spec/generate.ts prd/todo/api.md packages/contract/api/src --check",
     "test:unit": "pnpm -r --if-present test:unit",
     "test:integration": "pnpm -r --if-present test:integration",
     "test:e2e": "pnpm --filter @todo/bff test:e2e",
+    "test:tooling": "node --test tooling/",
     "test": "echo \"no bundled test run: use pnpm test:unit, pnpm test:integration or pnpm test:e2e\" >&2; exit 1"
   }
 }

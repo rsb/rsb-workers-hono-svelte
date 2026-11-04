@@ -1566,17 +1566,19 @@ Only these import a contract:
 
 ### What a contract holds
 
-Today `contract` holds (D1, D4):
+`contract` holds (D1, D4):
 - **messages**: the request and reply shapes (`AddTodoBody`,
-  `TodoReply`, `TodoListReply`, `HealthReply`) as valibot schemas;
-- **wire limits**: `BODY_LIMIT_BYTES`;
-- **error vocabulary**: the envelope's kinds (`validation`, `limit`,
-  …) and the `Envelope` shape;
+  `TodoReply`, `TodoListReply`, `HealthReply`) as valibot schemas,
+  generated into `messages.ts`;
+- **wire limits**: `BODY_LIMIT_BYTES`, written by hand;
+- **error vocabulary**: the envelope's kinds, generated into
+  `kinds.ts`, and the `Envelope` shape, written by hand;
 - **runtime decoding**: the same schemas parse the request in the api
-  and the reply in the client.
+  and the reply in the client;
+- **endpoints** (A4), generated into `endpoints.ts`.
 
-**Target.** It also gets endpoints (A4), generated with the rest of
-the contract from the api spec (L26). An endpoint is plain data:
+An endpoint is plain data, keyed by method and path as the spec
+writes them (`"PATCH /todos/{id}"`):
 - method and path;
 - the input schema;
 - the reply schema;
@@ -1585,8 +1587,9 @@ the contract from the api spec (L26). An endpoint is plain data:
 
 Narrowing the kinds lets a consumer switch on them exhaustively:
 `POST /todos` can fail with `validation` or `limit`, and TypeScript
-says so. Today both sides hard-code the path `"/todos"`, and nothing checks
-that a switch on an error kind is exhaustive (review tour §8).
+says so (`EndpointErrors<"POST /todos">`). The endpoints exist, but
+both sides still hard-code the path `"/todos"`, and nothing yet
+checks that a switch on an error kind is exhaustive (review tour §8).
 
 A contract holds no client. A client is the consumer's concrete call,
 so it lives in the consumer's data (chapter 8). The consumer derives
@@ -1625,12 +1628,16 @@ the vocabulary cannot state belongs in business. `PatchTodoBody`'s
 shape (which keys the body has), so it becomes valibot's
 `minEntries(1)`.
 
-**Generated from it** (target):
+**Generated from it:**
 - the contract, `packages/contract/api/src`: the valibot schemas,
-  their messages and the endpoints (A4);
-- the OpenAPI document, `apps/api/openapi.json`.
+  their messages, the kinds and the endpoints (A4). Done, by
+  `tooling/api-spec/generate.ts`;
+- the OpenAPI document, `apps/api/openapi.json` (target).
 
-Both are committed and carry `x-generated`, which names the script.
+Both are committed and name the script that wrote them: the
+contract's files in their first line, the document in
+`x-generated`. `generate.ts --check` writes nothing and fails when a
+committed file differs from what the spec generates.
 The route table and the BFF's client take method and path from the
 contract's endpoints, so a path is written once, in the spec.
 
@@ -1643,8 +1650,11 @@ A draft, tried first on `prd/todo/api.md`. Each line below is one
 thing a parser reads.
 
 The spec has four sections, in this order:
-- **Every endpoint**: what holds for every request, and the kinds
-  every endpoint can return. An endpoint lists only the kinds it adds.
+- **Every endpoint**: what holds for every request, in prose, and
+  one `Errors:` line naming the kinds every endpoint can return. An
+  endpoint lists only the kinds it adds. A kind in prose is not read:
+  `not_found` for a route the spec does not list is not one every
+  endpoint returns.
 - **Errors**: the envelope's kinds, and whether each carries `field`.
   Statuses are not in the spec (see OpenAPI below).
 - **Shapes**: the shapes several endpoints share, one `###` heading

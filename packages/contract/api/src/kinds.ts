@@ -1,0 +1,17 @@
+// Generated from prd/todo/api.md by tooling/api-spec/generate.ts. Do not edit: change the spec and regenerate.
+import * as v from "valibot";
+
+/** Every kind an API error can have (PRD, Envelope). */
+export const ErrorKind = v.picklist(["validation", "not_found", "limit", "too_large", "internal"]);
+export type ErrorKind = v.InferOutput<typeof ErrorKind>;
+
+/** The kinds that carry a `field`. */
+export const FieldKind = v.picklist(["validation"]);
+export type FieldKind = v.InferOutput<typeof FieldKind>;
+
+/** The kinds that carry no `field`. */
+export const OtherKind = v.picklist(["not_found", "limit", "too_large", "internal"]);
+export type OtherKind = v.InferOutput<typeof OtherKind>;
+
+/** The kinds every endpoint can return, before the ones it adds. */
+export const EVERY_KINDS = ["too_large", "internal"] as const satisfies readonly ErrorKind[];
