@@ -885,8 +885,10 @@ To be settled in later sessions:
   used by `prd/todo/api.md` and read by `tooling/api-spec/parse.ts`;
   waiting to be settled;
 - `tooling/`, the monorepo's scripts: their place and form are not yet
-  settled. Its generators are written as plain Node scripts with no
-  dependencies, outside the workspace:
+  settled. Its generators are plain Node scripts, run from the root
+  under Node's type stripping. Since stage 18 `tooling/` is a private
+  workspace package, `@todo/tooling`, whose only dependencies are
+  `typescript` and `@types/node`, so that `pnpm check` compiles it:
   - the contract and the OpenAPI document (`tooling/api-spec/`);
   - the extractor that reads construct, and the entry chain index
     (`tooling/entry-chains/`, stage 13);
