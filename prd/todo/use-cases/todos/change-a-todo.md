@@ -13,10 +13,10 @@ Set one todo's title, whether it is completed, or both.
 ## Input
 - An id: which todo.
 - A `TodoPatch`: a title, a value for `completed`, or both. Assumes
-  `patch.nonempty`, and `title.length` when a title is given.
+  `patch.nonempty`, `title.length`.
 
 ## Given
-- `todo.exists`: a todo has the id.
+- `todo.exists`
 
 ## Effects
 The todo is stored as changed. Each field given is set to the value

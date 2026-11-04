@@ -26,7 +26,7 @@ The todos left.
 - The store fails: `unavailable` or `server`. Nothing is removed.
 
 ## Guarantees
-- `todos.order`: lists are in the order todos were added.
+- `todos.order`
 
 ## Atomic
 The delete and the read of what is left are one step, so the list

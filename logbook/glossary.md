@@ -258,7 +258,8 @@ its steps, which are use cases.
 - **DDD:** use case, as in application services.
 - **Status:** locked (L25, L30, L31, L32). Each todo operation's doc
   comment cites its use case, and the seven todo use cases are in the
-  L30 form. The use-case lint and the triangle check are target.
+  L30 form. `pnpm check:rules` lints their rule citations; the rest
+  of the use-case lint and the triangle check are target.
 
 ### Spec
 
@@ -395,9 +396,10 @@ rule](#input-rule), a [state rule](#state-rule) or a
 - **DDD:** invariant, business rule.
 - **We differ:** DDD puts the invariant inside the aggregate, which
   both states and enforces it. We split the two.
-- **Status:** locked (L1, L29). The rule table,
-  `packages/business/src/rules.ts`, the one place a rule is defined, is
-  target (L34).
+- **Status:** locked (L1, L29, L34). Rules are defined once, in
+  `prd/todo/rules.md`; the rule table, `packages/business/src/rules.ts`,
+  and the rules index, `packages/business/rules-index.md`, are
+  generated from it.
 
 ### Input rule
 
@@ -420,8 +422,8 @@ lists its state rules under [Given](#given).
 ### Guarantee
 
 A promise the store makes: `todos.order` (lists are in the order
-todos were added), `todo.id` (no two todos share an id). A use case
-lists the ones it relies on under Guarantees; a [data
+todos were added), `todos.unique_id` (no two todos share an id). A use
+case lists the ones it relies on under Guarantees; a [data
 spec](#data-spec) entry would cite them.
 
 - **Status:** locked (L29).
@@ -431,21 +433,22 @@ spec](#data-spec) entry would cite them.
 The name of a rule, which specs cite and never restate: a spec gives
 no rule's wording or number, since the definition has one home (L33).
 The ids the use cases cite: `title.length`, `patch.nonempty`,
-`todos.cap`, `todo.exists`, `todos.order`, `todo.id`.
+`todos.cap`, `todo.exists`, `todos.order`, `todos.unique_id`.
 
 `valid`'s problems name rules too. There are two kinds:
 - **decode rules** are generic, named by the type the field needs, with
   the field beside them: `not_text`, `not_boolean`;
-- **input rules** are named after the business rule they apply:
-  `title.empty`, `title.too_long`, `patch.empty`.
+- **input rules** carry the id of the rule `rules.md` defines and a
+  [violation](#violation): `title.length` (`empty`, `too_long`),
+  `patch.nonempty` (`empty`).
 
 These ids are fixed: use cases cite them, so a rule is never renamed
-without the specs that cite it.
+without the specs that cite it. `pnpm check:rules` fails on a use case
+that cites an id `rules.md` does not define.
 
-- **Status:** locked (L27, L33). `valid` still carries stage 11's
-  ids, one per violation; renaming them to the rule plus a
-  [violation](#violation) (`title.empty` → `title.length`, `empty`) is
-  target, for stage 15.
+- **Status:** locked (L27, L33, L34). Stage 15 renamed stage 11's ids,
+  one per violation (`title.empty`, `title.too_long`, `patch.empty`),
+  to the rule plus a violation.
 
 ### Violation
 
@@ -453,8 +456,9 @@ How a value breaks a rule: `title.length` is broken as `empty` or as
 `too_long`. A problem carries the rule and the violation, and message
 tables branch on the violation.
 
-- **Status:** target (L33). Stage 11's problems carry one id per
-  violation instead.
+- **Status:** locked (L33). Each is named in `rules.md` with its
+  form's condition (`empty`: below), and `valid`'s problems carry it
+  since stage 15.
 
 ### Assumes
 
@@ -761,13 +765,18 @@ in `valid`, never in the delivery.
 
 ### Apply
 
-Applying the [input rules](#input-rule) to decoded values: trim the
-title, then require 1 to `TITLE_MAX` UTF-16 code units, in that order.
+Applying the [input rules](#input-rule): a rule that spans fields
+first, before any field is decoded, and alone when it fails (a patch
+must change a title, `completed` or both: `patch.nonempty`); then, to
+decoded values, trim the title and require 1 to `TITLE_MAX` UTF-16 code
+units, in that order.
 It is [Validate once](#validate-once) made one place: every delivery
 applies them through `valid`, and nothing below the entry point
 applies them again. The three steps are decode, apply, build.
 
-- **In the code:** `packages/valid/src/fields/title.ts`, private.
+- **In the code:** `packages/valid/src/rules/`, private, generated
+  from `prd/todo/rules.md` (one function per rule), called by each
+  validator.
 - **Not:** a [check](#check), which fails when code stops matching a
   spec.
 - **Status:** locked (L12, L27). Called *check* until the specs
@@ -776,8 +785,7 @@ applies them again. The three steps are decode, apply, build.
 ### Build
 
 Assembling the business input from decoded values the rules were
-applied to, and applying the rules that span fields: a patch must change a title, `completed` or
-both (`patch.empty`).
+applied to.
 
 - **In the code:** `to<Input>` in `packages/valid/src/<area>/<input>.ts`:
   `toNewTodo`, `toTodoPatch`, `toTodoFilter`, `toCompleted`.
@@ -785,11 +793,11 @@ both (`patch.empty`).
 
 ### Problem
 
-Why a candidate is not an input: a field, a [rule id](#rule-id) and
-all of the rule's parameters, never words. `{ field: "title", rule:
-"title.too_long", max: 256 }`. A problem carries every parameter of its
-rule, not only the ones the violation touched, so `title.empty` carries
-`max` too. `valid` returns every problem it finds; the delivery decides
+Why a candidate is not an input: a field, a [rule id](#rule-id), a
+[violation](#violation) and all of the rule's parameters, never words.
+`{ field: "title", rule: "title.length", violation: "too_long", max:
+256 }`. A problem carries every parameter of its rule, not only the
+ones the violation touched, so an `empty` title carries `max` too. `valid` returns every problem it finds; the delivery decides
 how many it shows and writes the words, taking any number from the
 problem.
 
@@ -830,8 +838,9 @@ replayed), rules spec (generated validators and table, cited ids
 exist), data spec (the conformance suite), and view (nothing yet, so
 not yet).
 
-- **Status:** locked (L35). The api spec's check is built and the use
-  case's in part; the rest are target, and the data spec is pending.
+- **Status:** locked (L35). The api spec's and the rules spec's checks
+  are built and the use case's in part; the rest are target, and the
+  data spec is pending.
 
 ### Precedence
 

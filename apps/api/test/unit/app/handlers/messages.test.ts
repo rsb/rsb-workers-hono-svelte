@@ -12,27 +12,27 @@ describe("invalidOf", () => {
   it.each<[string, Problems, string, string]>([
     ["not_text", [{ field: "title", rule: "not_text" }], "title", "title must be text"],
     ["not_boolean", [{ field: "completed", rule: "not_boolean" }], "completed", "completed must be true or false"],
-    ["title.empty", [{ field: "title", rule: "title.empty", max: 256 }], "title", "title is empty"],
+    ["title.length empty", [{ field: "title", rule: "title.length", violation: "empty", max: 256 }], "title", "title is empty"],
     [
-      "title.too_long",
-      [{ field: "title", rule: "title.too_long", max: 256 }],
+      "title.length too_long",
+      [{ field: "title", rule: "title.length", violation: "too_long", max: 256 }],
       "title",
       "title is longer than 256 characters",
     ],
-    ["patch.empty", [{ rule: "patch.empty" }], "body", "body must have title, completed or both"],
+    ["patch.nonempty", [{ rule: "patch.nonempty", violation: "empty" }], "body", "body must have title, completed or both"],
   ])("words %s as prd/todo/api.md does", (_, problems, field, message) => {
     expect(shown(problems)).toEqual({ kind: "invalid", field, message });
   });
 
   it("words the max the problem carries", () => {
-    const problems: Problems = [{ field: "title", rule: "title.too_long", max: 10 }];
+    const problems: Problems = [{ field: "title", rule: "title.length", violation: "too_long", max: 10 }];
 
     expect(shown(problems).message).toBe("title is longer than 10 characters");
   });
 
   it("shows the first problem only", () => {
     const problems: Problems = [
-      { field: "title", rule: "title.empty", max: 256 },
+      { field: "title", rule: "title.length", violation: "empty", max: 256 },
       { field: "completed", rule: "not_boolean" },
     ];
 

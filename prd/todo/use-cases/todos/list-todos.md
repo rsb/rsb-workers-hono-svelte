@@ -27,7 +27,7 @@ one; possibly none.
 - The store fails: `unavailable` or `server`.
 
 ## Guarantees
-- `todos.order`: lists are in the order todos were added.
+- `todos.order`
 
 ## Atomic
 One read: the list is a snapshot of one moment, never a mix of the

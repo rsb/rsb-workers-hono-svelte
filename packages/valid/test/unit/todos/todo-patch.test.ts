@@ -5,14 +5,14 @@ import { toTodoPatch } from "../../../src/todos/todo-patch.ts";
 const EMOJI = "😀";
 
 describe("toTodoPatch", () => {
-  it("refuses a patch with neither title nor completed as patch.empty", () => {
-    expect(toTodoPatch({})).toEqual({ ok: false, error: [{ rule: "patch.empty" }] });
+  it("refuses a patch with neither title nor completed as patch.nonempty", () => {
+    expect(toTodoPatch({})).toEqual({ ok: false, error: [{ rule: "patch.nonempty", violation: "empty" }] });
   });
 
   it("reads undefined fields as not given", () => {
     expect(toTodoPatch({ title: undefined, completed: undefined })).toEqual({
       ok: false,
-      error: [{ rule: "patch.empty" }],
+      error: [{ rule: "patch.nonempty", violation: "empty" }],
     });
   });
 
@@ -25,12 +25,12 @@ describe("toTodoPatch", () => {
   });
 
   it("refuses a title of only spaces", () => {
-    expect(toTodoPatch({ title: "   " })).toEqual({ ok: false, error: [{ field: "title", rule: "title.empty", max: 256 }] });
+    expect(toTodoPatch({ title: "   " })).toEqual({ ok: false, error: [{ field: "title", rule: "title.length", violation: "empty", max: 256 }] });
   });
 
   it("refuses a title too long, counted in UTF-16 code units", () => {
     const title = `${"a".repeat(255)}${EMOJI}`;
-    const tooLong = { field: "title", rule: "title.too_long", max: 256 };
+    const tooLong = { field: "title", rule: "title.length", violation: "too_long", max: 256 };
 
     expect(toTodoPatch({ title })).toEqual({ ok: false, error: [tooLong] });
   });
@@ -53,7 +53,7 @@ describe("toTodoPatch", () => {
     expect(toTodoPatch({ title: "", completed: "yes" })).toEqual({
       ok: false,
       error: [
-        { field: "title", rule: "title.empty", max: 256 },
+        { field: "title", rule: "title.length", violation: "empty", max: 256 },
         { field: "completed", rule: "not_boolean" },
       ],
     });

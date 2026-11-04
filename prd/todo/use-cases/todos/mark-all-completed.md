@@ -10,7 +10,7 @@ Make every todo completed, or every todo active, at once.
 - Deviation 20; scenarios 6.1 and 6.2.
 
 ## Input
-- A boolean: the value every todo's `completed` takes.
+- A `Completed`: the value every todo's `completed` takes.
 
 ## Given
 none
@@ -27,7 +27,7 @@ Every todo as it now is.
 - The store fails: `unavailable` or `server`. Nothing is changed.
 
 ## Guarantees
-- `todos.order`: lists are in the order todos were added.
+- `todos.order`
 
 ## Atomic
 The change and the read of the list are one step, so the list returned

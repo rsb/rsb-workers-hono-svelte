@@ -235,7 +235,7 @@ describe("resolveImport", () => {
 
   it("fails on a path the package does not export", () => {
     assert.throws(
-      () => resolveImport("apps/api/src/construct.ts", "@todo/valid/fields/title.ts", workspaces),
+      () => resolveImport("apps/api/src/construct.ts", "@todo/valid/fields/decode.ts", workspaces),
       /not in the exports of @todo\/valid/,
     );
   });

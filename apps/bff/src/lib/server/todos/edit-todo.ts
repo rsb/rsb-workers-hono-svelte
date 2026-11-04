@@ -34,7 +34,7 @@ export async function editTodo(api: Pick<Fetcher, "fetch">, form: FormData) {
   const patch = toTodoPatch({ title: form.get("title") });
   if (!patch.ok) {
     const [problem] = patch.error;
-    if (problem.rule === "title.empty") {
+    if (problem.rule === "title.length" && problem.violation === "empty") {
       return { edited: id };
     }
     return fail(422, { edit: { id, title, message: problemMessage(problem) } });

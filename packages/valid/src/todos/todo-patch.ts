@@ -1,52 +1,54 @@
+// Generated from prd/todo/rules.md by tooling/rules/generate.ts. Do not edit: change the spec and regenerate.
 import { type Result, err, ok } from "@todo/business/result.ts";
 import type { TodoPatch } from "@todo/business/todos/todo.ts";
-import { flag } from "../fields/decode.ts";
-import { title } from "../fields/title.ts";
+import { flag, text } from "../fields/decode.ts";
+import { problemsFrom } from "../fields/problems.ts";
 import type { Problem, Problems } from "../problem.ts";
+import { patchNonempty } from "../rules/patch-nonempty.ts";
+import { titleLength } from "../rules/title-length.ts";
 
-/**
- * What a delivery read for a change to a todo, not yet decoded or checked.
- * A field left undefined is not asked to change.
- */
+/** `title`: text, trimmed, then `title.length`. */
+const titleField = (value: unknown): Result<string, Problem> => {
+  const decoded = text("title", value);
+  if (!decoded.ok) {
+    return decoded;
+  }
+
+  const applied = decoded.value.trim();
+  const titleLengthProblem = titleLength("title", applied);
+  if (titleLengthProblem !== undefined) {
+    return err(titleLengthProblem);
+  }
+
+  return ok(applied);
+};
+
+/** What a delivery read for a `TodoPatch`, not yet decoded. */
 export type TodoPatchCandidate = { title?: unknown; completed?: unknown };
 
 /**
- * A patch from what a delivery read: a title, a `completed`, or both. A
- * title follows the title rules; `completed` is a boolean. A patch with
- * neither is `patch.empty`. Gives every problem it finds.
+ * A `TodoPatch` from what a delivery read. What someone asks to change in a
+ * todo. A field not given is not asked to change. Gives every problem it finds,
+ * as prd/todo/rules.md › Every input says.
  */
 export const toTodoPatch = (candidate: TodoPatchCandidate): Result<TodoPatch, Problems> => {
-  const hasTitle = candidate.title !== undefined;
-  const hasCompleted = candidate.completed !== undefined;
-  if (!hasTitle && !hasCompleted) {
-    return err([{ rule: "patch.empty" }]);
+  const patchNonemptyProblem = patchNonempty(candidate);
+  if (patchNonemptyProblem !== undefined) {
+    return err([patchNonemptyProblem]);
   }
 
-  const patch: TodoPatch = {};
-  const problems: Problem[] = [];
+  const title = candidate.title === undefined ? undefined : titleField(candidate.title);
+  const completed = candidate.completed === undefined ? undefined : flag("completed", candidate.completed);
 
-  if (hasTitle) {
-    const checked = title(candidate.title);
-    if (checked.ok) {
-      patch.title = checked.value;
-    } else {
-      problems.push(checked.error);
-    }
+  if (title !== undefined && !title.ok) {
+    return err(problemsFrom(title.error, [completed]));
+  }
+  if (completed !== undefined && !completed.ok) {
+    return err([completed.error]);
   }
 
-  if (hasCompleted) {
-    const decoded = flag("completed", candidate.completed);
-    if (decoded.ok) {
-      patch.completed = decoded.value;
-    } else {
-      problems.push(decoded.error);
-    }
-  }
-
-  const [first, ...rest] = problems;
-  if (first !== undefined) {
-    return err([first, ...rest]);
-  }
-
-  return ok(patch);
+  return ok({
+    ...(title === undefined ? {} : { title: title.value }),
+    ...(completed === undefined ? {} : { completed: completed.value }),
+  });
 };

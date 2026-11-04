@@ -1,7 +1,7 @@
 {
   "name": "@todo/valid",
   "private": true,
-  "description": "How a candidate becomes a business input: decode, check, build. Returns problems, never words. Imports business only.",
+  "description": "How a candidate becomes a business input: decode, apply, build, generated from prd/todo/rules.md. Returns problems, never words. Imports business only.",
   "type": "module",
   "exports": {
     "./problem.ts": "./src/problem.ts",
