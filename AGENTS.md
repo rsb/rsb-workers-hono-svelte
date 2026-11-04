@@ -17,6 +17,14 @@ Run from the root:
 - `pnpm test:e2e`
 - `pnpm test` fails on purpose and names `test:unit`, `test:integration` and `test:e2e`.
 
+## Finding code
+
+[apps/api/entry-chains.md](apps/api/entry-chains.md) lists every api
+entry point and its entry chain, from the route to the data method,
+with the file and symbols of each link. It is generated: after
+changing a route, a handler, an operation's port or a data method,
+run `pnpm gen:entry-chains`.
+
 ## Rules
 
 - rl-0009: Owned governance files change only with a recorded exception.

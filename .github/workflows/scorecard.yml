@@ -25,6 +25,9 @@ jobs:
       - name: Install Playwright browsers
         run: pnpm --filter @todo/bff exec playwright install --with-deps chromium
       - run: pnpm check
+      - run: pnpm check:api
+      - run: pnpm check:entry-chains
+      - run: pnpm test:tooling
       - run: pnpm test:unit
       - run: pnpm test:integration
       - run: pnpm test:e2e
