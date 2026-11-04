@@ -91,6 +91,7 @@ Reply: 200
 
 ### `GET /todos`
 Serves: `use-cases/todos/list-todos.md`.
+Applies: none
 
 Query: `GetTodosQuery`
 - `completed`: one of `"true"` `"false"`, optional "completed must be true or false"
@@ -168,6 +169,7 @@ Reply: 422
 
 ### `GET /todos/counts`
 Serves: `use-cases/todos/count-todos.md`.
+Applies: none
 
 Reply: 200 `TodoCountsReply`
 - `active`: integer, min 0
@@ -192,6 +194,7 @@ Reply: 200
 
 ### `POST /todos`
 Serves: `use-cases/todos/add-a-todo.md`.
+Applies: `title.length`
 
 Body: `AddTodoBody`
 - `title`: text "title must be text"
@@ -279,6 +282,7 @@ Reply: 409
 
 ### `PATCH /todos`
 Serves: `use-cases/todos/mark-all-completed.md`.
+Applies: none
 
 Body: `PatchTodosBody`
 - `completed`: boolean "completed must be true or false"
@@ -336,6 +340,7 @@ Reply: 422
 
 ### `PATCH /todos/{id}`
 Serves: `use-cases/todos/change-a-todo.md`.
+Applies: `patch.nonempty`, `title.length`
 
 Path:
 - `id`: text
@@ -406,6 +411,7 @@ Reply: 404
 
 ### `DELETE /todos`
 Serves: `use-cases/todos/clear-completed.md`.
+Applies: none
 
 Query: `DeleteTodosQuery`
 - `completed`: literal `"true"` "completed must be true"
@@ -448,6 +454,7 @@ Reply: 422
 
 ### `DELETE /todos/{id}`
 Serves: `use-cases/todos/remove-a-todo.md`.
+Applies: none
 
 Path:
 - `id`: text

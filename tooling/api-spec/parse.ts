@@ -56,6 +56,12 @@ export type Endpoint = {
   method: string;
   path: string;
   serves: string;
+  /**
+   * The rules the endpoint's validator applies, by id, as `Applies:` writes
+   * them; empty for `Applies: none`, undefined when the line is absent. That
+   * each id is a rule, and that the validator applies them, is the join's.
+   */
+  applies: string[] | undefined;
   params: Field[];
   /** The query shape's name, inline or shared. */
   query: string | undefined;
@@ -94,7 +100,7 @@ const SECTIONS = ["Every endpoint", "Errors", "Shapes", "Endpoints"] as const;
 type Section = (typeof SECTIONS)[number];
 
 const METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"];
-const PARTS = ["Serves", "Path", "Query", "Body", "Reply", "Errors", "Examples"] as const;
+const PARTS = ["Serves", "Applies", "Path", "Query", "Body", "Reply", "Errors", "Examples"] as const;
 type Part = (typeof PARTS)[number];
 
 const NAME = "[A-Za-z_][A-Za-z0-9_]*";
@@ -196,21 +202,27 @@ const parseShapeHead = (text: string): { name: string; atLeast: AtLeast | undefi
   return { name, atLeast: { fields: Number(atLeast[1]), message: atLeast[2] } };
 };
 
-const parseKinds = (text: string): string[] | string => {
+/** Reads "none" or names in code font separated by commas; `refused` is the problem otherwise. */
+const parseList = (text: string, name: string, refused: string): string[] | string => {
   if (text === "none") {
     return [];
   }
   const items = text.split(",").map((item) => item.trim());
-  const kinds: string[] = [];
+  const names: string[] = [];
   for (const item of items) {
-    const kind = new RegExp(`^\`(${NAME})\`$`).exec(item);
-    if (!kind) {
-      return 'errors are "none" or kinds in code font, separated by commas';
+    const found = new RegExp(`^\`(${name})\`$`).exec(item);
+    if (!found) {
+      return refused;
     }
-    kinds.push(kind[1] as string);
+    names.push(found[1] as string);
   }
-  return kinds;
+  return names;
 };
+
+const parseKinds = (text: string): string[] | string => parseList(text, NAME, 'errors are "none" or kinds in code font, separated by commas');
+
+/** A rule id as the rules spec writes it: `title.length`. */
+const RULE_ID = "[a-z][a-z_]*\\.[a-z][a-z_]*";
 
 /** The parameters a path names in braces: `/todos/{id}` names `id`. */
 export const pathParams = (path: string): string[] => {
@@ -653,6 +665,7 @@ export const parse = (source: string): Parsed => {
       method,
       path,
       serves: "",
+      applies: undefined,
       params: [],
       query: undefined,
       body: undefined,
@@ -729,6 +742,23 @@ export const parse = (source: string): Parsed => {
 
       if (label === "Serves") {
         endpoint.serves = text.replace(/\.$/, "");
+        continue;
+      }
+      if (label === "Applies") {
+        const ids = parseList(
+          text.replace(/\.$/, ""),
+          RULE_ID,
+          'Applies: is "none" or rule ids in code font, separated by commas',
+        );
+        if (typeof ids === "string") {
+          problem(entry.line, ids);
+          continue;
+        }
+        const twice = ids.filter((id, at) => ids.indexOf(id) !== at);
+        if (twice.length > 0) {
+          problem(entry.line, `Applies: names ${twice.join(", ")} twice`);
+        }
+        endpoint.applies = ids;
         continue;
       }
       if (label === "Path") {
