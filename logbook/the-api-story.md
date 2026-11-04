@@ -1571,11 +1571,15 @@ Only these import a contract:
   `TodoReply`, `TodoListReply`, `HealthReply`) as valibot schemas,
   generated into `messages.ts`;
 - **wire limits**: `BODY_LIMIT_BYTES`, written by hand;
-- **error vocabulary**: the envelope's kinds, generated into
-  `kinds.ts`, and the `Envelope` shape, written by hand;
+- **error vocabulary**: the envelope's kinds and the status each
+  replies with (`KIND_STATUS`), generated into `kinds.ts`, and the
+  `Envelope` shape, written by hand;
 - **runtime decoding**: the same schemas parse the request in the api
   and the reply in the client;
-- **endpoints** (A4), generated into `endpoints.ts`.
+- **endpoints** (A4), generated into `endpoints.ts`;
+- **examples**: the spec's worked examples as plain data, generated
+  into `examples.ts`. `index.ts` does not export them: they are for
+  tests.
 
 An endpoint is plain data, keyed by method and path as the spec
 writes them (`"PATCH /todos/{id}"`):
@@ -1609,6 +1613,7 @@ Every endpoint has the same form:
 - its input: path parameters, query and body;
 - its reply;
 - the error kinds it can return;
+- worked examples: requests and the replies they get;
 - what it serves: the use case path when it runs a unit, or the
   requirement when it is a probe (a probe runs no unit, so it has no
   use case: L20, L25).
@@ -1632,7 +1637,8 @@ shape (which keys the body has), so it becomes valibot's
 - the contract, `packages/contract/api/src`: the valibot schemas,
   their messages, the kinds and the endpoints (A4). Done, by
   `tooling/api-spec/generate.ts`;
-- the OpenAPI document, `apps/api/openapi.json` (target).
+- the OpenAPI document, `apps/api/openapi.json`. Done, by the same
+  script.
 
 Both are committed and name the script that wrote them: the
 contract's files in their first line, the document in
@@ -1650,13 +1656,14 @@ A draft, tried first on `prd/todo/api.md`. Each line below is one
 thing a parser reads.
 
 The spec has four sections, in this order:
-- **Every endpoint**: what holds for every request, in prose, and
-  one `Errors:` line naming the kinds every endpoint can return. An
-  endpoint lists only the kinds it adds. A kind in prose is not read:
+- **Every endpoint**: what holds for every request, in prose, then
+  one `Errors:` line naming the kinds every endpoint can return, then
+  `Examples:` with one example of each of those kinds. An endpoint
+  lists only the kinds it adds. A kind in prose is not read:
   `not_found` for a route the spec does not list is not one every
   endpoint returns.
-- **Errors**: the envelope's kinds, and whether each carries `field`.
-  Statuses are not in the spec (see OpenAPI below).
+- **Errors**: the envelope's kinds, each with its status and whether
+  it carries `field`: `` - `validation`: 422, with field ``.
 - **Shapes**: the shapes several endpoints share, one `###` heading
   each, named in code font.
 - **Endpoints**: one `###` heading each, the method and path in code
@@ -1668,7 +1675,8 @@ An endpoint has these parts, in this order, each left out when empty:
 - `Query:` a shape;
 - `Body:` a shape;
 - `Reply:` the success status, then a shape;
-- `Errors:` the kinds it adds, or `none`.
+- `Errors:` the kinds it adds, or `none`;
+- `Examples:` its worked examples, always last.
 
 The spec has no tables: they are slow to write and break when a
 column is edited. Everything is a heading, a labelled line or a list
@@ -1702,6 +1710,47 @@ Types:
 Every object is closed; there is no word for an open one. A rule the
 vocabulary cannot state belongs in business, not in the spec.
 
+**Examples.** Each example is a name, a request and the reply it
+gets, with JSON pretty-printed for people to read:
+
+````
+Example: the body is empty
+Request: `PATCH /todos/0b6f4c1e-8a7d-4b51-9e0a-3c2d1f5e7a90`
+```json
+{}
+```
+Reply: 422
+```json
+{
+  "ok": false,
+  "error": {
+    "kind": "validation",
+    "message": "body must have title, completed or both",
+    "field": "body"
+  }
+}
+```
+````
+
+- `Request:` is the request line as sent, in code font: path
+  parameters filled in, the query string written out
+  (`` `GET /todos?completed=true` ``). A `json` block under it is the
+  body. The examples under Every endpoint have no request: any
+  request can meet them.
+- `Reply:` is the status, then the whole envelope in a `json` block.
+- An endpoint has at least one example that succeeds, and one of each
+  kind it adds.
+
+The parser checks each example against its endpoint: the method, the
+path against its template, a body only where the endpoint takes one,
+a success at the endpoint's status, and a failure of a kind the
+endpoint can return at that kind's status. The contract's unit test
+then runs each request through the endpoint's schemas: a success
+must pass, and a `validation` failure the schema catches must name
+the field and message the schema gives. A failure only a use case's
+rule causes, such as an empty title, passes the schemas; only the api
+can show it.
+
 ### OpenAPI documents the contract (L23, L26)
 
 The api's contract is documented as OpenAPI. Only backend apis get
@@ -1716,16 +1765,32 @@ runs (`addTodo`). A probe's route has no `x-unit`. Neither is in the
 spec. They come from construct, read by the one extractor in
 `tooling/` that also feeds `apps/api/entry-chains.md` (L24).
 
-Each failure kind has the status `app/handlers/present.ts` gives it:
-`validation` 422, `not_found` 404, `limit` 409, `too_large` 413 and
-`internal` 500.
+Each failure kind's status is in the spec's Errors section. The
+contract carries it as `KIND_STATUS`, and `app/handlers/present.ts`
+replies with it.
 
-**Target.** Checks keep the spec, the generated files and the code in
-step:
-- regenerate and diff: a generated file that differs from its
-  regeneration fails;
-- an api unit test compares the routes Hono registers with the
-  spec's endpoints.
+The document is OpenAPI 3.1. 3.2 adds a closed query string, but some
+validators do not yet read 3.2; 3.0 has no `const`. In the document:
+- each shape is a schema, closed with `additionalProperties: false`;
+  `at least N fields` is `minProperties`;
+- a field's message is `x-message`;
+- each kind is a failure schema (`ValidationFailure`) at its status;
+  the kinds every endpoint returns are shared responses;
+- each example is a named example on the request body, on each path
+  and query parameter, and on the reply it gets;
+- the Every endpoint prose is the document's description.
+
+Checks keep the spec, the generated files and the code in step:
+- regenerate and diff (`--check`): a generated file that differs from
+  its regeneration fails. Done;
+- the examples run through the contract's schemas (above). Done;
+- every `$ref` in the document resolves, and every response has an
+  example (`tooling/api-spec/emit-openapi.test.ts`). Done;
+- **target:** a pinned OpenAPI linter, such as Redocly, run with
+  `npx` so the lockfile does not change;
+- **target:** an api test replays each example against the api;
+- **target:** an api unit test compares the routes Hono registers with
+  the spec's endpoints.
 
 ### Which rules go in a contract
 

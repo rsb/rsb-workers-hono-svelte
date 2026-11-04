@@ -27,7 +27,30 @@ export type Shape =
   | { name: string; doc: string | undefined; kind: "object"; fields: Field[]; atLeast: AtLeast | undefined }
   | { name: string; doc: string | undefined; kind: "list"; of: string };
 
-export type ErrorKind = { name: string; withField: boolean };
+export type ErrorKind = { name: string; status: number; withField: boolean };
+
+/** An example's request, as the request line and body the spec writes. */
+export type Request = {
+  method: string;
+  /** The path as sent, with its parameters filled in. */
+  path: string;
+  /** The path parameters, read from the path by the endpoint's template. */
+  params: Record<string, string>;
+  /** The query string's keys and values in order; a key given twice appears twice. */
+  query: [string, string][];
+  /** The parsed JSON body; undefined when the request has none. */
+  body: unknown;
+};
+
+/** A worked example: a request, and the reply's status and whole envelope. */
+export type Example = {
+  name: string;
+  /** Undefined for the examples every endpoint shares, which any request can cause. */
+  request: Request | undefined;
+  status: number;
+  reply: unknown;
+  line: number;
+};
 
 export type Endpoint = {
   method: string;
@@ -43,13 +66,18 @@ export type Endpoint = {
   reply: string;
   /** The kinds this endpoint adds to the ones every endpoint can return. */
   errors: string[];
+  examples: Example[];
   line: number;
 };
 
 export type Spec = {
   title: string;
+  /** The prose of "Every endpoint", as written: the rules no field can state. */
+  everyProse: string;
   /** The kinds every endpoint can return, from "Every endpoint". */
   everyKinds: string[];
+  /** The examples of the kinds every endpoint can return. */
+  everyExamples: Example[];
   kinds: ErrorKind[];
   /** Every named shape, shared or inline, in the order the spec names it. */
   shapes: Shape[];
@@ -66,7 +94,7 @@ const SECTIONS = ["Every endpoint", "Errors", "Shapes", "Endpoints"] as const;
 type Section = (typeof SECTIONS)[number];
 
 const METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"];
-const PARTS = ["Serves", "Path", "Query", "Body", "Reply", "Errors"] as const;
+const PARTS = ["Serves", "Path", "Query", "Body", "Reply", "Errors", "Examples"] as const;
 type Part = (typeof PARTS)[number];
 
 const NAME = "[A-Za-z_][A-Za-z0-9_]*";
@@ -212,6 +240,190 @@ const blocks = (lines: Lines) => {
 
 const nonBlank = (lines: Lines) => lines.filter((entry) => entry.text.trim() !== "");
 
+/** Splits lines at the first `Examples:` line: the lines before it, and the lines after it. */
+const splitExamples = (lines: Lines) => {
+  const at = lines.findIndex((entry) => entry.text === "Examples:");
+  if (at === -1) {
+    return { before: lines, examples: undefined };
+  }
+  return { before: lines.slice(0, at), examples: lines.slice(at + 1) };
+};
+
+type Token = { kind: "line"; text: string; line: number } | { kind: "json"; text: string; line: number };
+
+/** Reads lines as labelled lines and ```json blocks, skipping blank lines outside the blocks. */
+const tokens = (lines: Lines, problem: (line: number, message: string) => void): Token[] => {
+  const found: Token[] = [];
+  let block: { text: string[]; line: number } | undefined;
+  for (const entry of lines) {
+    if (block) {
+      if (entry.text.trim() === "```") {
+        found.push({ kind: "json", text: block.text.join("\n"), line: block.line });
+        block = undefined;
+      } else {
+        block.text.push(entry.text);
+      }
+      continue;
+    }
+    if (entry.text.startsWith("```")) {
+      if (entry.text !== "```json") {
+        problem(entry.line, "an example's block is ```json");
+      }
+      block = { text: [], line: entry.line };
+      continue;
+    }
+    if (entry.text.trim() !== "") {
+      found.push({ kind: "line", text: entry.text, line: entry.line });
+    }
+  }
+  if (block) {
+    problem(block.line, "this ```json block is not closed");
+  }
+  return found;
+};
+
+/** Reads a request line's query string into its keys and values, in order. */
+const parseQuery = (text: string): [string, string][] => {
+  if (text === "") {
+    return [];
+  }
+  return text.split("&").map((pair) => {
+    const at = pair.indexOf("=");
+    const key = at === -1 ? pair : pair.slice(0, at);
+    const value = at === -1 ? "" : pair.slice(at + 1);
+    const decode = (part: string) => decodeURIComponent(part.replaceAll("+", " "));
+    return [decode(key), decode(value)] as [string, string];
+  });
+};
+
+/** Matches a path as sent against a template such as `/todos/{id}`; undefined when it does not match. */
+export const matchPath = (template: string, path: string): Record<string, string> | undefined => {
+  const want = template.split("/");
+  const got = path.split("/");
+  if (want.length !== got.length) {
+    return undefined;
+  }
+  const params: Record<string, string> = {};
+  for (const [index, part] of want.entries()) {
+    const sent = got[index] as string;
+    const param = /^\{([^}]+)\}$/.exec(part);
+    if (param) {
+      if (sent === "") {
+        return undefined;
+      }
+      params[param[1] as string] = decodeURIComponent(sent);
+    } else if (part !== sent) {
+      return undefined;
+    }
+  }
+  return params;
+};
+
+/**
+ * Reads the examples after an `Examples:` line. Each is `Example: name`, then
+ * `` Request: `METHOD /path?query` `` and its ```json body when it has one,
+ * then `Reply: status` and the ```json envelope. `withRequest` is false for
+ * the examples every endpoint shares, which have no request.
+ */
+const parseExamples = (
+  lines: Lines,
+  withRequest: boolean,
+  problem: (line: number, message: string) => void,
+): Example[] => {
+  const examples: Example[] = [];
+  const found = tokens(lines, problem);
+  const json = (token: Token | undefined, what: string, line: number): { value: unknown } | undefined => {
+    if (token?.kind !== "json") {
+      problem(line, `${what} is a \`\`\`json block on the next lines`);
+      return undefined;
+    }
+    try {
+      return { value: JSON.parse(token.text) };
+    } catch (error) {
+      problem(token.line, `${what} is not JSON: ${(error as Error).message}`);
+      return undefined;
+    }
+  };
+
+  let index = 0;
+  while (index < found.length) {
+    const token = found[index] as Token;
+    index += 1;
+    const head = token.kind === "line" ? /^Example: (.+)$/.exec(token.text) : null;
+    if (!head) {
+      problem(token.line, "an example starts with \"Example: name\"");
+      continue;
+    }
+    const example: Example = { name: (head[1] as string).trim(), request: undefined, status: 0, reply: undefined, line: token.line };
+    if (examples.some((other) => other.name === example.name)) {
+      problem(token.line, `example "${example.name}" is already given`);
+    }
+
+    let next = found[index];
+    const request = next?.kind === "line" ? /^Request: `([A-Z]+) (\/[^`\s?]*)(?:\?([^`\s]*))?`$/.exec(next.text) : null;
+    if (next?.kind === "line" && next.text.startsWith("Request:") && !request) {
+      problem(next.line, "Request: is the request line in code font: Request: `GET /todos?completed=true`");
+    }
+    if (request && next) {
+      index += 1;
+      const requestLine = next.line;
+      let body: unknown;
+      if (found[index]?.kind === "json") {
+        body = json(found[index], "a request body", requestLine)?.value;
+        index += 1;
+      }
+      example.request = {
+        method: request[1] as string,
+        path: request[2] as string,
+        params: {},
+        query: parseQuery(request[3] ?? ""),
+        body,
+      };
+      if (!withRequest) {
+        problem(requestLine, "an example every endpoint shares has no Request:");
+      }
+    } else if (withRequest) {
+      problem(token.line, `example "${example.name}" has no Request:`);
+    }
+
+    next = found[index];
+    const reply = next?.kind === "line" ? /^Reply: (\d{3})$/.exec(next.text) : null;
+    if (!reply || !next) {
+      problem(next?.line ?? token.line, `example "${example.name}" has no "Reply: status" after its request`);
+      continue;
+    }
+    index += 1;
+    example.status = Number(reply[1]);
+    const envelope = json(found[index], "a reply", next.line);
+    if (found[index]?.kind === "json") {
+      index += 1;
+    }
+    if (envelope === undefined) {
+      continue;
+    }
+    example.reply = envelope.value;
+    examples.push(example);
+  }
+  return examples;
+};
+
+const isObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+/** The reply's error kind when it is a failure envelope, true for a success, else a problem. */
+const envelopeOf = (reply: unknown): { ok: true } | { ok: false; kind: string } | string => {
+  if (!isObject(reply) || typeof reply.ok !== "boolean") {
+    return "a reply is the whole envelope: { \"ok\": true, \"data\": … } or { \"ok\": false, \"error\": … }";
+  }
+  if (reply.ok) {
+    return { ok: true };
+  }
+  if (!isObject(reply.error) || typeof reply.error.kind !== "string") {
+    return "a failure's error has a kind";
+  }
+  return { ok: false, kind: reply.error.kind };
+};
+
 export const parse = (source: string): Parsed => {
   const problems: Problem[] = [];
   const problem = (line: number, message: string) => {
@@ -258,20 +470,67 @@ export const parse = (source: string): Parsed => {
   // Errors.
   const kinds: ErrorKind[] = [];
   for (const entry of nonBlank(sections.get("Errors") ?? [])) {
-    const kind = new RegExp(`^- \`(${NAME})\`(, with field)?$`).exec(entry.text);
+    const kind = new RegExp(`^- \`(${NAME})\`: (\\d{3})(, with field)?$`).exec(entry.text);
     if (!kind) {
-      problem(entry.line, 'an error is "- `kind`" or "- `kind`, with field"');
+      problem(entry.line, 'an error is "- `kind`: status" or "- `kind`: status, with field"');
       continue;
     }
-    kinds.push({ name: kind[1] as string, withField: kind[2] !== undefined });
+    kinds.push({ name: kind[1] as string, status: Number(kind[2]), withField: kind[3] !== undefined });
   }
   const kindNames = new Set(kinds.map((kind) => kind.name));
+  const statusOf = new Map(kinds.map((kind) => [kind.name, kind.status]));
+
+  /** Checks a reply against the kinds it may have and the statuses they map to; true for a success. */
+  const checkReply = (example: Example, allowed: string[], success: number | undefined) => {
+    const envelope = envelopeOf(example.reply);
+    if (typeof envelope === "string") {
+      problem(example.line, `example "${example.name}": ${envelope}`);
+      return;
+    }
+    if (envelope.ok) {
+      if (success === undefined) {
+        problem(example.line, `example "${example.name}" is a success; the examples every endpoint shares are failures`);
+      } else if (example.status !== success) {
+        problem(example.line, `example "${example.name}" replies ${example.status}; a success replies ${success}`);
+      }
+      return;
+    }
+    if (!allowed.includes(envelope.kind)) {
+      problem(example.line, `example "${example.name}" fails with ${envelope.kind}, which is not among ${allowed.join(", ")}`);
+      return;
+    }
+    const status = statusOf.get(envelope.kind);
+    if (example.status !== status) {
+      problem(example.line, `example "${example.name}" replies ${example.status}; ${envelope.kind} replies ${status}`);
+    }
+  };
+
+  /** The kinds the examples fail with, and whether any succeeds. */
+  const covered = (examples: Example[]) => {
+    const failures = new Set<string>();
+    let success = false;
+    for (const example of examples) {
+      const envelope = envelopeOf(example.reply);
+      if (typeof envelope === "string") {
+        continue;
+      }
+      if (envelope.ok) {
+        success = true;
+      } else {
+        failures.add(envelope.kind);
+      }
+    }
+    return { failures, success };
+  };
 
   // Every endpoint: prose, and one "Errors:" line naming the kinds every endpoint can return.
   let everyKinds: string[] | undefined;
-  for (const entry of nonBlank(sections.get("Every endpoint") ?? [])) {
+  const every = splitExamples(sections.get("Every endpoint") ?? []);
+  const prose: string[] = [];
+  for (const entry of every.before) {
     const line = /^Errors:\s+(.*)$/.exec(entry.text);
     if (!line) {
+      prose.push(entry.text);
       continue;
     }
     if (everyKinds !== undefined) {
@@ -293,6 +552,16 @@ export const parse = (source: string): Parsed => {
   if (everyKinds === undefined) {
     problem(1, 'Every endpoint has no Errors: line; write "Errors: none" when there are none');
     everyKinds = [];
+  }
+  const everyExamples = parseExamples(every.examples ?? [], false, problem);
+  for (const example of everyExamples) {
+    checkReply(example, everyKinds, undefined);
+  }
+  const everyCovered = covered(everyExamples).failures;
+  for (const kind of everyKinds) {
+    if (!everyCovered.has(kind)) {
+      problem(1, `Every endpoint has no example of ${kind}`);
+    }
   }
 
   // Shapes.
@@ -390,8 +659,10 @@ export const parse = (source: string): Parsed => {
       status: 0,
       reply: "",
       errors: [],
+      examples: [],
       line: block.line,
     };
+    const split = splitExamples(block.body);
 
     // Each part is a labelled line; Path, Query, Body and Reply may have fields under them.
     let part: Part | undefined;
@@ -410,7 +681,7 @@ export const parse = (source: string): Parsed => {
       inline = undefined;
     };
 
-    for (const entry of nonBlank(block.body)) {
+    for (const entry of nonBlank(split.before)) {
       if (entry.text.startsWith("- ")) {
         if (part !== "Path" && inline === undefined) {
           problem(entry.line, "a field belongs under Path:, or under a shape named in Query:, Body: or Reply:");
@@ -524,6 +795,46 @@ export const parse = (source: string): Parsed => {
     if (named.join() !== given.join()) {
       problem(block.line, `${key} names {${named.join("}, {")}} in its path but Path: lists ${given.join(", ") || "none"}`);
     }
+
+    if (split.examples === undefined) {
+      problem(block.line, `${key} has no Examples:`);
+    } else {
+      endpoint.examples = parseExamples(split.examples, true, problem);
+    }
+    for (const example of endpoint.examples) {
+      const request = example.request;
+      if (request === undefined) {
+        continue;
+      }
+      if (request.method !== method) {
+        problem(example.line, `example "${example.name}" sends ${request.method}; ${key} is ${method}`);
+      }
+      const params = matchPath(path, request.path);
+      if (params === undefined) {
+        problem(example.line, `example "${example.name}" sends ${request.path}, which does not match ${path}`);
+      } else {
+        request.params = params;
+      }
+      if (endpoint.body === undefined && request.body !== undefined) {
+        problem(example.line, `example "${example.name}" sends a body; ${key} takes none`);
+      }
+      if (endpoint.body !== undefined && request.body === undefined) {
+        problem(example.line, `example "${example.name}" sends no body; ${key} takes ${endpoint.body}`);
+      }
+      if (endpoint.query === undefined && request.query.length > 0) {
+        problem(example.line, `example "${example.name}" sends a query; ${key} takes none`);
+      }
+      checkReply(example, [...everyKinds, ...endpoint.errors], endpoint.status);
+    }
+    const endpointCovered = covered(endpoint.examples);
+    if (split.examples !== undefined && !endpointCovered.success) {
+      problem(block.line, `${key} has no example that succeeds`);
+    }
+    for (const kind of endpoint.errors) {
+      if (split.examples !== undefined && !everyKinds.includes(kind) && !endpointCovered.failures.has(kind)) {
+        problem(block.line, `${key} has no example of ${kind}`);
+      }
+    }
     endpoints.push(endpoint);
   }
 
@@ -556,5 +867,5 @@ export const parse = (source: string): Parsed => {
     problems.sort((a, b) => a.line - b.line);
     return { ok: false, problems };
   }
-  return { ok: true, spec: { title, everyKinds, kinds, shapes, shared, endpoints } };
+  return { ok: true, spec: { title, everyProse: prose.join("\n").trim(), everyKinds, everyExamples, kinds, shapes, shared, endpoints } };
 };

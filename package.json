@@ -10,8 +10,8 @@
   "scripts": {
     "dev": "pnpm --parallel --filter \"./apps/*\" dev",
     "check": "pnpm -r check",
-    "gen:api": "node tooling/api-spec/generate.ts prd/todo/api.md packages/contract/api/src",
-    "check:api": "node tooling/api-spec/generate.ts prd/todo/api.md packages/contract/api/src --check",
+    "gen:api": "node tooling/api-spec/generate.ts prd/todo/api.md packages/contract/api/src apps/api/openapi.json",
+    "check:api": "node tooling/api-spec/generate.ts prd/todo/api.md packages/contract/api/src apps/api/openapi.json --check",
     "test:unit": "pnpm -r --if-present test:unit",
     "test:integration": "pnpm -r --if-present test:integration",
     "test:e2e": "pnpm --filter @todo/bff test:e2e",

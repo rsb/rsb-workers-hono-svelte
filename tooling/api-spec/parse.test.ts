@@ -10,16 +10,40 @@ const spec = (endpoints: string, shapes = "") => `# Test api
 
 Errors: \`internal\`
 
+Examples:
+
+Example: the server fails
+Reply: 500
+\`\`\`json
+{ "ok": false, "error": { "kind": "internal", "message": "internal error" } }
+\`\`\`
+
 ## Errors
 
-- \`validation\`, with field
-- \`not_found\`
-- \`internal\`
+- \`validation\`: 422, with field
+- \`not_found\`: 404
+- \`internal\`: 500
 
 ## Shapes
 ${shapes}
 ## Endpoints
 ${endpoints}`;
+
+/** An Examples: part with one success of `GET /a`, replying `{ "ok": true }`. */
+const works = `
+Examples:
+
+Example: works
+Request: \`GET /a\`
+Reply: 200
+\`\`\`json
+{ "ok": true, "data": { "ok": true } }
+\`\`\`
+`;
+
+/** An endpoint `GET /a` with the given examples. */
+const getA = (examples: string, errors = "none") =>
+  `\n### \`GET /a\`\nServes: x.\n\nReply: 200 \`R\`\n- \`ok\`: boolean\n\nErrors: ${errors}\n${examples}`;
 
 const problems = (source: string) => {
   const parsed = parse(source);
@@ -94,6 +118,38 @@ Reply: 200 \`Todo\`
 - \`id\`: text
 
 Errors: \`validation\`, \`not_found\`
+
+Examples:
+
+Example: renames
+Request: \`PATCH /todos/t1\`
+\`\`\`json
+{ "title": "Buy milk" }
+\`\`\`
+Reply: 200
+\`\`\`json
+{ "ok": true, "data": { "id": "t1" } }
+\`\`\`
+
+Example: empty
+Request: \`PATCH /todos/t1\`
+\`\`\`json
+{}
+\`\`\`
+Reply: 422
+\`\`\`json
+{ "ok": false, "error": { "kind": "validation", "message": "body must have a field", "field": "body" } }
+\`\`\`
+
+Example: missing
+Request: \`PATCH /todos/t2\`
+\`\`\`json
+{ "title": "Buy milk" }
+\`\`\`
+Reply: 404
+\`\`\`json
+{ "ok": false, "error": { "kind": "not_found", "message": "no todo has id t2" } }
+\`\`\`
 `),
     );
     assert.ok(parsed.ok, JSON.stringify(!parsed.ok && parsed.problems));
@@ -106,42 +162,50 @@ Errors: \`validation\`, \`not_found\`
     const body = parsed.spec.shapes.find((shape) => shape.name === "PatchTodoBody");
     assert.ok(body?.kind === "object");
     assert.deepEqual(body.atLeast, { fields: 1, message: "body must have a field" });
+    assert.deepEqual(
+      endpoint?.examples.map((example) => [example.name, example.status]),
+      [
+        ["renames", 200],
+        ["empty", 422],
+        ["missing", 404],
+      ],
+    );
+    assert.deepEqual(endpoint?.examples[2]?.request?.params, { id: "t2" });
+    assert.deepEqual(endpoint?.examples[1]?.request?.body, {});
   });
 
   it("refuses a kind every endpoint already returns", () => {
-    const found = problems(
-      spec("\n### `GET /a`\nServes: x.\n\nReply: 200 `R`\n- `ok`: boolean\n\nErrors: `internal`\n"),
-    );
+    const found = problems(spec(getA(works, "`internal`")));
     assert.deepEqual(found, ["kind internal is one every endpoint can return; list only the kinds it adds"]);
   });
 
   it("refuses a path parameter Path: does not list", () => {
-    const found = problems(spec("\n### `GET /a/{id}`\nServes: x.\n\nReply: 200 `R`\n- `ok`: boolean\n\nErrors: none\n"));
+    const found = problems(spec(getA(works.replace("`GET /a`", "`GET /a/1`")).replaceAll("/a`", "/a/{id}`")));
     assert.deepEqual(found, ["GET /a/{id} names {id} in its path but Path: lists none"]);
   });
 
   it("refuses parts out of order", () => {
-    const found = problems(spec("\n### `GET /a`\nReply: 200 `R`\n- `ok`: boolean\n\nServes: x.\n\nErrors: none\n"));
-    assert.deepEqual(found, ["Serves: is out of order; the order is Serves, Path, Query, Body, Reply, Errors"]);
+    const found = problems(spec(`\n### \`GET /a\`\nReply: 200 \`R\`\n- \`ok\`: boolean\n\nServes: x.\n\nErrors: none\n${works}`));
+    assert.deepEqual(found, ["Serves: is out of order; the order is Serves, Path, Query, Body, Reply, Errors, Examples"]);
   });
 
   it("refuses a shape that is not defined", () => {
-    const found = problems(spec("\n### `GET /a`\nServes: x.\n\nReply: 200 `Missing`\n\nErrors: none\n"));
+    const found = problems(spec(`\n### \`GET /a\`\nServes: x.\n\nReply: 200 \`Missing\`\n\nErrors: none\n${works}`));
     assert.deepEqual(found, ["shape Missing is not defined"]);
   });
 
   it("refuses a kind not in Errors", () => {
-    const found = problems(spec("\n### `GET /a`\nServes: x.\n\nReply: 200 `R`\n- `ok`: boolean\n\nErrors: `limit`\n"));
-    assert.deepEqual(found, ["kind limit is not in Errors"]);
+    const found = problems(spec(getA(works, "`limit`")));
+    assert.deepEqual(found, ["GET /a has no example of limit", "kind limit is not in Errors"]);
   });
 
   it("refuses an endpoint without Errors:", () => {
-    const found = problems(spec("\n### `GET /a`\nServes: x.\n\nReply: 200 `R`\n- `ok`: boolean\n"));
+    const found = problems(spec(`\n### \`GET /a\`\nServes: x.\n\nReply: 200 \`R\`\n- \`ok\`: boolean\n${works}`));
     assert.deepEqual(found, ['GET /a has no Errors:; write "Errors: none" when it adds none']);
   });
 
   it("refuses a table row", () => {
-    const found = problems(spec("\n### `GET /a`\nServes: x.\n\n| a | b |\n\nReply: 200 `R`\n- `ok`: boolean\n\nErrors: none\n"));
+    const found = problems(spec(`\n### \`GET /a\`\nServes: x.\n\n| a | b |\n\nReply: 200 \`R\`\n- \`ok\`: boolean\n\nErrors: none\n${works}`));
     assert.equal(found.length, 1);
     assert.match(found[0] ?? "", /^an endpoint holds only/);
   });
@@ -149,7 +213,7 @@ Errors: \`validation\`, \`not_found\`
   it("reads a shared list shape", () => {
     const parsed = parse(
       spec(
-        "\n### `GET /a`\nServes: x.\n\nReply: 200 `TodoList`\n\nErrors: none\n",
+        `\n### \`GET /a\`\nServes: x.\n\nReply: 200 \`TodoList\`\n\nErrors: none\n${works}`,
         "\n### `Todo`\nA todo.\n- `id`: text\n\n### `TodoList`\nlist of `Todo`\n",
       ),
     );
@@ -157,5 +221,72 @@ Errors: \`validation\`, \`not_found\`
     assert.deepEqual(parsed.spec.shared, ["Todo", "TodoList"]);
     const list = parsed.spec.shapes.find((shape) => shape.name === "TodoList");
     assert.deepEqual(list, { name: "TodoList", doc: undefined, kind: "list", of: "Todo" });
+  });
+
+  it("reads the examples every endpoint shares", () => {
+    const parsed = parse(spec(getA(works)));
+    assert.ok(parsed.ok, JSON.stringify(!parsed.ok && parsed.problems));
+    assert.deepEqual(parsed.spec.everyExamples.map((example) => [example.name, example.status, example.request]), [
+      ["the server fails", 500, undefined],
+    ]);
+  });
+
+  it("reads a query string into its keys and values", () => {
+    const query = spec(
+      "\n### `GET /a`\nServes: x.\n\nQuery: `Q`\n- `c`: text, optional\n\nReply: 200 `R`\n- `ok`: boolean\n\nErrors: none\n" +
+        works.replace("`GET /a`", "`GET /a?c=x%20y&c=z`"),
+    );
+    const parsed = parse(query);
+    assert.ok(parsed.ok, JSON.stringify(!parsed.ok && parsed.problems));
+    assert.deepEqual(parsed.spec.endpoints[0]?.examples[0]?.request?.query, [
+      ["c", "x y"],
+      ["c", "z"],
+    ]);
+  });
+
+  it("refuses an endpoint without Examples:", () => {
+    assert.deepEqual(problems(spec(getA(""))), ["GET /a has no Examples:"]);
+  });
+
+  it("refuses an endpoint without an example that succeeds", () => {
+    const failing = works.replace('{ "ok": true, "data": { "ok": true } }', '{ "ok": false, "error": { "kind": "internal", "message": "internal error" } }').replace("Reply: 200", "Reply: 500");
+    assert.deepEqual(problems(spec(getA(failing))), ["GET /a has no example that succeeds"]);
+  });
+
+  it("refuses a success with another status", () => {
+    const found = problems(spec(getA(works.replace("Reply: 200", "Reply: 201"))));
+    assert.deepEqual(found, ['example "works" replies 201; a success replies 200']);
+  });
+
+  it("refuses a failure whose status is not its kind's", () => {
+    const wrong = `${works}\nExample: gone\nRequest: \`GET /a\`\nReply: 400\n\`\`\`json\n{ "ok": false, "error": { "kind": "internal", "message": "internal error" } }\n\`\`\`\n`;
+    assert.deepEqual(problems(spec(getA(wrong))), ['example "gone" replies 400; internal replies 500']);
+  });
+
+  it("refuses a failure of a kind the endpoint cannot return", () => {
+    const wrong = `${works}\nExample: gone\nRequest: \`GET /a\`\nReply: 404\n\`\`\`json\n{ "ok": false, "error": { "kind": "not_found", "message": "not found" } }\n\`\`\`\n`;
+    assert.deepEqual(problems(spec(getA(wrong))), ['example "gone" fails with not_found, which is not among internal']);
+  });
+
+  it("refuses a request that does not match the endpoint", () => {
+    const found = problems(spec(getA(works.replace("`GET /a`", "`POST /b`"))));
+    assert.deepEqual(found, ['example "works" sends POST; GET /a is GET', 'example "works" sends /b, which does not match /a']);
+  });
+
+  it("refuses a body the endpoint does not take", () => {
+    const found = problems(spec(getA(works.replace("`GET /a`\n", '`GET /a`\n```json\n{ "x": 1 }\n```\n'))));
+    assert.deepEqual(found, ['example "works" sends a body; GET /a takes none']);
+  });
+
+  it("refuses a block that is not JSON", () => {
+    const found = problems(spec(getA(works.replace('{ "ok": true, "data": { "ok": true } }', "{ ok: true }"))));
+    assert.equal(found.length, 2);
+    assert.equal(found[0], "GET /a has no example that succeeds");
+    assert.match(found[1] ?? "", /^a reply is not JSON/);
+  });
+
+  it("refuses a block that is not closed", () => {
+    const found = problems(spec(getA(works.replace(/```\n$/, ""))));
+    assert.ok(found.some((message) => message === "this ```json block is not closed"), JSON.stringify(found));
   });
 });

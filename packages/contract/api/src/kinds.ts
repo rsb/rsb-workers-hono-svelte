@@ -15,3 +15,12 @@ export type OtherKind = v.InferOutput<typeof OtherKind>;
 
 /** The kinds every endpoint can return, before the ones it adds. */
 export const EVERY_KINDS = ["too_large", "internal"] as const satisfies readonly ErrorKind[];
+
+/** The HTTP status each kind replies with. */
+export const KIND_STATUS = {
+  validation: 422,
+  not_found: 404,
+  limit: 409,
+  too_large: 413,
+  internal: 500,
+} as const satisfies Record<ErrorKind, number>;

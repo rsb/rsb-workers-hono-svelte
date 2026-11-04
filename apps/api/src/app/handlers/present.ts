@@ -1,15 +1,10 @@
-import type { ErrorKind, Failure } from "@todo/contract-api";
+import { type ErrorKind, type Failure, KIND_STATUS } from "@todo/contract-api";
 import { type AnyFail, type Fail, type FailKind, rootOf } from "@todo/fail/fail.ts";
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
-const status = {
-  validation: 422,
-  not_found: 404,
-  limit: 409,
-  too_large: 413,
-  internal: 500,
-} as const satisfies Record<ErrorKind, ContentfulStatusCode>;
+/** Each kind's status, from the spec through the contract. */
+const status = KIND_STATUS satisfies Record<ErrorKind, ContentfulStatusCode>;
 
 /**
  * The map: each failure kind as the contract names it. Every kind must have

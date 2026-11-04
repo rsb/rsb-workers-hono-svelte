@@ -2,7 +2,7 @@
 // error kinds, the messages as valibot schemas, and the endpoints (A4).
 // Each function returns a file's text; nothing here touches the disk.
 
-import type { Endpoint, Field, Shape, Spec, Type } from "./parse.ts";
+import type { Endpoint, Example, Field, Shape, Spec, Type } from "./parse.ts";
 
 const header = (source: string, script: string) =>
   `// Generated from ${source} by ${script}. Do not edit: change the spec and regenerate.\n`;
@@ -146,6 +146,7 @@ export const emitKinds = (spec: Spec, source: string, script: string) => {
   const field = spec.kinds.filter((kind) => kind.withField).map((kind) => quote(kind.name));
   const other = spec.kinds.filter((kind) => !kind.withField).map((kind) => quote(kind.name));
   const every = spec.everyKinds.map(quote);
+  const statuses = spec.kinds.map((kind) => `  ${kind.name}: ${kind.status},`);
   return `${header(source, script)}import * as v from "valibot";
 
 /** Every kind an API error can have (PRD, Envelope). */
@@ -162,6 +163,11 @@ export type OtherKind = v.InferOutput<typeof OtherKind>;
 
 /** The kinds every endpoint can return, before the ones it adds. */
 export const EVERY_KINDS = [${every.join(", ")}] as const satisfies readonly ErrorKind[];
+
+/** The HTTP status each kind replies with. */
+export const KIND_STATUS = {
+${statuses.join("\n")}
+} as const satisfies Record<ErrorKind, number>;
 `;
 };
 
@@ -237,5 +243,56 @@ export type EndpointKey = keyof typeof endpoints;
 
 /** The error kinds an endpoint can return, as a type a switch can be exhaustive over. */
 export type EndpointErrors<K extends EndpointKey> = (typeof endpoints)[K]["errors"][number];
+`;
+};
+
+/** An example as plain data: the request without an undefined body, then the reply. */
+const exampleData = (example: Example) => {
+  const data: Record<string, unknown> = { name: example.name };
+  if (example.request !== undefined) {
+    const { body, ...request } = example.request;
+    data.request = body === undefined ? request : { ...request, body };
+  }
+  data.status = example.status;
+  data.reply = example.reply;
+  return data;
+};
+
+/** JSON as TypeScript, indented to sit at `depth`. */
+const literal = (value: unknown, depth: number) => JSON.stringify(value, null, 2).replaceAll("\n", `\n${"  ".repeat(depth)}`);
+
+/** `examples.ts`: the spec's examples as plain data, for tests to replay. */
+export const emitExamples = (spec: Spec, source: string, script: string) => {
+  const list = (examples: Example[], depth: number) => literal(examples.map(exampleData), depth);
+  const entries = spec.endpoints.map(
+    (endpoint) => `  ${quote(`${endpoint.method} ${endpoint.path}`)}: ${list(endpoint.examples, 1)},`,
+  );
+  return `${header(source, script)}import type { EndpointKey } from "./endpoints.ts";
+
+/**
+ * A worked example: the request as sent, with its path parameters read
+ * out, and the reply's status and whole envelope. The examples every
+ * endpoint shares have no request.
+ */
+export type Example = {
+  name: string;
+  request?: {
+    method: string;
+    path: string;
+    params: Record<string, string>;
+    query: [string, string][];
+    body?: unknown;
+  };
+  status: number;
+  reply: unknown;
+};
+
+/** The examples every endpoint shares: failures any request can meet. */
+export const everyExamples: Example[] = ${list(spec.everyExamples, 0)};
+
+/** Each endpoint's examples, keyed as \`endpoints\` is. */
+export const examples: Record<EndpointKey, Example[]> = {
+${entries.join("\n")}
+};
 `;
 };

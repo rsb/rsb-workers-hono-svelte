@@ -19,13 +19,39 @@ Errors: `too_large`, `internal`
 
 The errors under each endpoint are the ones it adds to these.
 
+Examples:
+
+Example: a body over the limit
+Reply: 413
+```json
+{
+  "ok": false,
+  "error": {
+    "kind": "too_large",
+    "message": "request body too large"
+  }
+}
+```
+
+Example: the server fails
+Reply: 500
+```json
+{
+  "ok": false,
+  "error": {
+    "kind": "internal",
+    "message": "internal error"
+  }
+}
+```
+
 ## Errors
 
-- `validation`, with field
-- `not_found`
-- `limit`
-- `too_large`
-- `internal`
+- `validation`: 422, with field
+- `not_found`: 404
+- `limit`: 409
+- `too_large`: 413
+- `internal`: 500
 
 ## Shapes
 
@@ -49,6 +75,20 @@ Reply: 200 `HealthReply`
 
 Errors: none
 
+Examples:
+
+Example: the api is up
+Request: `GET /health`
+Reply: 200
+```json
+{
+  "ok": true,
+  "data": {
+    "ok": true
+  }
+}
+```
+
 ### `GET /todos`
 Serves: `use-cases/todos/list-todos.md`.
 
@@ -59,6 +99,73 @@ Reply: 200 `TodoListReply`
 
 Errors: `validation`
 
+Examples:
+
+Example: lists every todo
+Request: `GET /todos`
+Reply: 200
+```json
+{
+  "ok": true,
+  "data": [
+    {
+      "id": "0b6f4c1e-8a7d-4b51-9e0a-3c2d1f5e7a90",
+      "title": "Buy milk",
+      "completed": false
+    },
+    {
+      "id": "5d2a9c7e-1f3b-4e8a-b6d4-7c9e0a1f2b3c",
+      "title": "Post the letter",
+      "completed": true
+    }
+  ]
+}
+```
+
+Example: lists the completed todos
+Request: `GET /todos?completed=true`
+Reply: 200
+```json
+{
+  "ok": true,
+  "data": [
+    {
+      "id": "5d2a9c7e-1f3b-4e8a-b6d4-7c9e0a1f2b3c",
+      "title": "Post the letter",
+      "completed": true
+    }
+  ]
+}
+```
+
+Example: completed is not true or false
+Request: `GET /todos?completed=yes`
+Reply: 422
+```json
+{
+  "ok": false,
+  "error": {
+    "kind": "validation",
+    "message": "completed must be true or false",
+    "field": "completed"
+  }
+}
+```
+
+Example: completed is given twice
+Request: `GET /todos?completed=true&completed=false`
+Reply: 422
+```json
+{
+  "ok": false,
+  "error": {
+    "kind": "validation",
+    "message": "completed must be given once",
+    "field": "completed"
+  }
+}
+```
+
 ### `GET /todos/counts`
 Serves: `use-cases/todos/count-todos.md`.
 
@@ -67,6 +174,21 @@ Reply: 200 `TodoCountsReply`
 - `completed`: integer, min 0
 
 Errors: none
+
+Examples:
+
+Example: counts the todos
+Request: `GET /todos/counts`
+Reply: 200
+```json
+{
+  "ok": true,
+  "data": {
+    "active": 1,
+    "completed": 1
+  }
+}
+```
 
 ### `POST /todos`
 Serves: `use-cases/todos/add-a-todo.md`.
@@ -78,6 +200,83 @@ Reply: 201 `TodoReply`
 
 Errors: `validation`, `limit`
 
+Examples:
+
+Example: adds a todo
+Request: `POST /todos`
+```json
+{
+  "title": "Buy milk"
+}
+```
+Reply: 201
+```json
+{
+  "ok": true,
+  "data": {
+    "id": "0b6f4c1e-8a7d-4b51-9e0a-3c2d1f5e7a90",
+    "title": "Buy milk",
+    "completed": false
+  }
+}
+```
+
+Example: the title is not text
+Request: `POST /todos`
+```json
+{
+  "title": 3
+}
+```
+Reply: 422
+```json
+{
+  "ok": false,
+  "error": {
+    "kind": "validation",
+    "message": "title must be text",
+    "field": "title"
+  }
+}
+```
+
+Example: the title is empty
+Request: `POST /todos`
+```json
+{
+  "title": ""
+}
+```
+Reply: 422
+```json
+{
+  "ok": false,
+  "error": {
+    "kind": "validation",
+    "message": "title is empty",
+    "field": "title"
+  }
+}
+```
+
+Example: the list is full
+Request: `POST /todos`
+```json
+{
+  "title": "Buy milk"
+}
+```
+Reply: 409
+```json
+{
+  "ok": false,
+  "error": {
+    "kind": "limit",
+    "message": "the list is full"
+  }
+}
+```
+
 ### `PATCH /todos`
 Serves: `use-cases/todos/mark-all-completed.md`.
 
@@ -87,6 +286,53 @@ Body: `PatchTodosBody`
 Reply: 200 `TodoListReply`
 
 Errors: `validation`
+
+Examples:
+
+Example: marks every todo completed
+Request: `PATCH /todos`
+```json
+{
+  "completed": true
+}
+```
+Reply: 200
+```json
+{
+  "ok": true,
+  "data": [
+    {
+      "id": "0b6f4c1e-8a7d-4b51-9e0a-3c2d1f5e7a90",
+      "title": "Buy milk",
+      "completed": true
+    },
+    {
+      "id": "5d2a9c7e-1f3b-4e8a-b6d4-7c9e0a1f2b3c",
+      "title": "Post the letter",
+      "completed": true
+    }
+  ]
+}
+```
+
+Example: completed is not a boolean
+Request: `PATCH /todos`
+```json
+{
+  "completed": "yes"
+}
+```
+Reply: 422
+```json
+{
+  "ok": false,
+  "error": {
+    "kind": "validation",
+    "message": "completed must be true or false",
+    "field": "completed"
+  }
+}
+```
 
 ### `PATCH /todos/{id}`
 Serves: `use-cases/todos/change-a-todo.md`.
@@ -102,6 +348,62 @@ Reply: 200 `TodoReply`
 
 Errors: `validation`, `not_found`
 
+Examples:
+
+Example: renames a todo
+Request: `PATCH /todos/0b6f4c1e-8a7d-4b51-9e0a-3c2d1f5e7a90`
+```json
+{
+  "title": "Buy oat milk"
+}
+```
+Reply: 200
+```json
+{
+  "ok": true,
+  "data": {
+    "id": "0b6f4c1e-8a7d-4b51-9e0a-3c2d1f5e7a90",
+    "title": "Buy oat milk",
+    "completed": false
+  }
+}
+```
+
+Example: the body is empty
+Request: `PATCH /todos/0b6f4c1e-8a7d-4b51-9e0a-3c2d1f5e7a90`
+```json
+{}
+```
+Reply: 422
+```json
+{
+  "ok": false,
+  "error": {
+    "kind": "validation",
+    "message": "body must have title, completed or both",
+    "field": "body"
+  }
+}
+```
+
+Example: no todo has the id
+Request: `PATCH /todos/missing`
+```json
+{
+  "completed": true
+}
+```
+Reply: 404
+```json
+{
+  "ok": false,
+  "error": {
+    "kind": "not_found",
+    "message": "no todo has id missing"
+  }
+}
+```
+
 ### `DELETE /todos`
 Serves: `use-cases/todos/clear-completed.md`.
 
@@ -111,6 +413,38 @@ Query: `DeleteTodosQuery`
 Reply: 200 `TodoListReply`
 
 Errors: `validation`
+
+Examples:
+
+Example: clears the completed todos
+Request: `DELETE /todos?completed=true`
+Reply: 200
+```json
+{
+  "ok": true,
+  "data": [
+    {
+      "id": "0b6f4c1e-8a7d-4b51-9e0a-3c2d1f5e7a90",
+      "title": "Buy milk",
+      "completed": false
+    }
+  ]
+}
+```
+
+Example: completed is not true
+Request: `DELETE /todos?completed=false`
+Reply: 422
+```json
+{
+  "ok": false,
+  "error": {
+    "kind": "validation",
+    "message": "completed must be true",
+    "field": "completed"
+  }
+}
+```
 
 ### `DELETE /todos/{id}`
 Serves: `use-cases/todos/remove-a-todo.md`.
@@ -122,3 +456,30 @@ Reply: 200 `DeletedReply`
 - `id`: text
 
 Errors: `not_found`
+
+Examples:
+
+Example: removes a todo
+Request: `DELETE /todos/0b6f4c1e-8a7d-4b51-9e0a-3c2d1f5e7a90`
+Reply: 200
+```json
+{
+  "ok": true,
+  "data": {
+    "id": "0b6f4c1e-8a7d-4b51-9e0a-3c2d1f5e7a90"
+  }
+}
+```
+
+Example: no todo has the id
+Request: `DELETE /todos/missing`
+Reply: 404
+```json
+{
+  "ok": false,
+  "error": {
+    "kind": "not_found",
+    "message": "no todo has id missing"
+  }
+}
+```
