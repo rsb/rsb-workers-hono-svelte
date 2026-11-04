@@ -4,30 +4,32 @@
 Remove one todo for good.
 
 ## Serves
-From `prd/todo.md`:
-- Functionality › Item 3: "Hovering over the todo shows the remove
-  button (`.destroy`)", as changed by deviation 11.
+- `prd/todo.md` › Functionality › Item 3, as changed by deviation 11,
+  as evidence of the need. Its wording ("hovering", "`.destroy`")
+  belongs to the deliveries' specs, not here.
 - Scenarios 5.1 and 5.2.
 
 ## Input
-Which todo, by id.
+- An id: which todo.
 
-## Rules
-- Only that todo is removed.
-- Removing a todo that is not there, including one already removed, is
-  refused, not ignored.
-
-## Holds together
-One statement. If two removes of the same todo race, one removes it
-and the other finds nothing to remove.
+## Given
+- `todo.exists`: a todo has the id.
 
 ## Effects
-The todo is deleted from the database. There are no external effects.
+That todo is deleted; every other stays. No external effects.
 
 ## Result
 The id of the todo removed.
 
-## Failures
-- No todo has that id: `not_found`.
-- The database fails: `internal`. Whether the todo was removed is not
-  known to the caller.
+## Refused
+- `todo.exists` does not hold, including for a todo already removed:
+  `not_found`. Nothing is removed.
+- The store fails: `unavailable` or `server`. Whether the todo was
+  removed is not known to the caller.
+
+## Guarantees
+none
+
+## Atomic
+One step. If two removes of the same todo race, one removes it and for
+the other `todo.exists` does not hold.

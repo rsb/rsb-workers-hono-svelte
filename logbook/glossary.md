@@ -18,8 +18,11 @@ We ground our language in DDD's concepts, with two cautions:
 Decisions L1–L27 were agreed in the language sessions of 2026-11-03:
 L1–L13 on language, L14–L21 on operations, L22 on package layout, L23
 on OpenAPI, L24 on entry chains, L25 on use cases, L26 on the api
-spec, L27 on `valid`. They are recorded
-in [the api story](the-api-story.md).
+spec, L27 on `valid`. L29–L35 were agreed in the specs session of
+2026-11-04: L29 on rule kinds, L30 on the use case's form, L31 on a
+rule's sources, L32 on the use case as the root, L33 on citing rules
+by id, L34 on the rules spec, L35 on what makes a spec. They are
+recorded in [the api story](the-api-story.md).
 
 Status:
 - **locked:** agreed, and the story follows it;
@@ -46,6 +49,11 @@ needs one.
 - **Status:** locked (L2, L18). Called *chain* until L24; in file and
   identifier names it is `entry-chains`.
 
+It is rooted at the [use case](#use-case) (L32): an entry point is
+where one delivery attaches to a use case, so a use case may have
+several (`POST /todos`, later `todo add`). A probe is rooted at a PRD
+requirement instead.
+
 An entry chain is written in one line of exported symbols, `→` for a
 direct call and `⇢` across a port, where construct picks the
 implementation:
@@ -57,7 +65,9 @@ PATCH /todos/{id} → patchTodo → updateTodo ⇢ UpdateStore.updateTodo → d1
 Every entry point's entry chain, with the file and symbols of each
 link, is listed in `apps/api/entry-chains.md`. The index is generated, never
 written by hand, and checked by regenerating and diffing it. See
-[the api story](the-api-story.md), chapter 9.
+[the api story](the-api-story.md), chapter 9. Keying it by use case,
+and joining the triangle of `Serves:`, construct and the unit's doc
+comment, is target (L32).
 
 The chain ends at the data method. Private symbols are not links, and
 the driver helpers every chain shares are listed once, at the top of
@@ -132,14 +142,14 @@ on-error. Lives in `app/errors/`.
 ### Validate once
 
 The entry point validates input against the wire shape and the
-business rules, which it may import, and builds the input shape from
+[input rules](#input-rule), which it may import, and builds the input shape from
 the result. A single property is checked as a property: the title
 against `TITLE_MAX`. No new type is needed for that.
 
 It does so in three steps (L27): it decodes its own envelope, calls
 `valid`, which turns a candidate into the input, then words any
-problem in its own message table. The [check](#check) runs once, in
-`valid`, for every delivery.
+problem in its own message table. The rules are
+[applied](#apply) once, in `valid`, for every delivery.
 
 - **Status:** locked (L12, L27).
 
@@ -192,7 +202,7 @@ A business use case. "Use case" reads oddly in code, so the code says
 operation, but that is what it is. Each one is driven by its spec.
 
 An operation is the only place anything happens to an entity. It
-takes business inputs, enforces the business rules, and composes
+takes business inputs, enforces the [state rules](#state-rule), and composes
 entity behaviour with the actions of one or more ports. It may have
 several effects and returns one result. A different result is a new
 operation, which may reuse the same entity behaviour.
@@ -222,21 +232,38 @@ What the business needs done, written down before any code, at
 edits it. It is the spec of the one unit that realizes it, an
 operation or a process, and that unit's doc comment cites its path.
 
-It states the intent and the PRD sentences it serves, the input, the
-rules, what must hold together (under concurrency too), the effects
-and whether each must be delivered, the result and the failures. It is
-written for the developer, so it may speak of databases, transactions,
-concurrency and queues, but it names no code. Its name is a hint and a
-search key, not the unit's name.
+It is a state transition, in the operation's language only (L30). Its
+sections are:
+- **Intent**, and **Serves**: the PRD lines it is evidence for;
+- **Input**, with the input rules it [assumes](#assumes), by id;
+- **[Given](#given):** the state rules the operation applies, by id;
+- **Effects**, and whether each must be delivered;
+- **Result**;
+- **Refused:** its failures, in business kinds (`limit`, `not_found`,
+  `unavailable`, `server`), never the wire's;
+- **[Guarantees](#guarantee):** what the store promises, by id;
+- **Atomic:** what holds together, under concurrency too.
+
+An empty section says `none`. It has no delivery words (no Enter key,
+no form, no trimming): how the input came to be is the delivery's
+spec. Every rule it holds cites a source (L31): a PRD line or
+deviation; a recorded decision, story chapter or registry entry; or
+an answer from the owner, which becomes one of the first two before
+approval or sits under `Open:`. It names no code beside its business
+types. Its name is a hint and a search key, not the unit's name.
+
+It is the root of its entry chains (L32). A process's use case cites
+its steps, which are use cases.
 
 - **DDD:** use case, as in application services.
-- **Status:** locked (L25). Each todo operation's doc comment cites
-  its use case.
+- **Status:** locked (L25, L30, L31, L32). Each todo operation's doc
+  comment cites its use case, and the seven todo use cases are in the
+  L30 form. The use-case lint and the triangle check are target.
 
 ### Spec
 
 What drives a use case. An operation's spec states its intent, input,
-the rules it enforces, the action that carries its decision and what
+the state rules it enforces, the action that carries its decision and what
 it keeps atomic, its effects (for each external one: inline or
 recorded, and what its failure does to the result), its result and its
 failures. A process's spec states its steps, their dependencies, the
@@ -245,7 +272,9 @@ failure policy for each step, its mode and its result.
 A light operation's spec is a few lines.
 
 - **Status:** locked (L14) that a spec drives each use case. Its form
-  is the use case file (L25). How specs enter rsb-workflow is parked.
+  is the use case file (L25, L30). How specs enter rsb-workflow is
+  parked. For what makes any formalization a spec, see
+  [spec level](#spec-level).
 
 ### Port
 
@@ -357,20 +386,112 @@ an entry point, and each delivery is an operation.
 ### Rule
 
 A business truth: a type, a constant or a pure function. `TITLE_MAX`
-and `TODO_LIMIT` are rules. Business *states* rules and never enforces
-them.
+and `TODO_LIMIT` are rules. Business *states* rules and never applies
+them. Each rule has a [rule id](#rule-id) and one of three kinds, and
+the kind says where it is applied (L29): an [input
+rule](#input-rule), a [state rule](#state-rule) or a
+[guarantee](#guarantee).
 
 - **DDD:** invariant, business rule.
 - **We differ:** DDD puts the invariant inside the aggregate, which
   both states and enforces it. We split the two.
-- **Status:** locked (L1).
+- **Status:** locked (L1, L29). The rule table,
+  `packages/business/src/rules.ts`, the one place a rule is defined, is
+  target (L34).
+
+### Input rule
+
+A property of the input alone, decided with no world state:
+`title.length`, `patch.nonempty`. It is *applied* once, at the entry
+point, through `valid`; everything below [assumes](#assumes) it.
+
+- **Status:** locked (L29).
+
+### State rule
+
+A property of the world and the input: `todos.cap` (the list holds
+fewer than `TODO_LIMIT` todos), `todo.exists` (a todo has the id). It
+is enforced only where the world is read and written atomically: by
+the operation, with the store keeping the step together. A use case
+lists its state rules under [Given](#given).
+
+- **Status:** locked (L29).
+
+### Guarantee
+
+A promise the store makes: `todos.order` (lists are in the order
+todos were added), `todo.id` (no two todos share an id). A use case
+lists the ones it relies on under Guarantees; a [data
+spec](#data-spec) entry would cite them.
+
+- **Status:** locked (L29).
+
+### Rule id
+
+The name of a rule, which specs cite and never restate: a spec gives
+no rule's wording or number, since the definition has one home (L33).
+The ids the use cases cite: `title.length`, `patch.nonempty`,
+`todos.cap`, `todo.exists`, `todos.order`, `todo.id`.
+
+`valid`'s problems name rules too. There are two kinds:
+- **decode rules** are generic, named by the type the field needs, with
+  the field beside them: `not_text`, `not_boolean`;
+- **input rules** are named after the business rule they apply:
+  `title.empty`, `title.too_long`, `patch.empty`.
+
+These ids are fixed: use cases cite them, so a rule is never renamed
+without the specs that cite it.
+
+- **Status:** locked (L27, L33). `valid` still carries stage 11's
+  ids, one per violation; renaming them to the rule plus a
+  [violation](#violation) (`title.empty` → `title.length`, `empty`) is
+  target, for stage 15.
+
+### Violation
+
+How a value breaks a rule: `title.length` is broken as `empty` or as
+`too_long`. A problem carries the rule and the violation, and message
+tables branch on the violation.
+
+- **Status:** target (L33). Stage 11's problems carry one id per
+  violation instead.
+
+### Assumes
+
+What a use case's Input says of the input rules it already satisfies:
+"A `NewTodo`: a title. Assumes `title.length`." The operation does not
+apply them; the entry point did.
+
+- **Status:** locked (L33) in the use cases. The check that every
+  endpoint serving the use case [applies](#applies) them is target.
+
+### Given
+
+A use case's section of state rules: what the operation applies, and
+refuses when it does not hold. `add-a-todo` is given `todos.cap`. Each
+`Given` id is proven by a named test.
+
+- **Status:** locked (L30, L33) in the use cases. The named test per
+  id, read from the test runner's report, is target.
+
+### Applies
+
+An endpoint's declaration, in `api.md`, of the input rules its entry
+point applies: `Applies: title.length`. The check joins it: `Applies`
+covers the served use case's `Assumes`, the route's validator's
+`rules` equal it, and every cited id exists.
+
+- **Status:** target (L33). `api.md` has no `Applies:` line until
+  the check exists.
 
 ### Enforce
 
-To apply a rule to a real case and decide the result. Only operations
-enforce. `addTodo` enforces `TODO_LIMIT`.
+To apply a [state rule](#state-rule) to a real case and decide the
+result. Only operations enforce. `addTodo` enforces `todos.cap`
+(`TODO_LIMIT`). An [input rule](#input-rule) is not enforced but
+*applied*, once, at the entry point.
 
-- **Status:** locked (L1).
+- **Status:** locked (L1), narrowed to state rules (L29).
 
 ### Atomic
 
@@ -618,7 +739,7 @@ operations.
 ### Candidate
 
 What a delivery read for one business input, before it is decoded or
-checked: an object with the input's fields, each `unknown`.
+its rules are applied: an object with the input's fields, each `unknown`.
 `NewTodoCandidate = { title: unknown }`. A delivery fills one in a
 line and does no typing work.
 
@@ -638,20 +759,24 @@ in `valid`, never in the delivery.
 - **In the code:** `packages/valid/src/fields/decode.ts`, private.
 - **Status:** locked (L27).
 
-### Check
+### Apply
 
-Applying the business rules to decoded values: trim the title, then
-require 1 to `TITLE_MAX` UTF-16 code units, in that order. It is
-[Validate once](#validate-once) made one place: every delivery checks
-through `valid`, and nothing below the entry point checks again.
+Applying the [input rules](#input-rule) to decoded values: trim the
+title, then require 1 to `TITLE_MAX` UTF-16 code units, in that order.
+It is [Validate once](#validate-once) made one place: every delivery
+applies them through `valid`, and nothing below the entry point
+applies them again. The three steps are decode, apply, build.
 
 - **In the code:** `packages/valid/src/fields/title.ts`, private.
-- **Status:** locked (L12, L27).
+- **Not:** a [check](#check), which fails when code stops matching a
+  spec.
+- **Status:** locked (L12, L27). Called *check* until the specs
+  session.
 
 ### Build
 
-Assembling the business input from checked values, and applying the
-rules that span fields: a patch must change a title, `completed` or
+Assembling the business input from decoded values the rules were
+applied to, and applying the rules that span fields: a patch must change a title, `completed` or
 both (`patch.empty`).
 
 - **In the code:** `to<Input>` in `packages/valid/src/<area>/<input>.ts`:
@@ -673,18 +798,50 @@ problem.
   failure, because the delivery owns the message a failure carries.
 - **Status:** locked (L27).
 
-### Rule id
+## Specs
 
-The name of the rule a problem breaks. There are two kinds:
-- **decode rules** are generic, named by the type the field needs, with
-  the field beside them: `not_text`, `not_boolean`;
-- **check rules** are named after the business rule they guard:
-  `title.empty`, `title.too_long`, `patch.empty`.
+What makes a formalization a spec (L35). The story's chapter 11 tells
+it.
 
-Check rule ids are fixed: use cases cite them, so a check rule is
-never renamed.
+### Address
 
-- **Status:** locked (L27).
+An id something else can cite: a use case's path, an endpoint key
+(`"POST /todos"`), a [rule id](#rule-id). Without one, a spec cannot be
+linked.
+
+- **Status:** locked (L35). A stable use-case id beside the path waits
+  for the triangle check.
+
+### Check
+
+Something that fails when the code stops matching a spec or a rule:
+`check:api`, `check:entry-chains`, a conformance suite. Without one, a
+spec drifts, and a drifted spec is worse than none. "Check" means only
+this; `valid`'s middle step is [apply](#apply).
+
+- **Status:** locked (L35).
+
+### Spec level
+
+A formalization with an [address](#address) and a [check](#check). The
+levels: PRD (bound by the use-case lint), use case (the entry chain
+index and its triangle), api spec (`gen:api --check` and the examples
+replayed), rules spec (generated validators and table, cited ids
+exist), data spec (the conformance suite), and view (nothing yet, so
+not yet).
+
+- **Status:** locked (L35). The api spec's check is built and the use
+  case's in part; the rest are target, and the data spec is pending.
+
+### Precedence
+
+Which side gives way when a spec and the code disagree: for a
+generated artefact the spec wins, and the artefact is regenerated; for
+hand-written code the code wins, and the spec is corrected. The
+generated indexes are the arbiter.
+
+- **Status:** locked (L35). Its line in `AGENTS.md` waits for an rl-0009
+  exception.
 
 ## The BFF
 
@@ -704,7 +861,6 @@ To be settled in later sessions:
   read shapes (`TodoCounts`);
 - what sits beside entities in `business/entity`: rules, inputs, read
   shapes, `Result`;
-- business rules vs validation rules;
 - presentation;
 - the Supabase access route, and how transaction scopes and intent
   actions keep their atomic promise there: it needs experiments;
@@ -724,4 +880,9 @@ To be settled in later sessions:
   - the contract and the OpenAPI document (`tooling/api-spec/`);
   - the extractor that reads construct, and the entry chain index
     (`tooling/entry-chains/`, stage 13);
-- whether the data spec earns its place, once tried.
+- whether the data spec earns its place, once tried;
+- authentication and authorization, as subsystems rather than rule
+  kinds, modelled in their own session; the operation descriptor will
+  carry `kind` and `resource`;
+- branded input types as proof that validation happened (only `valid`
+  mints a `NewTodo`): offered, not decided.

@@ -5,30 +5,31 @@ Say how many todos are active and how many are completed, across the
 whole list.
 
 ## Serves
-From `prd/todo.md`:
-- Functionality › Counter: "Displays the number of active todos".
-- Functionality › Clear completed button: "Should be hidden when there
-  are no completed todos."
-- Deviations 5 and 6: on `/active` and `/completed` the counts come
-  from here, so they reflect every todo, not only those listed.
+- `prd/todo.md` › Functionality › Counter and › Clear completed button,
+  as evidence of the need. Their wording ("displays", "hidden") belongs
+  to the deliveries' specs, not here.
+- Deviations 5 and 6: every todo is counted, whatever is listed.
 - Scenarios 3.3–3.5, 7.1 and 8.7.
 
 ## Input
-None.
+none
 
-## Rules
-- Every todo is counted, whatever the page is showing.
-- No todos at all is two zeros, not a failure.
-
-## Holds together
-Both counts are read in one statement, so they always describe the
-same moment and add up to the size of the list then.
+## Given
+none
 
 ## Effects
 None. It changes nothing.
 
 ## Result
-The number of active todos and the number of completed todos.
+The number of active todos and the number of completed todos, across
+every todo. No todos at all is two zeros.
 
-## Failures
-- The database fails: `internal`.
+## Refused
+- The store fails: `unavailable` or `server`.
+
+## Guarantees
+none
+
+## Atomic
+Both counts are read in one step, so they describe the same moment and
+add up to the size of the list then.

@@ -157,18 +157,70 @@ The decisions behind this story are:
 - L27, agreed with the owner in the valid session (2026-11-03):
   `packages/valid` is a deep module that turns a candidate into a
   business input for every delivery: it decodes each field from
-  `unknown`, checks the business rules and builds the input. There is
-  one function per business input, named as a verb (`toNewTodo`), and
-  it returns every problem it finds. A problem is a field, a rule id
+  `unknown`, applies the input rules and builds the input: decode,
+  apply, build. There is one function per business input, named as a
+  verb (`toNewTodo`), and it returns every problem it finds. A problem is a field, a rule id
   and all of the rule's parameters, never words. Decode rules are generic and
-  named by the type expected (`not_text`, `not_boolean`); check rules
-  are named after the rule they guard (`title.empty`), and are fixed,
+  named by the type expected (`not_text`, `not_boolean`); input rules
+  are named after the rule they apply (`title.empty`), and are fixed,
   since use cases cite them. `valid` imports business only; operations
   and data never import it. Each delivery decodes its own envelope and
   words problems in its own message table (chapters 5, 7, 9 and 13).
   Business constants appear only in business, `valid` and operations,
-  the enforcers, and never under `apps/`: a delivery words a number
-  from the problem that carries it.
+  where rules are stated and applied, and never under `apps/`: a
+  delivery words a number from the problem that carries it.
+- L29, agreed with the owner in the specs session (2026-11-04): rules
+  have three kinds, and the kind says where a rule is applied. An
+  input rule is a property of the input alone, applied once at the
+  entry point through `valid` (`title.length`); a state rule is a
+  property of the world and the input, applied by the operation with
+  the store keeping the step atomic (`todos.cap`); a guarantee is a
+  promise the store makes (`todos.order`). This narrows L1: business
+  states rules, the entry point applies input rules, the operation
+  applies state rules, and the store keeps them atomic and provides
+  guarantees (chapters 5, 6, 7 and 8).
+- L30, agreed with the owner in the specs session (2026-11-04): a use
+  case is a state transition in the operation's language only. Its
+  sections are Intent, Serves, Input (with the input rules it
+  assumes, by id), Given (the state rules the operation applies),
+  Effects, Result, Refused (in business failure kinds), Guarantees and
+  Atomic. It has no delivery words and no wire kinds. This replaces
+  the form in L25 (chapters 6 and 13).
+- L31, agreed with the owner in the specs session (2026-11-04): a rule
+  cites one of three sources: a PRD line or deviation, a recorded
+  decision, story chapter or registry entry, or the owner's interview
+  answer, which becomes one of the first two before the use case is
+  approved or stays under `Open:`. An uncited rule is a lint failure
+  (chapter 6).
+- L32, agreed with the owner in the specs session (2026-11-04): the use
+  case is the root of the entry chain. An entry point is where a
+  delivery attaches to it, and a probe is rooted at a PRD requirement
+  instead. The api spec's `Serves:`, construct and the unit's doc
+  comment each state one edge of a triangle, which the index joins; a
+  mismatch is drift. A process's steps are use cases, so the index
+  read one level down is the process map. This amends L24 (chapters 6
+  and 9).
+- L33, agreed with the owner in the specs session (2026-11-04): specs
+  cite rules by id only, and the code carries what it applies as data.
+  A rule id names the rule (`title.length`) and a problem carries the
+  rule and the violation (`empty`, `too_long`). A use case declares
+  `Assumes:` and `Given:`, an endpoint declares `Applies:`, a validator
+  exports its `rules`, and a route declares its validator. A check
+  joins them, and a named test per `Given` id proves state rules. This
+  refines L27 and stage 13's route helper (chapters 5, 7, 9 and 11).
+  Target until stage 15.
+- L34, agreed with the owner in the specs session (2026-11-04): a rules
+  spec, `prd/<app>/rules.md`, is the source of inputs, rules,
+  constants and violations. The business rule table, the validators
+  for input rules, the `Problem` union and a rules index are generated
+  from it, with `--check`; a rule marked `custom` is hand-written.
+  Generation now stops at the validators and the rule table. Agreed in
+  principle, to be confirmed by stage 15 (chapters 7 and 11).
+- L35, agreed with the owner in the specs session (2026-11-04): a
+  formalization is a spec level only when it has an address and a
+  check. When a spec and the code disagree, the spec wins for
+  generated artefacts and the code wins for hand-written ones; the
+  generated indexes are the arbiter (chapter 11).
 
 After slice 2 (Add and list), the code followed chapters 1–10
 throughout, except for config, which has nothing to hold yet
@@ -207,7 +259,7 @@ packages/
 ├─ operations/         the work
 ├─ processes/          compositions of operations (L22, target)
 ├─ business/           types, rules, Result
-├─ valid/              a candidate to a business input: decode, check, build (L27)
+├─ valid/              a candidate to a business input: decode, apply, build (L27)
 ├─ fail/               every failure our code can name (chapter 13)
 └─ data/               one package per real thing
 ```
@@ -630,8 +682,8 @@ three steps (L27):
 1. **decode the envelope**, the delivery's own: the body is JSON and
    shaped as the contract says;
 2. **`valid`**, shared by every delivery: the candidate is decoded
-   field by field, checked against the business rules and built into
-   the business input;
+   field by field, the input rules are applied, and it is built into
+   the business input (decode, apply, build);
 3. **word the problem**, the delivery's own: a problem `valid` found
    becomes a failure with the api's words.
 
@@ -639,6 +691,11 @@ A single property is checked as a property: the title against
 `TITLE_MAX`, with no type of its own (L10). Everything below the entry
 point trusts what it receives: operations, ports and data do not
 check it again.
+
+The entry point applies input rules only: rules the input satisfies
+or breaks alone, with no world state (L29). A state rule, such as the
+cap on the list, needs the store, so it is the operation's business
+(chapter 6).
 
 ### One unit per handler (L19)
 
@@ -731,6 +788,12 @@ The duties are delegated to these places:
     its two problems, is gone (stage 11).
   - A function is named for the problem it solves, not for how it
     works: `readJson` became `validateBody` (review item 39).
+  - **Target (L33).** What an entry point applies becomes data, beside
+    the stage 13 route helper (chapter 4): the endpoint in `api.md`
+    declares `Applies: title.length`, the validator exports the rules
+    it applies (`toNewTodo.rules`), and the route declares its
+    validator, `route({ postTodos }, { addTodo }, { toNewTodo })`. A
+    check joins the three (chapter 11).
 - **Operate:** the operation construct injected. It now returns a
   promise, since the store is a database (chapter 6).
 - **Handle errors:** with one of two calls, chosen by what the
@@ -804,10 +867,10 @@ process.
 
 "Use case" reads oddly in code, so the code says operation, but a
 business use case is what it is. Each one is driven by its spec, which
-states its intent, input, the rules it enforces, the action that
-carries its decision and what it keeps atomic, its effects, its result
-and its failures. The spec is the use case file (L25); how use cases
-enter rsb-workflow is parked.
+states its intent, its input and the input rules it assumes, the state
+rules it applies, its effects, its result and what it refuses, what
+the store guarantees and what it keeps atomic (L30). The spec is the
+use case file (L25); how use cases enter rsb-workflow is parked.
 
 A light operation is fine. A use case that only reads still has an
 operation: `listTodos` is one. It costs a function call, keeps "only
@@ -834,22 +897,55 @@ The api spec is `prd/<app>/api.md` (L26, chapter 11).
   path. The link is the citation, not a matching name.
 - **The name** is a hint and a search key. It does not decide the
   unit's name.
-- **The use case is the spec** L14 asks for. It is written for the
-  developer, so it may speak of databases, transactions, concurrency
-  and queues. Its contents split along the line between the business
-  and the code:
+- **The use case is the spec** L14 asks for. It is a state
+  transition, written in the operation's language only (L30): what
+  the operation receives, what must hold of the world, what changes
+  and what comes back. It has no delivery words (no Enter key, no
+  form, no trimming) and no wire kinds. How the input came to be is
+  the delivery's spec: the api's is `api.md`. It may speak of the
+  store, steps and concurrency. Its sections split along the line
+  between the business and the code:
 
 | In the use case | In the unit |
 |---|---|
-| intent, and the PRD sentences it serves | the function, its type and its ports |
-| input | the input type (`TodoPatch`) |
-| rules, each citing the PRD | which entity function or port enforces each |
-| what must hold together, and under concurrency | transaction scope or intent action (L13, L16) |
-| effects, and whether each must be delivered | inline or recorded (L17) |
-| result and failures | the `Result` type and `Fail` kinds |
+| **Intent**, and **Serves**: the PRD lines it is evidence for | the function, its type and its ports |
+| **Input**, and the input rules it **assumes**, by id | the input type (`TodoPatch`), built by `valid` at the entry point |
+| **Given**: the state rules the operation applies, by id | the entity function or port fact that decides each |
+| **Effects**, and whether each must be delivered | the actions, inline or recorded (L17) |
+| **Result** | the `Result`'s value |
+| **Refused**, in business kinds (`limit`, `not_found`, `unavailable`, `server`) | the `Fail` kinds |
+| **Guarantees**: what the store promises, by id | the store, and its data spec when there is one (chapter 8) |
+| **Atomic**: what holds together, and under concurrency | transaction scope or intent action (L13, L16) |
 
-A use case holds no code names. The entry chain index joins it to the
-code: its `use case` row is the path the unit cites (L24).
+A section with nothing in it says `none`. A use case holds no code
+names beside its business types (`NewTodo`, `TODO_LIMIT`). The entry
+chain index joins it to the code: its `use case` row is the path the
+unit cites (L24).
+
+- **Every rule cites its source (L31),** one of three:
+  - a PRD line or deviation: what the product demands;
+  - a recorded decision, a story chapter or a registry entry: what
+    the system demands;
+  - an answer the owner gave when interviewed, which must become one
+    of the first two before the use case is approved, or it sits
+    under `Open:`.
+
+  An agent may propose a rule; it enters a spec only with a citation.
+  An uncited rule is a lint failure, not a forbidden thing.
+  **Target.** The use-case lint that fails on it.
+
+- **The use case is the root (L32).** An entry point is where a
+  delivery attaches to a use case: `POST /todos` and, later, a command
+  line's `todo add` both hang from `add-a-todo`. A probe is rooted at
+  a PRD requirement instead, since it serves no use case. Three
+  sources each state one edge of a triangle:
+  - the api spec's `Serves:`: route → use case;
+  - construct: route → unit;
+  - the unit's doc comment: unit → use case.
+
+  The entry chain index joins them, and a mismatch is drift (chapter
+  9). A process's steps are use cases, so the process's use case cites
+  them and the same index, read one level down, is the process map.
 
 ### Actions, effects and the result (L15)
 
@@ -867,13 +963,20 @@ meant both.
 
 ### Business states, the operation enforces (L1, L4, L5)
 
-Each layer has one part in a rule:
+Each layer has one part in a rule, and the rule's kind says which
+applies it (L29):
 - **business states it:** a type, a constant, a pure function
   (`TODO_LIMIT`);
-- **the operation enforces it:** it applies the rule to a real case
-  and decides the result (`addTodo` refuses the 501st todo);
-- **the store keeps it atomic:** no other request lands inside the
-  operation's decision, and the store answers with facts.
+- **the entry point applies input rules, once:** a property of the
+  input alone, decided with no world state, through `valid`
+  (`title.length`); everything below assumes it (chapter 5);
+- **the operation enforces state rules:** a property of the world and
+  the input, applied to a real case to decide the result (`addTodo`
+  refuses the 501st todo: `todos.cap`);
+- **the store keeps them atomic, and provides guarantees:** no other
+  request lands inside the operation's decision, the store answers
+  with facts, and it keeps promises of its own (`todos.order`,
+  `todo.id`).
 
 An operation is the only place anything happens to an entity. It
 composes the entity's behaviour (`newTodo`) with its actions to
@@ -1202,6 +1305,13 @@ Construct gains one level, between operations and routes:
 - Transaction scope on Postgres: the access route, the isolation each
   operation needs, and its latency from a Worker. It needs
   experiments, and decides whether D1 stays for the lab.
+- Authentication (is this caller allowed in) and authorization (what
+  may they do, under an ACL or an attribute policy) are subsystems
+  that steer the flow of code at run time, not rule kinds (L29). They
+  are modelled in their own session, before their PRD amendment and
+  use cases. What they touch now: the operation descriptor in the
+  route table will carry `kind` (read or write) and `resource`, minted
+  in the use case and read by the authorization subsystem.
 
 ## 7. Business
 
@@ -1223,7 +1333,17 @@ It holds:
   its own. A rule alone does not earn one, since the entry point
   checks single properties (L12). One value object per whole concept:
   money, not amount and currency. The todo app has none yet.
-- **Rules:** constants such as `TITLE_MAX` and `TODO_LIMIT`.
+- **Rules:** constants such as `TITLE_MAX` and `TODO_LIMIT`. A rule
+  has one of three kinds, and the kind says where it is applied
+  (L29):
+  - an **input rule** is a property of the input alone, applied once
+    at the entry point through `valid` (`title.length`,
+    `patch.nonempty`);
+  - a **state rule** is a property of the world and the input,
+    applied by the operation, with the store keeping the step atomic
+    (`todos.cap`, `todo.exists`);
+  - a **guarantee** is a promise the store makes (`todos.order`,
+    `todo.id`).
 
 Anything may import business. Business imports none of our other
 packages, contract included (D1).
@@ -1241,8 +1361,8 @@ In the code:
   that returns or reads a `Result` can reach it (D10).
 
 Business owns the title rule but does not apply it. The rule is a
-business fact (`TITLE_MAX`). Applying it is validation, which an entry
-point runs once (L12). Before stage 06 the contract held the title
+business fact (`TITLE_MAX`), and an input rule. Applying it is
+validation, which an entry point runs once (L12, L29). Before stage 06 the contract held the title
 rule; now it holds only the wire shape (review item 38, chapter 11).
 
 ### Business and `valid` (L27)
@@ -1250,7 +1370,7 @@ rule; now it holds only the wire shape (review item 38, chapter 11).
 The boundary between the two:
 - **business** is what is true: types, constants, pure functions;
 - **`valid`** is how a candidate becomes a business input: it decodes
-  each field, checks the business rules and builds the input;
+  each field, applies the input rules and builds the input;
 - **neither holds a message.** `valid` names the rule a candidate
   breaks; the delivery that shows it writes the words (chapter 13).
 
@@ -1261,8 +1381,8 @@ a CLI's commands. Operations and data never import it: they receive
 built inputs (L12).
 
 `valid` is not folded into business. D1 keeps business free of `fail`,
-and the owner keeps `valid` as the home of the rule checks every
-delivery shares.
+and the owner keeps `valid` as the home of the input rules every
+delivery applies.
 
 Its interface is one function per business input, all of one shape,
 and one problem vocabulary:
@@ -1293,10 +1413,10 @@ private (chapter 9):
   `false`, `"true"` or `"false"`. A spelling a delivery needs is added
   here, never in the delivery. A checkbox's `"on"` is not accepted;
   no form sends it.
-- **check:** the title trimmed, then 1 to `TITLE_MAX` long, counted in
+- **apply:** the title trimmed, then 1 to `TITLE_MAX` long, counted in
   UTF-16 code units, in that order;
 - **build:** the input assembled, and the cross-field rule
-  `patch.empty` checked: a form or a command line has no contract to
+  `patch.empty` applied: a form or a command line has no contract to
   catch an empty patch first.
 
 Candidate fields are `unknown`, so a delivery fills a candidate in one
@@ -1311,10 +1431,18 @@ envelope names one field; the BFF shows one per form.
 A problem is `{ field, rule, …params }`. Two kinds of rule:
 - **decode rules** are generic, named by the type the field needs, with
   the field beside them: `not_text`, `not_boolean`;
-- **check rules** are named after the business rule they guard:
+- **input rules** are named after the business rule they apply:
   `title.empty` and `title.too_long` (both with `max`), `patch.empty`
   (no field: it is about the whole candidate). Use cases cite them, so
-  they are fixed.
+  they are fixed. `problem.ts`'s comment still calls them check rules;
+  stage 15 regenerates it.
+
+**Target (L33).** A rule id names the rule, and a problem carries the
+rule and the violation: `title.empty` and `title.too_long` become
+`title.length` with the violation `empty` or `too_long`, and
+`patch.empty` becomes `patch.nonempty`. The use cases already cite the
+new ids; `valid` and both message tables still carry stage 11's.
+Message tables then branch on the violation. Stage 15 does the rename.
 
 A problem carries all of its rule's parameters, not only the ones the
 violation touched. An empty title and a long one are two violations of
@@ -1322,13 +1450,19 @@ one rule, so both carry `max`, and both message tables word the title
 rule from the problem, not from `TITLE_MAX`.
 
 A title is not a value object (L10). It has no identity and it has a
-rule, but the entry point checks the rule once and everything below
+rule, but the entry point applies the rule once and everything below
 trusts it (L12). That is lighter than a type with a constructor, and
 just as safe.
 
 **Target.**
 - The package becomes `business/entity`, so its name says what it
   holds.
+- **The rule table (L34).** `packages/business/src/rules.ts` is the one
+  place a rule is defined: its words, its numbers, its kind, its
+  violations and its source. It is generated from the rules spec,
+  `prd/<app>/rules.md`, in stage 15, with the constants (`TITLE_MAX`)
+  beside it. Specs cite a rule by id and never state its wording or
+  number (L33).
 
 **Open.**
 - What sits beside entities in `business/entity`: rules, input types
@@ -1360,6 +1494,12 @@ stays hand-written, because the engine-specific choices in it are made
 for performance (DB1, DB6). Each store function's doc comment would
 cite its section, and a conformance suite would hold one test per
 guarantee, run against D1 now and Postgres later.
+
+A guarantee is a rule of kind `guarantee` (L29): a promise the store
+makes, such as `todos.order` (lists come in the order todos were
+added) and `todo.id` (no two todos share an id). A use case lists the
+ones it relies on under Guarantees (L30), and a data spec's entry
+would cite them by the same ids.
 
 ### The D1 package
 
@@ -1650,6 +1790,12 @@ effects:
   → `operations/src/todos/update-todo.ts` → `data/d1/src/todos.ts`.
   An operation's port is declared in the operation's file.
 
+The chain is rooted at the use case (L32). An entry point is where one
+delivery attaches to it, so a use case may have several: `POST /todos`
+now, a command line's `todo add` later. A probe is rooted at a PRD
+requirement instead. The one-line form below starts at the entry point
+and stays as it is; the use case is the block's first row.
+
 An entry chain is written in one line of exported symbols:
 
 ```
@@ -1709,6 +1855,25 @@ data      packages/data/d1/src/todos.ts                       todoStore.updateTo
   to mark it as an output.
 - It is checked by regenerating it and diffing the result.
 
+**Target (L32, L33).** Stage 13's tooling generates the index above,
+keyed by entry point. What L32 asks for keys it by use case instead,
+with its entries listed per delivery:
+
+```
+## change-a-todo
+prd/todo/use-cases/todos/change-a-todo.md
+
+api       PATCH /todos/{id} → patchTodo → updateTodo ⇢ UpdateStore.updateTodo → d1.updateTodo
+unit      packages/operations/src/todos/update-todo.ts        updateTodo, UpdateStore
+data      packages/data/d1/src/todos.ts                       todoStore.updateTodo
+```
+
+- The three edges of the triangle are joined there: `api.md`'s
+  `Serves:` (route → use case), construct (route → unit) and the unit's
+  doc comment (unit → use case). A mismatch fails the check, as drift.
+- The `rules` rows come from the route's declared validator and the
+  `rules` it exports, not from the handler's imports.
+
 **The generator.** `tooling/entry-chains/generate.ts`, run as
 `pnpm gen:entry-chains`, writes the index, and `pnpm check:entry-chains`
 diffs it. The scorecard runs the check, and `AGENTS.md` points agents
@@ -1745,6 +1910,8 @@ way fails the generator; it is not read wrongly.
   port, most likely a transaction scope (L16).
 - Processes (L18). The index follows a unit that is an operation.
   A process's chain gets its form when the first process exists.
+  A process's steps are use cases, so the index read one level down is
+  the process map (L32).
 
 ## 10. Object style
 
@@ -1845,6 +2012,37 @@ A contract holds no client. A client is the consumer's concrete call,
 so it lives in the consumer's data (chapter 8). The consumer derives
 the types it sends from the schemas (valibot's `InferInput`).
 
+### What makes a spec (L35)
+
+A formalization is a spec level only when it has two things:
+- **an address:** an id something else can cite (a path, an endpoint
+  key, a rule id). Without it the spec cannot be linked;
+- **a check:** something that fails when the code stops matching it.
+  Without it the spec drifts, and a spec that has drifted is worse
+  than none.
+
+The levels, and what binds each:
+
+| Level | States | Bound by |
+| --- | --- | --- |
+| PRD | the need, product rules | the use-case lint (every rule cites a source) |
+| use case | one unit: input, given, effects, result | the entry-chains index, the triangle |
+| api spec | the wire | `gen:api --check`, the examples replayed |
+| rules spec | ids, parameters, kinds, violations | generated validators and table; cited ids exist |
+| data spec | what a store call guarantees | the conformance suite |
+| view | what a page composes | nothing yet, so not yet |
+
+Today the api spec's check exists. The use case is bound in part:
+`check:entry-chains` fails when the index drifts, but nothing yet
+checks the triangle (chapter 9). The use-case lint, the rules spec and
+the data spec are **Target.** A view spec waits for a check.
+
+**Precedence.** When a spec and the code disagree:
+- for a generated artefact, the spec wins, and the artefact is
+  regenerated;
+- for hand-written code, the code wins, and the spec is corrected;
+- the generated indexes are the arbiter of which case it is.
+
 ### The api spec defines the api (L26)
 
 An api is defined in markdown before it is coded, in one spec per api:
@@ -1868,8 +2066,17 @@ The spec also holds the shapes several endpoints share (`TodoReply`,
 `TodoListReply`) and the envelope's kinds.
 
 The use case and the endpoint do not repeat each other. The use case
-states the input, result, rules and failures in business terms. The
-endpoint states how they look on the wire.
+states the input, result, rules and failures in business terms, and
+cites rules by id: the input rules it assumes and the state rules it is
+given (L30). The endpoint states how they look on the wire.
+
+**Target (L33).** Each endpoint that serves a use case declares the
+input rules it applies, `Applies: title.length`, and a check joins the
+declarations: `Applies` covers the use case's `Assumes`, the route's
+validator's `rules` equal `Applies`, and every cited id exists. A
+state rule is proven by a named test per `Given` id instead, read from
+the test runner's report. `api.md` has no `Applies:` line until that
+check exists.
 
 **Rules as data.** The spec's vocabulary states rules as data only,
 for example "at least 1 field". It cannot hold a function. This chapter
@@ -1899,6 +2106,17 @@ client still writes its paths by hand.
 
 Generation stops at the contract. Entry points, operations, business
 and data are written by hand.
+
+**Target (L34).** Generation stops at the validators and the rule
+table. A rules spec, `prd/<app>/rules.md`, in this vocabulary's
+style, is the source of inputs, rules, constants and violations.
+Generated from it: the rule table and constants
+(`packages/business/src/rules.ts`), the validators for input rules,
+the `Problem` union, and a rules index, all with `--check`. Still
+written by hand: entity behaviour, operations, stores, the message
+tables, and any rule marked `custom`, which the generator only checks
+exists and exports its id. Stage 15 builds it and regenerates stage
+11's four validators as its proof.
 
 ### The spec's vocabulary (draft)
 
@@ -2070,7 +2288,7 @@ api and the BFF already import business, so neither lost access to
 the rule.
 
 Validation has one authority. Business defines the rule, and the api
-enforces it. A consumer may apply the same rule early, for a better
+applies it at the entry point (L29). A consumer may apply the same rule early, for a better
 form, but the api never trusts that it did.
 
 The messages in a contract become the words consumers show, unless a
@@ -2088,6 +2306,8 @@ consumer decodes every reply at runtime, so a skewed reply becomes
 
 **Open.**
 - How a deploy is ordered when a change cannot survive skew.
+- The precedence rule (L35) needs a line in `AGENTS.md`, under an
+  rl-0009 exception, beside the index pointer stage 13 added.
 
 ## 12. The BFF on the same architecture
 
@@ -2159,6 +2379,11 @@ and not part of the contract, because its kinds are not the wire's
 | `too_large` | the request is bigger than we accept | `tooLarge` |
 | `unavailable` | something we depend on cannot answer now | `unavailable` |
 | `server` | our own fault, or an error nobody recognised | `serverFault` |
+
+A use case names its failures in these kinds, never in the wire's
+(L30): `add-a-todo` is refused with `limit`, not `409`, and a store
+failure is `unavailable` or `server`, not `internal`. The delivery
+maps each kind to its wire kind and words the message (L27, below).
 
 `Fail` is a class that extends `Error`, so each failure has a stack
 and a standard `cause`. `AnyFail` is the union of `Fail<K>` for every
