@@ -466,8 +466,8 @@ What a use case's Input says of the input rules it already satisfies:
 "A `NewTodo`: a title. Assumes `title.length`." The operation does not
 apply them; the entry point did.
 
-- **Status:** locked (L33) in the use cases. The check that every
-  endpoint serving the use case [applies](#applies) them is target.
+- **Status:** locked (L33). `pnpm check:join` fails when an endpoint
+  serving the use case does not [apply](#applies) them (stage 16).
 
 ### Given
 
@@ -475,18 +475,19 @@ A use case's section of state rules: what the operation applies, and
 refuses when it does not hold. `add-a-todo` is given `todos.cap`. Each
 `Given` id is proven by a named test.
 
-- **Status:** locked (L30, L33) in the use cases. The named test per
-  id, read from the test runner's report, is target.
+- **Status:** locked (L30, L33). A test is named by its id
+  (`todos.cap: …`); `pnpm check:join` fails unless each `Given` id has
+  one that passed in the operations unit report (stage 16).
 
 ### Applies
 
 An endpoint's declaration, in `api.md`, of the input rules its entry
-point applies: `Applies: title.length`. The check joins it: `Applies`
-covers the served use case's `Assumes`, the route's validator's
-`rules` equal it, and every cited id exists.
+point applies: `Applies: title.length`, or `Applies: none`. A probe
+writes none. `pnpm check:join` joins it: each id is an input rule,
+`Applies` covers the served use case's `Assumes`, and the route's
+validator's `rules` equal it, as sets.
 
-- **Status:** target (L33). `api.md` has no `Applies:` line until
-  the check exists.
+- **Status:** locked (L33), stage 16.
 
 ### Enforce
 
