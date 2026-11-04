@@ -91,15 +91,15 @@ Commit `49402c8`: `apps/api/test/types/routes.ts`.
   | 4 | `route({ postTodos }, { listTodos }, { toNewTodo })` | the `Runs` property is missing |
   | 5a | a handler taking `(n: number) => Promise<number>`, given `addTodo` | the `Runs` property is missing |
   | 5b | `postTodos` given `first` from `{ first: AddTodo; second: AddTodo }` | the `Runs` property is missing |
-  | 6a | a `Routes` missing `DELETE /todos/{id}` | the property is missing |
-  | 6b | a `Routes` with `GET /todos/{id}` | the property is unknown |
+  | 6a | `Omit<Routes, "DELETE /todos/{id}">` given as a `Routes` | the property is missing |
+  | 6b | a whole `Routes` spread, plus `GET /todos/{id}` | the property is unknown |
 
 - **Accepted beside them:**
   - `route({ postTodos }, { addTodo }, { toNewTodo })`;
   - `route({ getTodoCounts }, { countTodos })`;
   - `probe({ getHealth })`;
   - for row 5b, the same call bound to `{ first: AddTodo }` alone;
-  - for row 6, a full `Routes`.
+  - for row 6, the same `Omit` with `DELETE /todos/{id}` put back.
   
   A helper that refuses everything therefore fails too.
 - **Each refusal is for its own reason.** I stripped every directive
@@ -128,10 +128,13 @@ Commit `49402c8`: `apps/api/test/types/routes.ts`.
 - **Only the api's helpers are covered.** The BFF has no route helper,
   so there is nothing of its own to test. The CLI's `constructCommands`
   would get its own type test when it binds `routing`.
-- **The type test reads no spec.** Row 6 writes the eight endpoint
-  keys out by hand. When an endpoint is added, `every` stops compiling
-  until it gains the key. That is the intended failure, but it also
-  means the file has to be edited with each endpoint.
+- **Row 6 names one endpoint each way, so a new endpoint does not edit
+  the file.** As first committed, it wrote the eight endpoint keys out
+  by hand, and each new endpoint meant editing it. The follow-up commit
+  on `test/route-keys` builds the missing case from
+  `Omit<Routes, "DELETE /todos/{id}">` and the extra case from a whole
+  `Routes` spread plus `GET /todos/{id}`. With the directives stripped,
+  `tsc` still reports TS2741 and TS2353, one each.
 - **`tooling/` is still not type-checked.** This is now row L of
   handoff 12's backlog (Q4), with no order set.
 

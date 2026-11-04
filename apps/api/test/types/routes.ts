@@ -56,39 +56,17 @@ const single = routing<{ first: AddTodo }>();
 single.route({ postTodos }, { first }, { toNewTodo });
 
 // 6. The table has a route for every endpoint, and none the contract lacks.
+// Each case names one endpoint, so a new endpoint does not edit this file.
 declare const any: Route;
+declare const short: Omit<Routes, "DELETE /todos/{id}">;
 
-export const every: Routes = {
-  "GET /health": any,
-  "GET /todos": any,
-  "GET /todos/counts": any,
-  "POST /todos": any,
-  "PATCH /todos": any,
-  "PATCH /todos/{id}": any,
-  "DELETE /todos": any,
-  "DELETE /todos/{id}": any,
-};
+export const whole: Routes = { ...short, "DELETE /todos/{id}": any };
 
 // @ts-expect-error
-export const missing: Routes = {
-  "GET /health": any,
-  "GET /todos": any,
-  "GET /todos/counts": any,
-  "POST /todos": any,
-  "PATCH /todos": any,
-  "PATCH /todos/{id}": any,
-  "DELETE /todos": any,
-};
+export const missing: Routes = short;
 
 export const extra: Routes = {
-  "GET /health": any,
-  "GET /todos": any,
-  "GET /todos/counts": any,
-  "POST /todos": any,
-  "PATCH /todos": any,
-  "PATCH /todos/{id}": any,
-  "DELETE /todos": any,
-  "DELETE /todos/{id}": any,
+  ...whole,
   // @ts-expect-error
   "GET /todos/{id}": any,
 };
