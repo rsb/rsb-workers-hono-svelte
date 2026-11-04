@@ -3,6 +3,7 @@ packages:
   - packages/*
   - packages/contract/*
   - packages/data/*
+  - tooling
 
 engineStrict: true
 saveExact: true
