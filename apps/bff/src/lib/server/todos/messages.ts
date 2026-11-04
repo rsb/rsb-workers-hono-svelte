@@ -29,12 +29,11 @@ export const SOMETHING_WENT_WRONG = "Something went wrong. Try again.";
  */
 export const problemMessage = (problem: Problem): string => {
   switch (problem.rule) {
-    case "title.empty":
-    case "title.too_long":
+    case "title.length":
       return titleRule(problem.max);
     case "not_text":
     case "not_boolean":
-    case "patch.empty":
+    case "patch.nonempty":
       return SOMETHING_WENT_WRONG;
     default: {
       const unworded: never = problem;

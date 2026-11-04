@@ -5,7 +5,7 @@ import { title } from "../fields/title.ts";
 import type { Problem, Problems } from "../problem.ts";
 
 /**
- * What a delivery read for a change to a todo, not yet decoded or checked.
+ * What a delivery read for a change to a todo, not yet decoded or applied.
  * A field left undefined is not asked to change.
  */
 export type TodoPatchCandidate = { title?: unknown; completed?: unknown };
@@ -13,13 +13,14 @@ export type TodoPatchCandidate = { title?: unknown; completed?: unknown };
 /**
  * A patch from what a delivery read: a title, a `completed`, or both. A
  * title follows the title rules; `completed` is a boolean. A patch with
- * neither is `patch.empty`. Gives every problem it finds.
+ * neither breaks `patch.nonempty`, and that is its only problem; otherwise
+ * it gives every problem it finds.
  */
 export const toTodoPatch = (candidate: TodoPatchCandidate): Result<TodoPatch, Problems> => {
   const hasTitle = candidate.title !== undefined;
   const hasCompleted = candidate.completed !== undefined;
   if (!hasTitle && !hasCompleted) {
-    return err([{ rule: "patch.empty" }]);
+    return err([{ rule: "patch.nonempty", violation: "empty" }]);
   }
 
   const patch: TodoPatch = {};

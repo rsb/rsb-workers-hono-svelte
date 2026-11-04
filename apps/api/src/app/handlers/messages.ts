@@ -13,11 +13,12 @@ const message = (problem: Problem): string => {
       return `${problem.field} must be text`;
     case "not_boolean":
       return `${problem.field} must be true or false`;
-    case "title.empty":
-      return "title is empty";
-    case "title.too_long":
+    case "title.length":
+      if (problem.violation === "empty") {
+        return "title is empty";
+      }
       return `title is longer than ${problem.max} characters`;
-    case "patch.empty":
+    case "patch.nonempty":
       return "body must have title, completed or both";
     default: {
       const unworded: never = problem;

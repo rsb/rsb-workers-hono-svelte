@@ -16,18 +16,18 @@ describe("messages", () => {
 
 describe("problemMessage", () => {
   it.each<[string, Problem, string]>([
-    ["title.empty", { field: "title", rule: "title.empty", max: 256 }, "Title must be 1 to 256 characters"],
-    ["title.too_long", { field: "title", rule: "title.too_long", max: 256 }, "Title must be 1 to 256 characters"],
+    ["title.length empty", { field: "title", rule: "title.length", violation: "empty", max: 256 }, "Title must be 1 to 256 characters"],
+    ["title.length too_long", { field: "title", rule: "title.length", violation: "too_long", max: 256 }, "Title must be 1 to 256 characters"],
     ["not_text", { field: "title", rule: "not_text" }, SOMETHING_WENT_WRONG],
     ["not_boolean", { field: "completed", rule: "not_boolean" }, SOMETHING_WENT_WRONG],
-    ["patch.empty", { rule: "patch.empty" }, SOMETHING_WENT_WRONG],
+    ["patch.nonempty", { rule: "patch.nonempty", violation: "empty" }, SOMETHING_WENT_WRONG],
   ])("words %s", (_, problem, message) => {
     expect(problemMessage(problem)).toBe(message);
   });
 
   it.each<[string, Problem]>([
-    ["title.empty", { field: "title", rule: "title.empty", max: 10 }],
-    ["title.too_long", { field: "title", rule: "title.too_long", max: 10 }],
+    ["title.length empty", { field: "title", rule: "title.length", violation: "empty", max: 10 }],
+    ["title.length too_long", { field: "title", rule: "title.length", violation: "too_long", max: 10 }],
   ])("words %s from the max the problem carries", (_, problem) => {
     expect(problemMessage(problem)).toBe("Title must be 1 to 10 characters");
   });

@@ -4,9 +4,10 @@ import type { Problem } from "../problem.ts";
 import { text } from "./decode.ts";
 
 /**
- * A title: decoded as text, trimmed, then checked to be 1 to `TITLE_MAX`
- * long, counted in UTF-16 code units (PRD deviation 7). The rules run in
- * that order, so a title has at most one problem. Gives the trimmed title.
+ * A title: decoded as text, trimmed, then held to `title.length`: 1 to
+ * `TITLE_MAX` long, counted in UTF-16 code units (PRD deviation 7). The
+ * steps run in that order, so a title has at most one problem. Gives the
+ * trimmed title.
  */
 export const title = (value: unknown): Result<string, Problem> => {
   const decoded = text("title", value);
@@ -16,11 +17,11 @@ export const title = (value: unknown): Result<string, Problem> => {
 
   const trimmed = decoded.value.trim();
   if (trimmed.length === 0) {
-    return err({ field: "title", rule: "title.empty", max: TITLE_MAX });
+    return err({ field: "title", rule: "title.length", violation: "empty", max: TITLE_MAX });
   }
 
   if (trimmed.length > TITLE_MAX) {
-    return err({ field: "title", rule: "title.too_long", max: TITLE_MAX });
+    return err({ field: "title", rule: "title.length", violation: "too_long", max: TITLE_MAX });
   }
 
   return ok(trimmed);
