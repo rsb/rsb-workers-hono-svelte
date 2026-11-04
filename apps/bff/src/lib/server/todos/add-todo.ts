@@ -1,13 +1,13 @@
 import { fail } from "@sveltejs/kit";
+import { toNewTodo } from "@todo/valid/todos/new-todo.ts";
 import { postTodo } from "../api/todos.ts";
-import { addFailedMessage } from "./messages.ts";
+import { addFailedMessage, problemMessage } from "./messages.ts";
 import { status } from "./status.ts";
-import { validateTitle } from "./validate-title.ts";
 
 /**
- * The `add` action: validate the title, ask the API, turn a failure into
- * `fail` with the message the page shows, and present what was added. A
- * failure keeps what was typed, so the input still holds it.
+ * The `add` action: make the form a new todo, ask the API, turn a failure
+ * into `fail` with the message the page shows, and present what was added.
+ * A failure keeps what was typed, so the input still holds it.
  */
 export async function addTodo(api: Pick<Fetcher, "fetch">, form: FormData) {
   const raw = form.get("title");
@@ -16,9 +16,11 @@ export async function addTodo(api: Pick<Fetcher, "fetch">, form: FormData) {
     title = raw;
   }
 
-  const newTodo = validateTitle({ title });
+  // The title must follow the business rules; this saves the user a round trip.
+  const newTodo = toNewTodo({ title: raw });
   if (!newTodo.ok) {
-    return fail(422, { title, message: newTodo.error });
+    const [problem] = newTodo.error;
+    return fail(422, { title, message: problemMessage(problem) });
   }
 
   const reply = await postTodo(api, newTodo.value);

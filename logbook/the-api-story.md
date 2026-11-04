@@ -151,6 +151,21 @@ The decisions behind this story are:
   points and everything below them are still written by hand. The
   spec states every rule as data. A data spec for store calls is
   pending, to be tried (chapters 6, 8 and 11).
+- L27, agreed with the owner in the valid session (2026-11-03):
+  `packages/valid` is a deep module that turns a candidate into a
+  business input for every delivery: it decodes each field from
+  `unknown`, checks the business rules and builds the input. There is
+  one function per business input, named as a verb (`toNewTodo`), and
+  it returns every problem it finds. A problem is a field, a rule id
+  and all of the rule's parameters, never words. Decode rules are generic and
+  named by the type expected (`not_text`, `not_boolean`); check rules
+  are named after the rule they guard (`title.empty`), and are fixed,
+  since use cases cite them. `valid` imports business only; operations
+  and data never import it. Each delivery decodes its own envelope and
+  words problems in its own message table (chapters 5, 7, 9 and 13).
+  Business constants appear only in business, `valid` and operations,
+  the enforcers, and never under `apps/`: a delivery words a number
+  from the problem that carries it.
 
 After slice 2 (Add and list), the code followed chapters 1–10
 throughout, except for config, which has nothing to hold yet
@@ -189,6 +204,7 @@ packages/
 ├─ operations/         the work
 ├─ processes/          compositions of operations (L22, target)
 ├─ business/           types, rules, Result
+├─ valid/              a candidate to a business input: decode, check, build (L27)
 ├─ fail/               every failure our code can name (chapter 13)
 └─ data/               one package per real thing
 ```
@@ -231,6 +247,7 @@ packages/
 │  ├─ api/                published by the api, consumed by the bff-api
 │  └─ bff-api/            published by the bff-api, consumed by the frontend
 ├─ business/
+├─ valid/                 how a candidate becomes a business input (L27)
 ├─ fail/
 ├─ operations/
 ├─ processes/             (L22)
@@ -243,7 +260,9 @@ packages/
 Refactor A (`a6676cd`) moved the code from `apps/todo/{api,web,contract}`
 into this layout. Everything in the tree exists except
 `contract/bff-api` and `data/internal/api`. Stage 06 added `fail` and
-`data/d1`, and deleted `data/memory` (chapter 8):
+`data/d1`, and deleted `data/memory` (chapter 8). `valid` held one
+title check from slice 4; stage 11 made it the module every delivery
+validates through (L27, chapter 7):
 
 | Before | Now |
 |---|---|
@@ -253,6 +272,7 @@ into this layout. Everything in the tree exists except
 | `api/src/app/business` | `packages/business` |
 | `api/src/app/operations` | `packages/operations` |
 | `api/src/app/data/memory` | `packages/data/memory`, deleted in stage 06 |
+| `api/src/app/handlers/todos/validate.ts`, the BFF's `validate-title.ts` | `packages/valid`, stage 11 |
 
 Refactor B adds `packages/data/internal/api` (from the BFF's
 `lib/server/api/`) and `packages/contract/bff-api`.
@@ -541,12 +561,20 @@ Two of the duties translate (L9):
 - **present** translates outward, into the published language: the
   contract. The api serves that language as an open host service.
 
-Validation happens once, here (L12). The entry point checks the wire
-shape and the business rules, which it may import, and builds the
-input shape from the result. A single property is checked as a
-property: the title against `TITLE_MAX`, with no type of its own
-(L10). Everything below the entry point trusts what it receives:
-operations, ports and data do not check it again.
+Validation happens once, here (L12). The entry point runs it, in
+three steps (L27):
+1. **decode the envelope**, the delivery's own: the body is JSON and
+   shaped as the contract says;
+2. **`valid`**, shared by every delivery: the candidate is decoded
+   field by field, checked against the business rules and built into
+   the business input;
+3. **word the problem**, the delivery's own: a problem `valid` found
+   becomes a failure with the api's words.
+
+A single property is checked as a property: the title against
+`TITLE_MAX`, with no type of its own (L10). Everything below the entry
+point trusts what it receives: operations, ports and data do not
+check it again.
 
 ### One unit per handler (L19)
 
@@ -603,9 +631,9 @@ export const postTodos = (addTodo: AddTodo) => async (c: Context) => {
   }
 
   // The title must follow the business rules.
-  const newTodo = validateTitle(body.value);
+  const newTodo = toNewTodo({ title: body.value.title });
   if (!newTodo.ok) {
-    return userFailure(c, newTodo.error);
+    return userFailure(c, invalidOf(newTodo.error));
   }
 
   // Adding can fail for the user (the list is full) or for us (the store).
@@ -620,17 +648,23 @@ export const postTodos = (addTodo: AddTodo) => async (c: Context) => {
 ```
 
 The duties are delegated to these places:
-- **Validate:** in two steps, each returning `Result<…, Fail<"invalid">>`
+- **Validate:** in the three steps above, each returning a `Result`
   and never throwing. Errors on the request path stay values from the
   first byte (D4).
-  - `handlers/validate.ts` holds what every handler shares.
+  - `handlers/validate.ts` decodes the envelope.
     `validateBody(c, schema)` reads the body, parses it as JSON and
     checks it against a contract schema: the wire shape only.
-  - `handlers/todos/validate.ts` holds what only the todos handlers
-    need. `validateTitle` trims the title and applies the business
-    rule (`TITLE_MAX`), and turns the body into a `NewTodo`.
-  - One `validate.ts` per handler package, split only when it grows
-    too large.
+    `validateQuery` does the same for the query string.
+  - `@todo/valid` turns a candidate into a business input:
+    `toNewTodo`, `toTodoPatch`, `toTodoFilter`, `toCompleted`. It
+    returns every problem it finds, each a rule id with its
+    parameters and no words (chapter 7).
+  - `handlers/messages.ts` words a problem. `invalidOf(problems)`
+    gives the first as `Fail<"invalid">`, since the envelope names one
+    field, in the words `prd/todo/api.md`'s examples show. Every rule
+    must have words, or it does not compile.
+  - `handlers/todos/validate.ts`, which trimmed the title and worded
+    its two problems, is gone (stage 11).
   - A function is named for the problem it solves, not for how it
     works: `readJson` became `validateBody` (review item 39).
 - **Operate:** the operation construct injected. It now returns a
@@ -666,6 +700,8 @@ translates once, and no boundary passes on a word it did not define
 |---|---|---|
 | api data package | a driver error → a failure | D1's text → `unavailable` or `server` |
 | api operation | a fact → a failure | "not inserted" → `limit` |
+| `valid` | a candidate → a problem (rule id) | `"   "` → `title.empty` |
+| each delivery | a problem → its own words | `title.empty` → "title is empty" (api), "Title must be 1 to 256 characters" (BFF) |
 | api handler | failure kind → wire kind | `limit` → `limit`, `invalid` → `validation` |
 | bff-api data client | wire → business | `limit` → `{ kind: "full" }` |
 | bff-api handler | business → page | `full` → a form status and message |
@@ -1141,12 +1177,85 @@ In the code:
   that returns or reads a `Result` can reach it (D10).
 
 Business owns the title rule but does not apply it. The rule is a
-business fact (`TITLE_MAX`), so the api and the BFF both import it
-from business. Applying it is validation, which is a handler's job:
-`validateTitle` in the api's handlers, and the same check in the BFF's
-action. The operation receives a valid `NewTodo`. Before stage 06 the
-contract held the title rule; now it holds only the wire shape
-(review item 38, chapter 11).
+business fact (`TITLE_MAX`). Applying it is validation, which an entry
+point runs once (L12). Before stage 06 the contract held the title
+rule; now it holds only the wire shape (review item 38, chapter 11).
+
+### Business and `valid` (L27)
+
+The boundary between the two:
+- **business** is what is true: types, constants, pure functions;
+- **`valid`** is how a candidate becomes a business input: it decodes
+  each field, checks the business rules and builds the input;
+- **neither holds a message.** `valid` names the rule a candidate
+  breaks; the delivery that shows it writes the words (chapter 13).
+
+`valid` imports business and nothing else of ours. It never imports
+`fail`, Hono, the contract or anything that knows an envelope. Every
+delivery imports it: the api's handlers, the BFF's actions, and later
+a CLI's commands. Operations and data never import it: they receive
+built inputs (L12).
+
+`valid` is not folded into business. D1 keeps business free of `fail`,
+and the owner keeps `valid` as the home of the rule checks every
+delivery shares.
+
+Its interface is one function per business input, all of one shape,
+and one problem vocabulary:
+
+```ts
+// packages/valid/src/todos/new-todo.ts
+export type NewTodoCandidate = { title: unknown };
+export const toNewTodo = (candidate: NewTodoCandidate): Result<NewTodo, Problems> => { … };
+```
+
+| Input | Function | File |
+|---|---|---|
+| `NewTodo` | `toNewTodo({ title })` | `todos/new-todo.ts` |
+| `TodoPatch` | `toTodoPatch({ title?, completed? })` | `todos/todo-patch.ts` |
+| `TodoFilter` | `toTodoFilter({ completed? })` | `todos/todo-filter.ts` |
+| `setAllCompleted`'s boolean | `toCompleted({ completed })` | `todos/completed.ts` |
+
+A bare boolean is still an input, even without a named type. Ids have
+no business type and no rule yet, so `valid` has no function for
+them.
+
+The function names are verbs (`toNewTodo`), so they do not collide
+with the entity behaviour `newTodo(id, input)`.
+
+What it hides, in `fields/`, which the package's `exports` map keeps
+private (chapter 9):
+- **decode:** `unknown` narrowed to text, or to a boolean from `true`,
+  `false`, `"true"` or `"false"`. A spelling a delivery needs is added
+  here, never in the delivery. A checkbox's `"on"` is not accepted;
+  no form sends it.
+- **check:** the title trimmed, then 1 to `TITLE_MAX` long, counted in
+  UTF-16 code units, in that order;
+- **build:** the input assembled, and the cross-field rule
+  `patch.empty` checked: a form or a command line has no contract to
+  catch an empty patch first.
+
+Candidate fields are `unknown`, so a delivery fills a candidate in one
+line and does no typing work. Over HTTP the contract has already
+checked the types, so the decode runs twice; the comment at the top of
+`fields/decode.ts` says why that is paid.
+
+A function returns every problem it finds, never only the first. The
+delivery decides how many it shows: the api shows the first, since its
+envelope names one field; the BFF shows one per form.
+
+A problem is `{ field, rule, …params }`. Two kinds of rule:
+- **decode rules** are generic, named by the type the field needs, with
+  the field beside them: `not_text`, `not_boolean`;
+- **check rules** are named after the business rule they guard:
+  `title.empty` and `title.too_long` (both with `max`), `patch.empty`
+  (no field: it is about the whole candidate). Use cases cite them, so
+  they are fixed.
+
+A problem carries all of its rule's parameters, not only the ones the
+violation touched. An empty title and a long one are two violations of
+one rule, so both carry `max`, and both message tables word the title
+rule from the problem, not from `TITLE_MAX`.
 
 A title is not a value object (L10). It has no identity and it has a
 rule, but the entry point checks the rule once and everything below
@@ -1422,6 +1531,8 @@ where they are enforced (A1):
   data       → business
   data       → contract     (the contract of the system it reaches)
   handlers, probes, processes, operations, data → fail
+  handlers   → valid      → business   (L27)
+  bff-api    → valid
   ```
 
   Business imports nothing of ours, contract included. A contract
@@ -1429,6 +1540,10 @@ where they are enforced (A1):
   A process imports operations' types only, since construct hands it
   built operations (L18). Handlers and probes both import `app/errors/`
   (L20). Probes import neither operations nor processes.
+  `valid` imports business only: never fail, Hono, a contract or
+  anything that knows an envelope. Every delivery imports it (the
+  api's handlers, the BFF's actions, later a CLI's commands);
+  operations, processes and data never do (L12, L27).
   Within `business`, `operations` and `processes`, each area is a
   sibling folder, so the hierarchy rules keep areas apart; the
   layers below reach any area (L22).
@@ -1438,11 +1553,26 @@ where they are enforced (A1):
   apply to routes by file suffix and to `$lib` by directory
   (chapter 12).
 
-**Open.**
-- How privacy is shown without Go's `internal/`. A9 settles half of
-  it: `internal` means *inside the closed system*, never *private*, so
-  the name is not available for privacy. If a package needs privacy,
-  subpath `exports` can hide what it does not list.
+**Privacy without Go's `internal/`.** A9 settles half of it:
+`internal` means *inside the closed system*, never *private*, so the
+name is not available for privacy. A package that needs privacy lists
+only its public paths in its `exports` map, and an import of anything
+else does not resolve. `valid` is the first (L27): it exports
+`problem.ts` and `todos/*`, and `fields/` is private.
+
+**Checks (L27).** Three grep-checks hold the edges of `valid`:
+- the business constants (`TITLE_MAX`, `TODO_LIMIT`) appear only in
+  `packages/business`, `packages/valid` and `packages/operations`,
+  the enforcers, and never under `apps/`, tests included. A message
+  table words a number from the problem's parameters (`max`), never
+  from the constant; a message with no problem in hand has no number;
+- no `Context`, `FormData`, `argv` or `hono` inside `packages/business`
+  or `packages/valid`;
+- `packages/valid` imports neither `@todo/fail` nor a contract.
+
+In `package.json`, `@todo/valid` lists only `@todo/business`, and
+neither `@todo/operations` nor `@todo/data-d1` lists `@todo/valid`.
+All three hold at stage 11.
 
 ### Following an entry chain (L24)
 
@@ -1480,7 +1610,7 @@ PATCH /todos/:id → patchTodo → updateTodo ⇢ UpdateStore.updateTodo → d1.
 use case  prd/todo/use-cases/todos/change-a-todo.md
 route     apps/api/src/construct.ts                       constructRoutes
 handler   apps/api/src/app/handlers/todos/patch-todo.ts   patchTodo
-rules     packages/valid/src/todos/title.ts               checkTitle
+rules     packages/valid/src/todos/todo-patch.ts          toTodoPatch
 op        packages/operations/src/todos/update-todo.ts    updateTodo, UpdateStore
 data      packages/data/d1/src/todos.ts                   updateTodo
 driver    packages/data/d1/src/driver.ts                  queryAll
@@ -1972,6 +2102,28 @@ by an `unavailable` one shows its own message, not D1's. Before the
 review, `rootOf` walked the whole chain, and such a failure would have
 sent D1's text to the caller. Nothing created one yet, but the types
 allowed it.
+
+A message is written by the delivery that shows it (L27). `valid`
+names the rule a candidate breaks, as a problem with a rule id and its
+parameters, and never words it. Each delivery has a message table
+that does:
+- the api's `handlers/messages.ts` words a problem for the developer
+  who reads the reply: `title.empty` → "title is empty", in the words
+  of `prd/todo/api.md`'s examples;
+- the BFF's `messages.ts` words it for the person using the app:
+  `title.empty` → "Title must be 1 to 256 characters", with 256 from
+  the problem's `max`. Rules the person cannot fix (`not_text`,
+  `not_boolean`, `patch.empty`) are "Something went wrong. Try
+  again.", since the page never sends them.
+
+A message the BFF shows with no problem in hand has no number. When
+the api refuses a title the BFF accepted, that is skew or a bug, not
+the person's mistake, so the page shows the generic message. A full
+list is "The list is full. Clear completed or remove some to add
+more.", since the api's `limit` reply carries no number.
+
+Both tables are a `switch` over the rule that ends in a `never` check,
+so a new rule does not compile until every delivery has words for it.
 
 **Open.**
 - `unavailable` is `internal` and 500 today, because the PRD's

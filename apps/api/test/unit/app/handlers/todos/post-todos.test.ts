@@ -1,5 +1,4 @@
 import { Failure, TodoReply, envelope } from "@todo/contract-api";
-import { TITLE_MAX } from "@todo/business/todos/todo.ts";
 import { Context } from "hono";
 import * as v from "valibot";
 import { describe, expect, it, vi } from "vitest";
@@ -50,7 +49,7 @@ describe("postTodos", () => {
   });
 
   it("rejects a title over the limit", async () => {
-    const title = "x".repeat(TITLE_MAX + 1);
+    const title = "x".repeat(257);
     const response = await postTodos(unreached)(post(JSON.stringify({ title })));
 
     expect(await failed(response)).toEqual({

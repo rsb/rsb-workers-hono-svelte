@@ -1,6 +1,6 @@
 import { DeletedReply, Failure, TodoCountsReply, TodoListReply, TodoReply, envelope } from "@todo/contract-api";
 import { ok } from "@todo/business/result.ts";
-import { TODO_LIMIT, type Todo } from "@todo/business/todos/todo.ts";
+import type { Todo } from "@todo/business/todos/todo.ts";
 import type { DbStore } from "@todo/data-d1/store.ts";
 import * as v from "valibot";
 import { expect, it } from "vitest";
@@ -97,7 +97,9 @@ it("an add after the limit is refused with limit", async () => {
   let n = 0;
   const api = app(() => `id-${++n}`);
   const add = () => api.request("/todos", { method: "POST", body: '{"title":"buy milk"}' });
-  for (let i = 1; i <= TODO_LIMIT; i++) {
+  // The PRD's limit, written out: business constants stay out of apps/ (L27).
+  const limit = 500;
+  for (let i = 1; i <= limit; i++) {
     expect((await add()).status).toBe(201);
   }
 

@@ -1,6 +1,7 @@
 import { fail } from "@sveltejs/kit";
+import { toCompleted } from "@todo/valid/todos/completed.ts";
 import { patchTodos } from "../api/todos.ts";
-import { SOMETHING_WENT_WRONG } from "./messages.ts";
+import { SOMETHING_WENT_WRONG, problemMessage } from "./messages.ts";
 import { status } from "./status.ts";
 
 /**
@@ -11,15 +12,14 @@ import { status } from "./status.ts";
  * The person cannot fix a failed mark all, so every failure says the same.
  */
 export async function markAllTodos(api: Pick<Fetcher, "fetch">, form: FormData) {
-  const completed = form.get("completed");
-
-  // The page always sends "true" or "false"; anything else did not come from it.
-  const isBoolean = completed === "true" || completed === "false";
-  if (!isBoolean) {
-    return fail(422, { markAll: { message: SOMETHING_WENT_WRONG } });
+  // completed must be true or false.
+  const completed = toCompleted({ completed: form.get("completed") });
+  if (!completed.ok) {
+    const [problem] = completed.error;
+    return fail(422, { markAll: { message: problemMessage(problem) } });
   }
 
-  const value = completed === "true";
+  const value = completed.value;
   const reply = await patchTodos(api, { completed: value });
   if (!reply.ok) {
     const kind = reply.error.kind;

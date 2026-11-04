@@ -1,7 +1,7 @@
 import { fail } from "@sveltejs/kit";
-import { checkTitle } from "@todo/valid/todos/title.ts";
+import { toTodoPatch } from "@todo/valid/todos/todo-patch.ts";
 import { patchTodo } from "../api/todos.ts";
-import { SOMETHING_WENT_WRONG, TITLE_RULE } from "./messages.ts";
+import { SOMETHING_WENT_WRONG, problemMessage } from "./messages.ts";
 import { status } from "./status.ts";
 
 /** A form value as text, or empty when it is missing or a file. */
@@ -29,15 +29,18 @@ export async function editTodo(api: Pick<Fetcher, "fetch">, form: FormData) {
     return fail(422, { edit: { id, title, message: SOMETHING_WENT_WRONG } });
   }
 
-  const checked = checkTitle(title);
-  if (!checked.ok && checked.error === "empty") {
-    return { edited: id };
-  }
-  if (!checked.ok) {
-    return fail(422, { edit: { id, title, message: TITLE_RULE } });
+  // The title must follow the business rules. An empty one is not a
+  // failure here: it leaves the todo as it is.
+  const patch = toTodoPatch({ title: form.get("title") });
+  if (!patch.ok) {
+    const [problem] = patch.error;
+    if (problem.rule === "title.empty") {
+      return { edited: id };
+    }
+    return fail(422, { edit: { id, title, message: problemMessage(problem) } });
   }
 
-  const reply = await patchTodo(api, id, { title: checked.value });
+  const reply = await patchTodo(api, id, patch.value);
   if (!reply.ok) {
     const kind = reply.error.kind;
     return fail(status(kind), { edit: { id, title, message: SOMETHING_WENT_WRONG } });

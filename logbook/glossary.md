@@ -15,10 +15,10 @@ We ground our language in DDD's concepts, with two cautions:
   intent per port, plain types rather than hydrated objects, and one
   translation per boundary.
 
-Decisions L1–L26 were agreed in the language sessions of 2026-11-03:
+Decisions L1–L27 were agreed in the language sessions of 2026-11-03:
 L1–L13 on language, L14–L21 on operations, L22 on package layout, L23
 on OpenAPI, L24 on entry chains, L25 on use cases, L26 on the api
-spec. They are recorded
+spec, L27 on `valid`. They are recorded
 in [the api story](the-api-story.md).
 
 Status:
@@ -131,7 +131,12 @@ business rules, which it may import, and builds the input shape from
 the result. A single property is checked as a property: the title
 against `TITLE_MAX`. No new type is needed for that.
 
-- **Status:** locked (L12).
+It does so in three steps (L27): it decodes its own envelope, calls
+`valid`, which turns a candidate into the input, then words any
+problem in its own message table. The [check](#check) runs once, in
+`valid`, for every delivery.
+
+- **Status:** locked (L12, L27).
 
 ### Trusted
 
@@ -512,7 +517,9 @@ job. The idea survives as two questions we ask of every operation:
 
 A translation inward, from a language that is not ours into business
 types. We have three:
-- entry-point validation: the request into business inputs;
+- entry-point validation: the request into business inputs. The
+  delivery decodes its envelope, and `valid` [decodes](#decode) each
+  field and builds the input;
 - data's Outer layer: rows or vendor payloads into business objects
   and facts;
 - the BFF's api client: the api's wire into the BFF's business types.
@@ -586,6 +593,93 @@ spec, through the extractor in `tooling/` that also feeds
 - **Status:** target (L23, L26). The document is generated (OpenAPI
   3.1), with the spec's examples; `operationId` and `x-unit` wait for
   the extractor.
+
+## Validation
+
+How a delivery turns what it read into a business input (L27). The
+code is `packages/valid`; the story's chapter 7 tells it.
+
+### Delivery
+
+A way the business is delivered: an app that reads input in its own
+envelope and shows results in its own way. The api (HTTP and JSON),
+the BFF (forms and pages) and, later, a CLI (`argv` and a terminal)
+are deliveries. Each has a decoder for its envelope, a message table
+and a present module, and they share `valid`, business and
+operations.
+
+- **Status:** locked (L27).
+
+### Candidate
+
+What a delivery read for one business input, before it is decoded or
+checked: an object with the input's fields, each `unknown`.
+`NewTodoCandidate = { title: unknown }`. A delivery fills one in a
+line and does no typing work.
+
+- **In the code:** `<Input>Candidate`, beside its function in
+  `packages/valid/src/<area>/<input>.ts`.
+- **Status:** locked (L27).
+
+### Decode
+
+Narrowing one field's value from `unknown` to the type the field
+needs: text, or a boolean from `true`, `false`, `"true"` or `"false"`.
+It is the field-level end of the [anti-corruption
+layer](#anti-corruption-layer-acl): the envelope is the delivery's to
+decode, the fields are `valid`'s. A spelling a delivery needs is added
+in `valid`, never in the delivery.
+
+- **In the code:** `packages/valid/src/fields/decode.ts`, private.
+- **Status:** locked (L27).
+
+### Check
+
+Applying the business rules to decoded values: trim the title, then
+require 1 to `TITLE_MAX` UTF-16 code units, in that order. It is
+[Validate once](#validate-once) made one place: every delivery checks
+through `valid`, and nothing below the entry point checks again.
+
+- **In the code:** `packages/valid/src/fields/title.ts`, private.
+- **Status:** locked (L12, L27).
+
+### Build
+
+Assembling the business input from checked values, and applying the
+rules that span fields: a patch must change a title, `completed` or
+both (`patch.empty`).
+
+- **In the code:** `to<Input>` in `packages/valid/src/<area>/<input>.ts`:
+  `toNewTodo`, `toTodoPatch`, `toTodoFilter`, `toCompleted`.
+- **Status:** locked (L27).
+
+### Problem
+
+Why a candidate is not an input: a field, a [rule id](#rule-id) and
+all of the rule's parameters, never words. `{ field: "title", rule:
+"title.too_long", max: 256 }`. A problem carries every parameter of its
+rule, not only the ones the violation touched, so `title.empty` carries
+`max` too. `valid` returns every problem it finds; the delivery decides
+how many it shows and writes the words, taking any number from the
+problem.
+
+- **In the code:** `packages/valid/src/problem.ts`.
+- **Not:** a failure (`Fail`). A delivery turns a problem into a
+  failure, because the delivery owns the message a failure carries.
+- **Status:** locked (L27).
+
+### Rule id
+
+The name of the rule a problem breaks. There are two kinds:
+- **decode rules** are generic, named by the type the field needs, with
+  the field beside them: `not_text`, `not_boolean`;
+- **check rules** are named after the business rule they guard:
+  `title.empty`, `title.too_long`, `patch.empty`.
+
+Check rule ids are fixed: use cases cite them, so a check rule is
+never renamed.
+
+- **Status:** locked (L27).
 
 ## The BFF
 

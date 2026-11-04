@@ -1,12 +1,13 @@
 import { AddTodoBody } from "@todo/contract-api";
 import type { Context } from "hono";
 import type { AddTodo } from "@todo/operations/todos/add-todo.ts";
+import { toNewTodo } from "@todo/valid/todos/new-todo.ts";
+import { invalidOf } from "../messages.ts";
 import { created, mapFailure, userFailure } from "../present.ts";
 import { validateBody } from "../validate.ts";
 import { presentTodo } from "./present.ts";
-import { validateTitle } from "./validate.ts";
 
-/** `POST /todos`: validate the body, validate the title, add, then present. */
+/** `POST /todos`: validate the body, make it a new todo, add, then present. */
 export const postTodos = (addTodo: AddTodo) => async (c: Context) => {
   // The body must be JSON, shaped as the contract says.
   const body = await validateBody(c, AddTodoBody);
@@ -15,9 +16,9 @@ export const postTodos = (addTodo: AddTodo) => async (c: Context) => {
   }
 
   // The title must follow the business rules.
-  const newTodo = validateTitle(body.value);
+  const newTodo = toNewTodo({ title: body.value.title });
   if (!newTodo.ok) {
-    return userFailure(c, newTodo.error);
+    return userFailure(c, invalidOf(newTodo.error));
   }
 
   // Adding can fail for the user (the list is full) or for us (the store).
