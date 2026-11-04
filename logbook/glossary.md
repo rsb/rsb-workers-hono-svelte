@@ -51,7 +51,7 @@ direct call and `⇢` across a port, where construct picks the
 implementation:
 
 ```
-PATCH /todos/:id → patchTodo → updateTodo ⇢ UpdateStore.updateTodo → d1.updateTodo → queryAll
+PATCH /todos/{id} → patchTodo → updateTodo ⇢ UpdateStore.updateTodo → d1.updateTodo
 ```
 
 Every entry point's entry chain, with the file and symbols of each
@@ -59,7 +59,12 @@ link, is listed in `apps/api/entry-chains.md`. The index is generated, never
 written by hand, and checked by regenerating and diffing it. See
 [the api story](the-api-story.md), chapter 9.
 
-- **Status:** target (L24). The generator is open.
+The chain ends at the data method. Private symbols are not links, and
+the driver helpers every chain shares are listed once, at the top of
+the index.
+
+- **Status:** built (L24, stage 13): `pnpm gen:entry-chains` writes the
+  index, and `pnpm check:entry-chains` diffs it.
 
 ### Boundary
 
@@ -590,9 +595,9 @@ use case (L14). `operationId` and `x-unit` come from construct, not the
 spec, through the extractor in `tooling/` that also feeds
 `apps/api/entry-chains.md`.
 
-- **Status:** target (L23, L26). The document is generated (OpenAPI
-  3.1), with the spec's examples; `operationId` and `x-unit` wait for
-  the extractor.
+- **Status:** built (L23, L26). The document is generated (OpenAPI
+  3.1), with the spec's examples. Since stage 13 it also carries
+  `operationId` and `x-unit`, read from construct.
 
 ## Validation
 
@@ -713,8 +718,10 @@ To be settled in later sessions:
 - the api spec's vocabulary: drafted in the story (chapter 11) and
   used by `prd/todo/api.md` and read by `tooling/api-spec/parse.ts`;
   waiting to be settled;
-- `tooling/`, the monorepo's scripts: the extractor that reads
-  construct and the generator for `apps/api/entry-chains.md`. The
-  generator for the contract and the OpenAPI document is written:
-  plain Node scripts with no dependencies, outside the workspace;
+- `tooling/`, the monorepo's scripts: their place and form are not yet
+  settled. Its generators are written as plain Node scripts with no
+  dependencies, outside the workspace:
+  - the contract and the OpenAPI document (`tooling/api-spec/`);
+  - the extractor that reads construct, and the entry chain index
+    (`tooling/entry-chains/`, stage 13);
 - whether the data spec earns its place, once tried.
