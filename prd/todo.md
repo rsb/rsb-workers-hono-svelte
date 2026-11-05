@@ -20,8 +20,8 @@ Since stage 22 the PRD is a tree (L44). This file keeps what is
 product-wide; the rest lives beside it in `prd/todo/`:
 `features/` (one per user job, with its views, states and acceptance
 scenarios), `use-cases/<area>/` (one per operation), `rules.md`,
-`api.md` and `data/` (one file per database). `access.md` is added in
-slice A.
+`api.md`, `access.md` (who may run each operation, L39, L43) and
+`data/` (one file per database).
 
 ## Source and licence
 Behaviour comes from the TodoMVC application specification,
@@ -139,6 +139,11 @@ deviation that cannot is dropped.
     page is built (hash links, state held in the browser), this file
     wins: routes stay real paths (4) and every mutation stays a form
     action (12).
+- **C-accounts** The app has accounts, built in slices A to E
+  (`logbook/handoffs/2026-11-05-23-auth-slice-a.md`, L37–L43): every
+  request acts for an actor, and every todo belongs to one user. The
+  accounts design is `design/2026-11-03-ui-accounts/`, under C-design's
+  lines.
 
 ## Deviations
 One per line, each with its constraint.
@@ -163,9 +168,11 @@ One per line, each with its constraint.
    (UTF-16 code units). Upstream sets no limit (C-secure).
 8. A request body over 8 KiB is rejected with `too_large` (413)
    (C-secure).
-9. The store holds at most 500 todos. Adding one more is rejected with
-   `limit` (409) (C-secure). The check and the insert are one atomic
-   step in every store (Database).
+9. Each user's list holds at most 500 todos. Adding one more is
+   rejected with `limit` (409) (C-secure). The check and the insert are
+   one atomic step in every store (Database). Until slice A the 500 was
+   for the one list; from A it is per user, since each user has their
+   own (C-accounts).
 10. DOM selectors (`#main`, `#footer`, `.destroy`, `<strong>`,
     `.editing`, `.completed`, `selected`) are not required. The
     behaviour each names is kept, and e2e finds elements by role,
@@ -201,6 +208,15 @@ One per line, each with its constraint.
 20. "Mark all as complete" is a toggle button with a pressed state, not
     a checkbox. It is pressed when every todo is completed, and is
     shown only when there are todos (C-design).
+21. Every todo belongs to one user, and a person sees and changes only
+    their own. A request with no live session acts for no one
+    (`anonymous`): it reads no list and changes nothing, and the page
+    says to sign in (C-accounts).
+22. The envelope has the kinds `unauthenticated` (401) and `forbidden`
+    (403), in addition to those of deviation 14. A `forbidden` error
+    carries a `reason`: `account_disabled` when the session's user is
+    disabled, `role` when the actor lacks what the operation requires
+    (C-accounts).
 
 ## Design
 The page's screens are the views and states of
@@ -214,25 +230,38 @@ examples, and how a use case's refusals map to the envelope's kinds.
 ## Envelope
 - Success: `{ "ok": true, "data": <reply> }`.
 - Error: `{ "ok": false, "error": { "kind": <kind>, "message": <text> } }`,
-  plus `"field": <name>` when the kind is `validation`.
-- Kinds: `validation` (422), `not_found` (404), `limit` (409),
-  `too_large` (413), `internal` (500).
+  plus `"field": <name>` when the kind is `validation`, and
+  `"reason": <reason>` when the kind is `forbidden`.
+- Kinds: `validation` (422), `unauthenticated` (401), `forbidden` (403),
+  `not_found` (404), `limit` (409), `too_large` (413), `internal` (500)
+  (deviations 14 and 22).
 - An `internal` error never carries the cause in its message; the
   cause is logged.
 
 ## Security
-Recorded here so that each slice keeps them; none needs code of its
-own beyond the limits above.
+Recorded here so that each slice keeps them. The threats and their
+tests are `logbook/threats.md`.
 - The page never renders a title as HTML: `{@html}` is not used.
-- SvelteKit's origin check on form actions stays on.
+- SvelteKit's origin check on form actions stays on; in SvelteKit 3 it
+  is always on, with no trusted origin beyond the BFF's own.
 - The API has no public route (C-fixed).
+- The session cookie is `__Host-sid`: `Secure`, `HttpOnly`,
+  `SameSite=Lax`, `Path=/`. Only the BFF writes it; the API never
+  writes `Set-Cookie` (L40). Under `http://localhost` it is named `sid`,
+  since a browser refuses a `__Host-` cookie without https; the name is
+  one config value, and no code branches on the environment.
+- A raw session token is never stored: the API keeps its SHA-256 hash
+  (L40).
+- The API checks the channel of every request that carries a cookie
+  and changes something (L38), whatever SvelteKit has already checked.
 
 ## Shape
 These are constraints, not rules.
 - `apps/` holds the Workers: `api` (Hono on Cloudflare Workers) and
   `bff` (SvelteKit, Svelte 5, Cloudflare adapter). `packages/` holds
   what they build on: `contract/api` (the shapes and limits both
-  share), `business`, `operations` and `data/*`, one per store.
+  share), `business`, `gates` (L37), `operations` and `data/*`, one per
+  store.
 - The BFF is the only public Worker. The API is reached only through a
   service binding.
 - Local only. `pnpm dev` at the root runs both Workers with the binding
@@ -241,8 +270,10 @@ These are constraints, not rules.
 - The store is behind a port. D1 is the store the API runs on.
 
 ## Database
-- D1, local only, through a `DB` binding on the API Worker. The BFF
-  never reaches it.
+- D1, local only. Two databases, each bound on the API Worker (L42):
+  the identity database, `IDENTITY_DB`, holds users and sessions; the
+  app database, `APP_DB`, holds todos, each with its user's id. No
+  query joins the two. The BFF reaches neither.
 - SQL is written by hand, with `prepare` and `bind` only: no ORM, no
   query builder, and no value is ever put into SQL text.
 - The schema is a set of numbered migration files, applied by
@@ -265,9 +296,12 @@ planned.
 | 6 | Mark all as complete | Mark all as complete | 15, 20 |
 | 7 | Clear completed | Clear completed | 15 |
 | 8 | Filter | Routing | 4, 5, 6, 15 |
+| A | Ownership without login | ours | 9, 21, 22 |
 
 Slice 2 was built before the design; it is restyled to the design
-before slice 3 starts.
+before slice 3 starts. The accounts slices are lettered, A to E
+(C-accounts); B to E are named in handoff 23 and added here as each
+starts.
 
 ## Acceptance scenarios
 E2e runs these, through the BFF, with the scenarios under each
@@ -289,14 +323,13 @@ numbers: they are that feature's done criteria. Scenario 1 stays here:
 health is a probe, not a user job.
 
 ## Done
-All eight slices work locally, and the tests pass at every tier: unit,
+Every slice in the table works locally, and the tests pass at every tier: unit,
 integration, and end to end through the BFF. End to end runs scenario
 1 above and every scenario under a feature's Done in
 `prd/todo/features/`; this file keeps no copy of them.
 
 ## Out of scope
 - Deploying, staging, production, a public site.
-- Sign-in and users.
 - Concurrency control beyond what each store's transactions settle
   (locks held across requests, retries, optimistic versions). An agent
   that introduces it is a finding, not a feature.
@@ -322,3 +355,10 @@ integration, and end to end through the BFF. End to end runs scenario
   their slices; "Sign-in and users" leaves Out of scope in the
   amendment that starts slice A
   (`logbook/handoffs/2026-11-05-22-prd-tree.md`).
+- 2026-11-05, stage 23, slice A: "Sign-in and users" leaves Out of
+  scope, as stage 22's amendment said. New constraint C-accounts;
+  deviation 9 is per user; deviations 21 and 22; the Envelope's two
+  kinds and `reason`; Security's cookie, token and channel lines; Shape
+  names `gates`; Database names both databases; the slice table gains
+  A. `access.md` joins the tree
+  (`logbook/handoffs/2026-11-05-23-auth-slice-a.md`).

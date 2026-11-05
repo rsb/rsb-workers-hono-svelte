@@ -34,19 +34,22 @@ it.
 
 | State | The user sees | Produced by | Board |
 | --- | --- | --- | --- |
-| `accounts.shell.signed_out` | the top bar with "Sign in"; in place of the list, "Sign in to see your list. Your to-dos are kept with your account.", with "Sign in" and "Create an account" | authenticate › `anonymous` (no cookie, or one that names no live session, which also clears it); then the page's read, list-todos, is refused by the runner: it requires `member` | `shell.signed-out` |
-| `accounts.shell.member` | the top bar with "Todos" and the account button with the person's initials; the page inside | authenticate › an actor whose role is `member` | `shell.member` |
-| `accounts.shell.admin` | as `member`, with a "Users" link | authenticate › an actor whose role is `admin` | drawn only with the menu open (`shell.menu-open`, as admin) |
-| `accounts.shell.menu_open` | the account menu open over the page: name and email, "Admin" for an admin, then Todos, Users (admin only), Profile and Sign out | bff (no chain runs) | `shell.menu-open` |
-| `accounts.shell.signed_out_notice` | `signed_out`, with the notice "You’re signed out on this device." | bff, after sign-out; open until B | `shell.signed-out-notice` |
+| `accounts.shell.signed_out` | the top bar with no links; in place of the list, "Sign in to see your list. Your to-dos are kept with your account." "Sign in" and "Create an account" are added in B and C, with their pages | `bff, over the runner › unauthenticated`: authenticate › `anonymous` (no cookie, or one that names no live session, which the BFF then deletes), and the page's read, list-todos, is refused by the runner, which requires `member` | `shell.signed-out` (drawn with the two links slice A leaves out) |
+| `accounts.shell.member` | the top bar with "Todos" and the account button with the person's initials; the page inside | `authenticate › member`: an actor whose role is `member` | `shell.member` |
+| `accounts.shell.admin` | as `member`; the "Users" link is added in D, with its page | `authenticate › admin`: an actor whose role is `admin` | drawn only with the menu open (`shell.menu-open`, as admin) |
+| `accounts.shell.menu_open` | the account menu open over the page: name and email, "Admin" for an admin, then Todos; Sign out from B, Users (admin only) from D, and Profile when its page exists | `bff` (no chain runs) | `shell.menu-open` |
+| `accounts.shell.signed_out_notice` | `signed_out`, with the notice "You’re signed out on this device." | `open: B (after sign-out)` | `shell.signed-out-notice` |
 
 Slice A has no sign-in page: there is no redirect, and with no cookie
-the BFF renders `signed_out` with no list. "Sign in" and "Create an
-account" have pages behind them from B and C.
+the BFF renders `signed_out` with no list and no links. The shell shows
+a link only when its page exists: "Sign in" and "Create an account"
+from B and C, "Users" from D, "Profile" when its page exists. The
+boards draw them all; slice A renders the frame without them.
 
 The chain produces one result no board shows: authenticate › refused
-`account_disabled`, a live session whose user is disabled. It is
-`open` until D, which disables users.
+`forbidden`, reason `account_disabled`, a live session whose user is
+disabled. It is `open: D (disables users)`; until then the BFF renders
+`accounts.error.failed` for it, as for any reply it cannot place.
 
 The account fields the frame shows (initials, name, email) and the
 "current page" mark in the top bar are read with the actor; they are
@@ -58,10 +61,10 @@ line, a title, a sentence, and "Try again" or "Go to your to-dos".
 
 | State | The user sees | Produced by | Board |
 | --- | --- | --- | --- |
-| `accounts.error.not_found` | "404", "This page doesn’t exist", "The address may be mistyped, or the page has moved." | bff: no page has that path | `error.not-found` |
-| `accounts.error.forbidden` | "403", "You don’t have access to this page", "It’s limited to some accounts. If you think you should have access, ask an admin." | a page's read › the runner's `forbidden`: a signed-in actor without the `requires` its operation names; the bff shows this state for every route but the users pages. Open until D, since every todo operation requires only `member` | `error.forbidden` |
-| `accounts.error.admin_only` | "403 · /users", "Users is for admins", and who the person is signed in as, and their role | the same runner `forbidden` as `forbidden`: the chain does not tell the two apart. The bff chooses `admin_only` over `forbidden` from the route, when the refused read is a users page's. Open until D | `error.admin-only` |
-| `accounts.error.failed` | "Something went wrong", "That didn’t go through — nothing was changed. Try again.", with "Try again" | a page's read › refused `unavailable` or `server` (for the todos page: list-todos or count-todos) | `error.failed` |
+| `accounts.error.not_found` | "404", "This page doesn’t exist", "The address may be mistyped, or the page has moved." | `bff`: no page has that path | `error.not-found` |
+| `accounts.error.forbidden` | "403", "You don’t have access to this page", "It’s limited to some accounts. If you think you should have access, ask an admin." | `open: D (every todo operation requires only member)`. Then `bff, over the runner › forbidden`: a signed-in actor without the `requires` its operation names, on every route but the users pages | `error.forbidden` |
+| `accounts.error.admin_only` | "403 · /users", "Users is for admins", and who the person is signed in as, and their role | `open: D (the users pages)`. Then `bff, over the runner › forbidden`, the same result as `forbidden`: the chain does not tell the two apart, and the BFF chooses `admin_only` from the route, when the refused read is a users page's | `error.admin-only` |
+| `accounts.error.failed` | "Something went wrong", "That didn’t go through — nothing was changed. Try again.", with "Try again" | `list-todos › unavailable or server`, and the same for count-todos, or the `authenticate` gate when its store fails: any read the page needs; the api's reply is `internal` | `error.failed` |
 
 ## Inputs
 None.
@@ -70,25 +73,52 @@ None.
 
 | Read | Endpoint | Use case | Data cases |
 | --- | --- | --- | --- |
-| the actor, with the name and email the frame shows | slice A names it: one api call per page load | authenticate (a gate, not a use case) | `data/identity.md`, written in slice A |
+| the actor, with the name and email the frame shows | `GET /sessions/current`, once per page load | current-session, over what the `authenticate` gate attached | `data/identity.md › sessions.find` (the gate's statement; the reply needs none of its own) |
 
 ## Actions
 
-| Action | Endpoint | Use case | Leads to |
-| --- | --- | --- | --- |
-| open or close the account menu | none | bff | `menu_open`, or back |
-| sign out | open until B | sign out (B): ends this device's session | `signed_out_notice` |
-| try again | the page's own read | the page's | the page's state, or `accounts.error.failed` again |
+| Action | Endpoint | Use case | Data cases | Leads to |
+| --- | --- | --- | --- | --- |
+| open or close the account menu | none | bff | none | `menu_open`, or back |
+| sign out | open until B | sign out (B): ends this device's session | open until B | `signed_out_notice` |
+| try again | the page's own read | the page's | the page's | the page's state, or `accounts.error.failed` again |
 
 ## Budget
-Slice A: the actor read is one api call per page load, recorded in the
-BFF budgets; on the api, a gated request is 1 identity round trip, at
-most 2 rows read and none written on the steady path (handoff 23,
-item 7).
+The actor read is one api call per page load, `GET /sessions/current`,
+asserted in `apps/bff/test/unit/budgets.test.ts`. On the api every
+gated request costs 1 identity round trip, the gate's: 1 statement, at
+most 2 rows read and none written on the steady path. The actor read
+adds no statement of its own. When the gate says `refreshDue`, 1 write
+follows the response (`sessions.touch`), at most once per session per
+half idle window. Asserted in `apps/api/test/unit/budgets.test.ts` and
+`packages/data/d1/test/unit/budgets.test.ts`.
 
 ## Done
-None yet. Slice A writes the scenarios for `signed_out`, `member`,
-`admin`, `not_found` and `failed`; B and D write theirs.
+E2e runs these through the BFF, with the dev seed's member and admin
+sessions. Each cites the deviation or the decision it comes from. B
+and D write theirs.
+
+### A Ownership without login
+1. *Given* no session cookie, *when* I open `/`, *then* I see "Sign in
+   to see your list", no list, and no links in the top bar. (21)
+2. *Given* a session cookie that names no live session, *when* I open
+   `/`, *then* I see the same, and the cookie is deleted. (21; L39)
+3. *Given* the member's session, *when* I open `/`, *then* the top bar
+   shows "Todos" and the account button with the member's initials,
+   and the page shows the member's list. (21)
+4. *Given* the member's session, *when* I open the account menu,
+   *then* it shows the member's name and email, and no "Admin". (21)
+5. *Given* the admin's session, *when* I open the account menu, *then*
+   it shows the admin's name and email and "Admin", and there is no
+   "Users" link. (21; slice A has no users page)
+6. *Given* any session, *when* I open `/nowhere`, *then* I see "This
+   page doesn’t exist", in the frame. (C-accounts)
+7. *Given* the api fails, *when* I open `/`, *then* I see "Something
+   went wrong" and "Try again", in the frame. (C-accounts)
+
+Scenario 7 is not an e2e scenario, for the reason scenario 1 of the
+root gives for health: `test:e2e` starts both Workers. It is the BFF's
+unit test of the page load, with a fake binding that fails.
 
 ## Board map
 The accounts design was exported before the naming convention. Its
