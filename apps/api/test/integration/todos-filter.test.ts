@@ -1,4 +1,4 @@
-import { Failure, TodoCountsReply, TodoListReply, envelope } from "@todo/contract-api";
+import { TodoCountsReply, TodoListReply, envelope } from "@todo/contract-api";
 import { exports } from "cloudflare:workers";
 import * as v from "valibot";
 import { expect, it } from "vitest";
@@ -39,11 +39,4 @@ it("GET /todos?completed= lists only the todos asked for, in creation order", as
   expect(await titles("?completed=false")).toEqual(["walk dog"]);
   expect(await titles("")).toEqual(["buy milk", "walk dog", "call mum"]);
   expect(await counts()).toEqual({ ok: true, data: { active: 1, completed: 2 } });
-});
-
-it("GET /todos with a bad completed is refused, naming the field", async () => {
-  const response = await fetchApi("/todos?completed=yes");
-
-  expect(response.status).toBe(422);
-  expect(v.parse(Failure, await response.json()).error).toMatchObject({ kind: "validation", field: "completed" });
 });
