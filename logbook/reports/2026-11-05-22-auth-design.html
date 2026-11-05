@@ -1,0 +1,1202 @@
+<title>Authentication Design</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap');
+/* Layout: engineering document. Sticky numbered nav at left, one reading column at right; diagrams sit in quiet panels with a side detail pane. */
+:root {
+  --bg: #f4f6f9; --surface: #ffffff; --sunk: #e9edf3; --fg: #182032; --muted: #556077; --line: #d3d9e3;
+  --accent: #23408e; --on-accent: #ffffff;
+  --c-startup: #64748b; --c-gate: #b06a10; --c-entry: #2563c9; --c-process: #7a4cbf;
+  --c-operation: #2c8549; --c-port: #0e8484; --c-data: #b3502a; --c-client: #5d6b84;
+  --ok: #2b7a45; --bad: #b42318; --warn: #a96410;
+  --f-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --f-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #11151d; --surface: #181e29; --sunk: #222a37; --fg: #e5e9f0; --muted: #9ba6ba; --line: #2f3848;
+  --accent: #9db2ff; --on-accent: #0f1530;
+  --c-startup: #9aa7bb; --c-gate: #e3a44a; --c-entry: #6ea2f2; --c-process: #b493ea;
+  --c-operation: #63bf7f; --c-port: #45bdbd; --c-data: #e58660; --c-client: #9aa6bc;
+  --ok: #67c486; --bad: #f2786b; --warn: #e3a44a; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #11151d; --surface: #181e29; --sunk: #222a37; --fg: #e5e9f0; --muted: #9ba6ba; --line: #2f3848;
+  --accent: #9db2ff; --on-accent: #0f1530;
+  --c-startup: #9aa7bb; --c-gate: #e3a44a; --c-entry: #6ea2f2; --c-process: #b493ea;
+  --c-operation: #63bf7f; --c-port: #45bdbd; --c-data: #e58660; --c-client: #9aa6bc;
+  --ok: #67c486; --bad: #f2786b; --warn: #e3a44a; color-scheme: dark }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--f-body); font-size: 16px; line-height: 1.6; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+.wrap { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 48px; max-width: 1200px; margin: 0 auto;
+  padding-block: 36px 96px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+nav.side { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 24px); align-self: start; max-height: calc(100vh - 48px); overflow-y: auto; font-size: 14px; }
+nav.side .brand { font-family: var(--f-display); font-weight: 700; font-size: 17px; margin-bottom: 12px; line-height: 1.25; }
+nav.side ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+nav.side a { display: grid; grid-template-columns: 26px 1fr; padding: 4px 8px; border-radius: 5px; color: var(--muted); text-decoration: none; }
+nav.side a span { font-family: var(--f-mono); font-size: 12px; padding-top: 2px; font-variant-numeric: tabular-nums; }
+nav.side a:hover { color: var(--fg); background: var(--sunk); }
+nav.side a.active { color: var(--accent); background: var(--sunk); font-weight: 600; }
+.mobilenav { display: none; position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); padding-block: 8px; border-bottom: 1px solid var(--line); }
+.mobilenav select { width: 100%; font: inherit; font-size: 15px; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); }
+main { min-width: 0; }
+@media (max-width: 920px) { .wrap { grid-template-columns: minmax(0, 1fr); gap: 0; padding-block: 0 72px; } nav.side { display: none; } .mobilenav { display: block; } header.top { padding-top: 20px; } }
+
+header.top .eyebrow { font-family: var(--f-mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font-family: var(--f-display); font-weight: 750; font-size: clamp(34px, 6vw, 52px); line-height: 1.05; letter-spacing: -.02em; margin: 8px 0 16px; text-wrap: balance; }
+h2 { font-family: var(--f-display); font-weight: 700; font-size: clamp(24px, 3.4vw, 30px); line-height: 1.15; margin: 0 0 12px; text-wrap: balance; display: flex; gap: 12px; align-items: baseline; }
+h2 .num { font-family: var(--f-mono); font-size: 14px; font-weight: 500; color: var(--accent); border: 1px solid var(--line); border-radius: 4px; padding: 0 6px; flex: none; }
+h3 { font-family: var(--f-display); font-weight: 650; font-size: 19px; margin: 28px 0 8px; text-wrap: balance; }
+h4 { font-size: 13px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin: 0 0 6px; font-weight: 600; }
+p, li { max-width: 68ch; }
+p { margin: 0 0 12px; }
+ul.tight { margin: 0 0 12px; padding-left: 20px; } ul.tight li { margin: 3px 0; }
+.lede { font-size: 18px; line-height: 1.55; max-width: 66ch; }
+.small { font-size: 14px; color: var(--muted); }
+code, .mono { font-family: var(--f-mono); font-size: .86em; }
+code { background: var(--sunk); padding: 1px 5px; border-radius: 3px; overflow-wrap: anywhere; }
+section { padding-block: 44px 8px; border-top: 1px solid var(--line); margin-top: 36px; scroll-margin-top: 64px; }
+section:first-of-type { border-top: 0; margin-top: 8px; }
+
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 18px; }
+.diag { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 18px; align-items: start; margin-top: 16px; }
+@media (max-width: 1120px) { .diag { grid-template-columns: minmax(0, 1fr); } }
+.diag > * { min-width: 0; }
+.svgbox { width: 100%; overflow-x: auto; }
+.svgbox svg { display: block; width: 100%; height: auto; max-width: 100%; }
+.detail { min-height: 120px; font-size: 15px; }
+.detail h4 { margin-bottom: 4px; }
+.detail .def { font-size: 16px; margin-bottom: 10px; }
+.detail ul { padding-left: 18px; margin: 0; } .detail li { margin: 4px 0; }
+
+/* SVG nodes */
+.node { cursor: pointer; }
+.node rect { fill: color-mix(in srgb, var(--sc) 10%, var(--surface)); stroke: var(--sc); stroke-width: 1.5; transition: fill .15s; }
+.node rect.dashed { stroke-dasharray: 5 4; }
+.node:hover rect { fill: color-mix(in srgb, var(--sc) 20%, var(--surface)); }
+.node.on rect { fill: color-mix(in srgb, var(--sc) 32%, var(--surface)); stroke-width: 3; }
+.node.seen rect { fill: color-mix(in srgb, var(--sc) 18%, var(--surface)); }
+.node.stop rect { stroke: var(--bad); stroke-width: 3; fill: color-mix(in srgb, var(--bad) 18%, var(--surface)); }
+.node.dim { opacity: .62; }
+.node:focus { outline: none; }
+.node:focus-visible rect { stroke: var(--accent); stroke-width: 3.5; }
+.t-main { fill: var(--fg); font-family: var(--f-mono); font-size: 14px; font-weight: 500; }
+.t-disp { fill: var(--fg); font-family: var(--f-display); font-size: 16px; font-weight: 650; }
+.t-sub { fill: var(--muted); font-family: var(--f-body); font-size: 11.5px; }
+.t-badge { font-family: var(--f-body); font-size: 11px; font-weight: 600; }
+.t-muted { fill: var(--muted); font-family: var(--f-body); font-size: 12px; }
+.edge { stroke: var(--muted); stroke-width: 1.5; fill: none; }
+.edge.hot { stroke: var(--accent); stroke-width: 2.5; }
+.edge.dash { stroke-dasharray: 5 4; }
+.ah { fill: var(--muted); }
+.b-unit { fill: var(--c-gate); } .b-bind { fill: var(--muted); }
+[data-stage="startup"] { --sc: var(--c-startup); } [data-stage="gate"] { --sc: var(--c-gate); }
+[data-stage="entry"] { --sc: var(--c-entry); } [data-stage="process"] { --sc: var(--c-process); }
+[data-stage="operation"] { --sc: var(--c-operation); } [data-stage="port"] { --sc: var(--c-port); }
+[data-stage="data"] { --sc: var(--c-data); } [data-stage="client"] { --sc: var(--c-client); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; color: var(--muted); margin-top: 10px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 12px; height: 12px; border-radius: 3px; border: 2px solid var(--sc); background: color-mix(in srgb, var(--sc) 18%, var(--surface)); }
+
+/* controls */
+.btn { font: inherit; font-size: 14px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); padding: 6px 12px; border-radius: 6px; cursor: pointer; line-height: 1.3; }
+.btn:hover { border-color: var(--muted); }
+.btn[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.btn:disabled { opacity: .45; cursor: default; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+label.ctl { display: block; font-size: 13px; color: var(--muted); }
+label.ctl select { display: block; margin-top: 4px; }
+select.ctl, label.ctl select { font: inherit; font-size: 14px; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); max-width: 100%; }
+
+/* tables */
+.tbl { overflow-x: auto; margin-top: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+table.wide { min-width: 680px; } table.mid { min-width: 520px; }
+.diag.stack { grid-template-columns: minmax(0, 1fr); }
+#life-box svg { max-width: 560px; margin: 0 auto; }
+#areas-box svg { min-width: 520px; }
+th, td { padding: 9px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; background: var(--sunk); }
+tr:last-child td { border-bottom: 0; }
+td.num { font-variant-numeric: tabular-nums; font-family: var(--f-mono); }
+.yes { color: var(--ok); font-weight: 600; } .no { color: var(--muted); } .bad { color: var(--bad); font-weight: 600; }
+tr.pick { cursor: pointer; } tr.pick:hover td { background: var(--sunk); }
+tr.pick[aria-expanded="true"] td { background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
+tr.explain td { background: var(--sunk); font-size: 14px; }
+.pill { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 99px; border: 1px solid var(--line); white-space: nowrap; }
+.pill.stage { border-color: var(--sc); background: color-mix(in srgb, var(--sc) 12%, var(--surface)); }
+.pill.chosen { border-color: var(--ok); color: var(--ok); } .pill.rej { border-color: var(--bad); color: var(--bad); } .pill.res { border-color: var(--warn); color: var(--warn); }
+
+/* walkthrough */
+.walk-ctl { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: end; justify-content: space-between; margin-top: 14px; }
+.caption { margin-top: 14px; padding: 14px 16px; border-left: 3px solid var(--accent); background: var(--sunk); border-radius: 0 6px 6px 0; min-height: 84px; }
+.caption .stepno { font-family: var(--f-mono); font-size: 12px; color: var(--muted); }
+.caption.stopped { border-left-color: var(--bad); }
+.reply { margin-top: 8px; font-weight: 600; color: var(--bad); }
+.budget { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+@media (max-width: 560px) { .budget { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.meter { border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; background: var(--surface); }
+.meter b { display: block; font-family: var(--f-mono); font-size: 22px; font-variant-numeric: tabular-nums; font-weight: 500; }
+.meter span { font-size: 12px; color: var(--muted); }
+.meter.over b { color: var(--bad); }
+
+/* sessions */
+.bar { position: relative; height: 26px; background: var(--sunk); border-radius: 4px; margin: 6px 0 2px; }
+.bar .win { position: absolute; inset: 0 auto 0 0; background: color-mix(in srgb, var(--c-operation) 26%, var(--surface)); border-radius: 4px 0 0 4px; }
+.bar .half { position: absolute; top: 0; bottom: 0; width: 0; border-left: 2px dashed var(--c-gate); }
+.bar .needle { position: absolute; top: -5px; bottom: -5px; width: 3px; margin-left: -1px; background: var(--fg); border-radius: 2px; }
+.ticks { position: relative; height: 18px; font-size: 11.5px; color: var(--muted); font-family: var(--f-mono); }
+.ticks span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+.ticks span.l { transform: none; } .ticks span.r { transform: translateX(-100%); }
+input[type="range"] { width: 100%; accent-color: var(--accent); }
+.state { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.flag { font-family: var(--f-mono); font-size: 13px; padding: 3px 10px; border-radius: 5px; border: 1px solid var(--line); background: var(--surface); }
+.flag.t { border-color: var(--warn); color: var(--warn); } .flag.ok { border-color: var(--ok); color: var(--ok); } .flag.x { border-color: var(--bad); color: var(--bad); }
+.cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; margin-top: 16px; }
+@media (max-width: 760px) { .cols { grid-template-columns: minmax(0, 1fr); } }
+.cols > * { min-width: 0; }
+dl.colspec { margin: 0; display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 12px; font-size: 14px; }
+dl.colspec dt { font-family: var(--f-mono); font-size: 13px; color: var(--fg); }
+dl.colspec dd { margin: 0; color: var(--muted); }
+@media (max-width: 460px) { dl.colspec { grid-template-columns: minmax(0, 1fr); } dl.colspec dd { margin-bottom: 6px; } }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font-family: var(--f-mono); font-size: 12.5px; padding: 2px 9px; border-radius: 99px; border: 1px solid var(--line); background: var(--surface); }
+.chip.hot { border-color: var(--bad); color: var(--bad); font-weight: 600; }
+
+/* areas */
+.arc { fill: none; stroke: var(--c-process); stroke-width: 2.5; cursor: pointer; }
+.arc-hit { fill: none; stroke: transparent; stroke-width: 18; cursor: pointer; }
+.arcg.on .arc { stroke-width: 5; }
+.arcg:focus { outline: none; } .arcg:focus-visible .arc { stroke: var(--accent); stroke-width: 5; }
+.arc-lbl rect { fill: var(--surface); stroke: var(--c-process); }
+.arcg.on .arc-lbl rect { fill: color-mix(in srgb, var(--c-process) 25%, var(--surface)); }
+.arc-lbl text { fill: var(--fg); font-family: var(--f-mono); font-size: 15px; }
+.area rect { fill: var(--surface); stroke: var(--fg); stroke-width: 1.5; }
+.area .t-disp { font-size: 22px; }
+.area .tblname { fill: var(--c-data); font-family: var(--f-mono); font-size: 15px; }
+.forbid { stroke: var(--bad); stroke-width: 2.5; }
+ol.steps { counter-reset: s; list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 6px; }
+ol.steps li { counter-increment: s; display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; gap: 8px; align-items: center; font-size: 14px; }
+ol.steps code { justify-self: start; }
+ol.steps li::before { content: counter(s); font-family: var(--f-mono); font-size: 12px; color: var(--muted); text-align: right; }
+.tag { font-size: 11px; padding: 0 7px; border-radius: 99px; border: 1px solid var(--line); color: var(--muted); }
+.tag.users { border-color: var(--c-entry); color: var(--c-entry); } .tag.auth { border-color: var(--c-gate); color: var(--c-gate); }
+
+/* access sim */
+.verdict { margin-top: 12px; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; align-items: center; }
+.status { font-family: var(--f-mono); font-size: 28px; font-weight: 500; padding: 4px 12px; border-radius: 6px; border: 2px solid var(--line); font-variant-numeric: tabular-nums; }
+.status.ok { border-color: var(--ok); color: var(--ok); } .status.bad { border-color: var(--bad); color: var(--bad); }
+.where { font-size: 14px; }
+
+/* cards */
+.cards { align-items: start; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 12px; margin-top: 14px; }
+.cards > * { min-width: 0; }
+details.card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 0; }
+details.card summary { cursor: pointer; padding: 14px 16px; list-style: none; display: grid; gap: 2px; }
+details.card summary::-webkit-details-marker { display: none; }
+details.card summary .t { font-family: var(--f-display); font-weight: 650; font-size: 18px; display: flex; justify-content: space-between; gap: 10px; }
+details.card summary .t::after { content: "+"; font-family: var(--f-mono); color: var(--muted); }
+details.card[open] summary .t::after { content: "\2212"; }
+details.card summary .s { font-size: 14px; color: var(--muted); }
+details.card .body { padding: 0 16px 14px; font-size: 14px; display: grid; gap: 10px; }
+details.card .body h4 { margin: 0 0 2px; }
+details.card .body p { margin: 0; }
+.rejected { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 10px; margin-top: 12px; }
+.rejected div { border-top: 2px solid var(--bad); padding-top: 8px; font-size: 14px; min-width: 0; }
+.rejected b { font-family: var(--f-display); font-size: 16px; display: block; }
+
+/* threats */
+.cover { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin: 6px 0 12px; }
+.cover b { font-family: var(--f-mono); font-size: 40px; font-weight: 500; font-variant-numeric: tabular-nums; color: var(--accent); }
+.cover .bar { flex: 1 1 200px; height: 10px; margin: 0; min-width: 0; }
+.cover .bar .win { background: var(--accent); border-radius: 4px; }
+td .homes { display: flex; flex-wrap: wrap; gap: 4px; }
+
+/* pillars, roadmap */
+.pillars { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+@media (max-width: 700px) { .pillars { grid-template-columns: minmax(0, 1fr); } }
+.pillar { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px; font-size: 14px; display: grid; gap: 10px; align-content: start; min-width: 0; }
+.pillar .name { font-family: var(--f-display); font-weight: 700; font-size: 20px; }
+.pillar .means { font-size: 15px; color: var(--fg); }
+.dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); }
+.matrix td, .matrix th { text-align: center; } .matrix td:first-child, .matrix th:first-child { text-align: left; }
+.road { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0; margin-top: 14px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface); }
+.road > div { padding: 14px; border-left: 1px solid var(--line); font-size: 13.5px; min-width: 0; }
+.road > div:first-child { border-left: 0; background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
+.road .k { font-family: var(--f-display); font-weight: 750; font-size: 26px; color: var(--accent); line-height: 1; }
+.road .k small { font-family: var(--f-body); font-size: 11px; font-weight: 600; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; margin-left: 6px; }
+@media (max-width: 800px) { .road { grid-template-columns: minmax(0, 1fr); } .road > div { border-left: 0; border-top: 1px solid var(--line); } .road > div:first-child { border-top: 0; } }
+.decided { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+@media (max-width: 760px) { .decided { grid-template-columns: minmax(0, 1fr); } }
+.decided > div { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; font-size: 14px; min-width: 0; }
+.decided .lbl { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--ok); }
+.decided b { display: block; font-family: var(--f-display); font-size: 17px; margin: 2px 0 4px; }
+dl.gloss { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 10px 18px; margin: 14px 0 0; }
+dl.gloss dt { font-family: var(--f-mono); font-weight: 500; }
+dl.gloss dd { margin: 0; max-width: 68ch; }
+@media (max-width: 560px) { dl.gloss { grid-template-columns: minmax(0, 1fr); gap: 2px; } dl.gloss dd { margin-bottom: 10px; } }
+.rules { display: grid; gap: 6px; margin: 10px 0 0; padding: 0; list-style: none; }
+.rules li { padding-left: 16px; position: relative; } .rules li::before { content: ""; position: absolute; left: 0; top: .7em; width: 7px; height: 2px; background: var(--accent); }
+.imp td { text-align: center; font-family: var(--f-mono); } .imp td:first-child, .imp th:first-child { text-align: left; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; scroll-behavior: auto !important; } }
+html { scroll-behavior: smooth; }
+</style>
+
+<div class="wrap">
+<nav class="side" aria-label="Sections">
+  <div class="brand">Authentication design</div>
+  <ol id="nav-list"></ol>
+</nav>
+<main>
+<div class="mobilenav"><label for="nav-select" class="small" hidden>Jump to section</label><select id="nav-select" aria-label="Jump to section"></select></div>
+
+<header class="top">
+  <div class="eyebrow">workers-hono-svelte lab · before slice A</div>
+  <h1>Authentication design</h1>
+  <p class="lede">The api is the one authority for "who is this". Four gates run in order before routing. <code>authenticate</code> turns a hashed cookie or bearer token into an <code>Actor</code> with one D1 statement and no writes. Sessions live in D1 with a 24 h idle and 30 d absolute timeout. Authorization is never a gate: a runner applies <code>requires</code> from <code>access.md</code>, and stores apply <code>scope</code>. Every identity method converges on <code>sessions.start</code>. Thirteen threats each have a home in the chain.</p>
+  <p class="small">For Rob and his coding agent. Everything here is decided unless marked open. Terms are used exactly as in the brief.</p>
+</header>
+
+<section id="s0" data-title="The system">
+  <h2><span class="num">0</span>The system in one paragraph</h2>
+  <p>A pnpm monorepo on Cloudflare. <code>apps/api</code> is a Hono Worker: a JSON api with an OpenAPI document generated from a spec. <code>apps/bff</code> is a SvelteKit Worker (Svelte 5.57.3, SvelteKit 3.1.0, adapter-cloudflare 8.x: bindings come from <code>import { env, ctx } from 'cloudflare:workers'</code>, not <code>event.platform</code>). It renders pages and calls the api over a service binding: in-process, no network hop, the browser <code>Request</code> forwarded whole. D1 is the database. A CLI delivery is designed: a consumer over fetch, or a provider running operations in-process.</p>
+  <h4 style="margin-top:16px">Design rules everything honours</h4>
+  <ul class="rules">
+    <li>Every business decision has one authority, an operation.</li>
+    <li>Stores report facts; operations decide.</li>
+    <li>Errors are returned values (<code>Result</code>), never thrown across a boundary.</li>
+    <li>Every spec level has an address (file + id) and a check (a test or generator that fails on drift).</li>
+    <li>Performance is a design input, and a number a cheap test asserts.</li>
+  </ul>
+</section>
+
+<section id="s1" data-title="The entry chain">
+  <h2><span class="num">1</span>The entry chain, with the new stage</h2>
+  <p>Before auth: <code>startup → entry point → [process] → operation → port ← data</code>. After auth, <strong>gates</strong> sit between startup and the entry point. Select a stage to read its rules. Gates expands to its four gates.</p>
+  <div class="diag stack">
+    <div class="panel">
+      <div class="svgbox" id="chain-box"></div>
+      <div class="legend" id="chain-legend"></div>
+    </div>
+    <div class="panel detail" id="chain-detail" aria-live="polite"></div>
+  </div>
+</section>
+
+<section id="s2" data-title="Gates in order">
+  <h2><span class="num">2</span>Gates in order (the api)</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>#</th><th>Gate</th><th>Does</th><th>Parts</th></tr></thead>
+    <tbody>
+      <tr><td class="num">1</td><td><code>requestId</code></td><td>Mints a request id, binds a request-scoped logger.</td><td>binding only</td></tr>
+      <tr><td class="num">2</td><td><code>bodyLimit</code></td><td>Refuses oversized bodies before parse (413).</td><td>binding only</td></tr>
+      <tr><td class="num">3</td><td><code>channel</code></td><td>Origin and content-type checks on cookie-bearing unsafe requests. Attaches <code>channel: cookie | bearer | none</code>.</td><td>binding only</td></tr>
+      <tr><td class="num">4</td><td><code>authenticate</code></td><td>Resolves the credential to an actor with one D1 statement. Never writes.</td><td><strong>binding + unit</strong></td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>The <code>authenticate</code> unit</h3>
+  <p><code>authenticate({ credential, now }, { sessions })</code> → <code>Result&lt;Actor, Unauthenticated | AccountDisabled&gt;</code>, plus <code>refreshDue: boolean</code> (idle window decayed past half). One statement: <code>sessions JOIN users</code> by hashed token, on the primary, never a read replica.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Credential state</th><th>Result</th></tr></thead>
+    <tbody>
+      <tr><td>No credential</td><td><code>anonymous</code></td></tr>
+      <tr><td>Unknown, expired or unparseable <strong>cookie</strong></td><td><code>anonymous</code> + <code>clearCookie</code> hint for the BFF. A user who signed out in one tab and submits from another sees the sign-in page, not an error.</td></tr>
+      <tr><td>Unknown <strong>bearer</strong></td><td class="bad">refuse 401. The client asserted a credential and it is wrong.</td></tr>
+      <tr><td>Live session, <code>users.disabled</code></td><td class="bad">refuse <code>account_disabled</code></td></tr>
+      <tr><td>Live session</td><td class="yes"><code>Actor { userId, role, emailVerified }</code></td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Why <code>channel</code> is its own gate</h3>
+  <p>OWASP treats origin verification as mandatory before trusting a cookie on an unsafe method. Hono's <code>csrf()</code> has had three bypasses: CVE-2024-43787 (uppercase content-type), and 4.13.16 fixed Chromium <code>&lt;a ping&gt;</code> POSTs. A content-type allow-list alone is brittle. A bearer token (CLI) is never ambient and needs no CSRF check.</p>
+
+  <h3>Binding and unit</h3>
+  <p>Each gate has a <em>binding</em> in the delivery: Hono middleware in <code>apps/api/src/gates/*.ts</code>, or a token-file reader in a provider CLI. When it has a decision over a port, it also has a <em>unit</em> in <code>packages/gates</code>. Construct lists the bindings in order; that list is the gates' address, as the route table is the routes'. No <code>Gate</code> interface, no registry: two plain functions per gate with a port is a convention, held by tests.</p>
+
+  <h3>Import rules (dependency check)</h3>
+  <div class="tbl"><table class="imp">
+    <thead><tr><th>from \ imports</th><th>business</th><th>fail</th><th>operations</th><th>valid</th><th>data</th><th>gates</th></tr></thead>
+    <tbody>
+      <tr><td>gates</td><td class="yes">yes</td><td class="yes">yes</td><td class="bad">never</td><td class="bad">never</td><td class="bad">never</td><td class="no">·</td></tr>
+      <tr><td>operations</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="bad">never</td></tr>
+      <tr><td>data</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="bad">never</td></tr>
+    </tbody>
+  </table></div>
+  <p class="small" style="margin-top:8px"><code>gates</code> imports <code>business</code> and <code>fail</code> only. An operation receives an <code>Actor</code>, a business type, so it never needs <code>gates</code>. Cells marked · are not governed by this rule set.</p>
+
+  <h3>Where gates run</h3>
+  <p class="small">Select a delivery to read why.</p>
+  <div class="tbl"><table id="where-table" class="mid">
+    <thead><tr><th>Delivery</th><th>Runs a gate?</th><th>Which binding</th><th>Port answered?</th></tr></thead>
+    <tbody id="where-body"></tbody>
+  </table></div>
+</section>
+
+<section id="s3" data-title="A request, step by step">
+  <h2><span class="num">3</span>A request, step by step</h2>
+  <p>Example: a member adds a todo from the browser. Use Prev and Next, or the arrow keys. Pick a branch to replay a refusal and see where it stops.</p>
+  <div class="panel" id="walk" tabindex="0" aria-label="Request walkthrough. Use left and right arrow keys to step.">
+    <div class="walk-ctl">
+      <label class="ctl" for="branch">Branch
+        <select id="branch">
+          <option value="happy">Happy path: member adds a todo</option>
+          <option value="a">(a) Cross-site POST</option>
+          <option value="b">(b) Stale cookie</option>
+          <option value="c">(c) Anonymous on a member operation</option>
+          <option value="d">(d) Wrong owner</option>
+          <option value="e">(e) Disabled user</option>
+        </select>
+      </label>
+      <div class="row">
+        <button class="btn" id="walk-prev" type="button">Prev</button>
+        <button class="btn" id="walk-next" type="button">Next</button>
+        <button class="btn" id="walk-reset" type="button">Restart</button>
+      </div>
+    </div>
+    <div class="svgbox" id="walk-box" style="margin-top:14px"></div>
+    <div class="caption" id="walk-caption" aria-live="polite"></div>
+    <div class="budget" aria-label="Budget counters">
+      <div class="meter" id="m-rt"><b>0</b><span>gate D1 round trips · budget 1</span></div>
+      <div class="meter" id="m-rows"><b>0</b><span>gate rows read · budget ≤ 2</span></div>
+      <div class="meter" id="m-w"><b>0</b><span>gate rows written · budget 0</span></div>
+      <div class="meter" id="m-op"><b>0</b><span>operation statements</span></div>
+    </div>
+    <p class="small" style="margin:10px 0 0">Budget asserted by tests: a gated request is 1 D1 round trip, ≤ 2 rows read, 0 rows written on the steady path; at most 1 write per session per half-idle-window. The todo insert is the operation's own statement.</p>
+  </div>
+</section>
+
+<section id="s4" data-title="Sessions">
+  <h2><span class="num">4</span>Sessions</h2>
+  <p>Drag the controls to move "now". <code>refreshDue</code> turns true once less than half the idle window remains. Send a request to see whether the binding writes.</p>
+  <div class="panel">
+    <div class="svgbox" id="life-box"></div>
+    <div class="chips" id="ended-reasons" style="margin-top:6px" aria-label="Ended reasons"></div>
+  </div>
+  <div class="cols">
+    <div class="panel">
+      <label class="ctl" for="idle-h">Hours since <code>idle_until</code> was last set (sign-in or touch): <b id="idle-h-out" class="mono">0 h</b></label>
+      <input type="range" id="idle-h" min="0" max="30" step="1" value="6">
+      <div class="small">Idle window · 24 h, sliding</div>
+      <div class="bar"><div class="win" style="width:80%"></div><div class="half" style="left:40%"></div><div class="needle" id="idle-needle"></div></div>
+      <div class="ticks"><span class="l" style="left:0">0</span><span style="left:40%">12 h · half</span><span style="left:80%">24 h</span><span class="r" style="left:100%">30 h</span></div>
+
+      <label class="ctl" for="age-d" style="margin-top:14px">Session age since sign-in: <b id="age-d-out" class="mono">0 d</b></label>
+      <input type="range" id="age-d" min="0" max="33" step="1" value="3">
+      <div class="small">Absolute expiry · 30 d, fixed</div>
+      <div class="bar"><div class="win" style="width:90.9%"></div><div class="needle" id="age-needle"></div></div>
+      <div class="ticks"><span class="l" style="left:0">0</span><span style="left:45.45%">15 d</span><span style="left:90.9%">30 d</span></div>
+
+      <div class="state" id="sess-state"></div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn" id="sess-req" type="button">Send a request now</button>
+        <span class="small" id="sess-log" aria-live="polite"></span>
+      </div>
+    </div>
+    <div class="panel">
+      <h4>Table <code>sessions</code></h4>
+      <dl class="colspec">
+        <dt>id</dt><dd>primary key</dd>
+        <dt>token_hash</dt><dd>SHA-256 of the 256-bit random token; raw token never stored</dd>
+        <dt>user_id</dt><dd>indexed, for revoke-all</dd>
+        <dt>channel</dt><dd><code>cookie</code> | <code>bearer</code></dd>
+        <dt>created_at</dt><dd>row minted</dd>
+        <dt>idle_until</dt><dd>sliding idle deadline</dd>
+        <dt>expires_at</dt><dd>absolute deadline</dd>
+        <dt>ended_at</dt><dd>when the row was ended</dd>
+        <dt>ended_reason</dt><dd><code>sign_out</code> | <code>all_devices</code> | <code>disabled</code> | <code>password_changed</code> | <code>expired</code></dd>
+      </dl>
+    </div>
+  </div>
+
+  <h3>Token and cookie</h3>
+  <ul class="tight">
+    <li>32 bytes from <code>crypto.getRandomValues</code>, base64url. Minted by the operation <code>sessions.start</code>, which returns <code>{ token, expiresAt }</code> in the result envelope.</li>
+    <li>Each delivery stores it its own way. The BFF sets <code>__Host-sid=…; Secure; HttpOnly; SameSite=Lax; Path=/</code>, with no <code>Domain</code>, locked to the BFF host. The CLI writes it to its keyring or config.</li>
+    <li>The api never writes <code>Set-Cookie</code>. A bearer token is never accepted from a <code>Cookie</code> header, and vice versa: the <code>channel</code> column and the <code>channel</code> gate agree.</li>
+  </ul>
+  <h3>Timeouts, rotation, ending</h3>
+  <ul class="tight">
+    <li>Both timeouts are business constants: idle 24 h (sliding), absolute 30 d. CLI bearer tokens: no idle, longer absolute.</li>
+    <li>Idle refresh: when <code>idle_until − now &lt; idle/2</code>, the binding schedules <code>sessions.touch</code> after the response. At most one write per session per 12 h.</li>
+    <li>Rotation: a new row on every sign-in and re-authentication; the old row ended. Ids are server-minted only, so classic fixation is impossible.</li>
+    <li>Sign-out: this device ends one row; all devices ends every row for the user and requires re-authentication. The BFF sends an expiring <code>Set-Cookie</code> and <code>Clear-Site-Data</code> as a courtesy. Chromium has blocked it since Apr 2025; the row is the control.</li>
+    <li>Disable user: <code>users.disable</code> is a process. It sets <code>users.disabled</code> and ends all sessions (hygiene). The gate's join on <code>users.disabled</code> is the control, so a disabled user is refused even if row-ending lagged.</li>
+    <li>Read replication: keep it off for the gate (or <code>first-primary</code>). A replica read can be arbitrarily stale and would show a revoked session as live.</li>
+  </ul>
+
+  <h3>Why D1: the store comparison</h3>
+  <div class="row" role="group" aria-label="Scale">
+    <span class="small">Cost at</span>
+    <button class="btn" id="scale-a" type="button" aria-pressed="false">Scale A · 300 users</button>
+    <button class="btn" id="scale-b" type="button" aria-pressed="true">Scale B · 300k users</button>
+  </div>
+  <div class="tbl"><table class="wide">
+    <thead><tr><th>Store</th><th>Consistency and ending</th><th>Read path</th><th>Cost</th><th>Verdict</th></tr></thead>
+    <tbody id="store-body"></tbody>
+  </table></div>
+  <p class="small" style="margin-top:8px">Scale A is 300 users (about 20k gated requests a day); scale B is 300k users (about 20M a day). Costs are incremental to the $5 Workers Paid plan, from the pricing pages as read on 5 Nov 2026.</p>
+
+  <h3>Isolation: what it buys, per pillar</h3>
+  <p>Isolating the session store does not move the first hop. A service binding or RPC call is in-process, so a separate auth Worker adds no latency and removes none; a Durable Object per user or Workers KV changes the geography for the worse or the correctness for the worse. What isolation buys is <strong>security</strong>: credentials and the pepper in a store business code cannot bind. Reliability is slightly worse (one more thing that must be up, both fail closed). The <code>sessions</code> port is the seam: <code>construct</code> decides whether it is answered by a D1 store, a second binding, or an RPC client, and neither the unit nor the gate changes.</p>
+  <div class="tbl"><table class="wide">
+    <thead><tr><th>Rung</th><th>What</th><th>Gate cost</th><th>Verdict</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Two D1 databases</strong></td><td>An identity database (<code>users</code>, <code>credentials</code>, <code>sessions</code>, <code>verifications</code>) and an app database (business rows carrying <code>user_id</code>). Two bindings in the api: <code>IDENTITY_DB</code>, <code>APP_DB</code>.</td><td>unchanged: the gate's <code>sessions JOIN users</code> stays inside one database</td><td><span class="pill chosen">chosen, slice A</span></td></tr>
+      <tr><td>Split <code>auth</code> from <code>users</code></td><td>Auth tables alone in a second database.</td><td>the join crosses databases: two round trips, or a copied <code>disabled</code> flag that turns hygiene into the control</td><td><span class="pill rej">rejected</span></td></tr>
+      <tr><td>Separate auth Worker</td><td>Identity in its own Worker and database, surface <code>issue / verify / revoke</code> over RPC.</td><td>unchanged (in-process)</td><td><span class="pill res">later, if a second consumer Worker or a jurisdiction need appears</span></td></tr>
+      <tr><td>Durable Object as write authority</td><td>One object per user for session mutations: revoke-all ordering, concurrent-session limits. On the api Worker, never on the read path.</td><td>unchanged (reads stay on D1)</td><td><span class="pill res">later, when a mutation needs ordering</span></td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="s5" data-title="Areas: users and auth">
+  <h2><span class="num">5</span>Areas: <code>users</code> and <code>auth</code></h2>
+  <p><code>users</code> owns the person. <code>auth</code> owns proof and continuity. Areas never import each other. <code>auth</code> builds the actor from a <code>users</code> row through the gate's join. Anything that crosses both is a <strong>process</strong>. Select a process arc to list its steps.</p>
+  <div class="diag">
+    <div class="panel"><div class="svgbox" id="areas-box"></div></div>
+    <div class="panel detail" id="areas-detail" aria-live="polite"></div>
+  </div>
+  <div class="cols">
+    <div class="panel">
+      <h4>users · table <code>users</code></h4>
+      <dl class="colspec">
+        <dt>id</dt><dd></dd><dt>email</dt><dd></dd><dt>name</dt><dd></dd>
+        <dt>role</dt><dd><code>member</code> | <code>admin</code>; a fact about the person</dd>
+        <dt>disabled</dt><dd>joined by the gate; the control</dd>
+        <dt>email_verified_at</dt><dd></dd><dt>created_at</dt><dd></dd>
+      </dl>
+      <p class="small" style="margin:10px 0 0">Operations: profile edits, admin list, detail, disable.</p>
+    </div>
+    <div class="panel">
+      <h4>auth · tables</h4>
+      <dl class="colspec">
+        <dt>credentials</dt><dd><code>user_id</code>, <code>kind</code> (password | passkey | oauth), <code>provider</code>, <code>provider_subject</code>, <code>secret_or_pubkey</code>, <code>params</code>, <code>counter</code></dd>
+        <dt>sessions</dt><dd>see section 4</dd>
+        <dt>verifications</dt><dd><code>kind</code>, <code>identifier</code>, <code>token_hash</code>, <code>expires_at</code>, <code>consumed_at</code></dd>
+      </dl>
+      <p class="small" style="margin:10px 0 0">OAuth links live in <code>auth</code>, keyed on (provider, <code>sub</code>). Link by email only when the provider says <code>email_verified</code>.</p>
+    </div>
+  </div>
+  <p style="margin-top:14px">Sign-up is the first process the story has waited for. It brings the step record <code>Step&lt;T&gt; = { name, attempt, started, finished, result }</code>.</p>
+
+  <h3>Two databases, one key</h3>
+  <p>The area boundary is physical. The <strong>identity database</strong> holds <code>users</code>, <code>credentials</code>, <code>sessions</code> and <code>verifications</code>. The <strong>app database</strong> holds business rows (<code>todos</code>) that carry a <code>user_id</code> as an opaque value. The api binds both (<code>IDENTITY_DB</code>, <code>APP_DB</code>); the stores under <code>packages/data</code> split the same way; migrations and the data spec are per database.</p>
+  <ul class="tight">
+    <li><strong>The user id is the only foreign key between the two.</strong> Minted once by the id source in <code>users.create</code>, opaque and immutable; never the email, which can change. The database never enforces it.</li>
+    <li><strong>No query joins across databases.</strong> The gate joins <code>sessions</code> to <code>users</code> inside identity. Todo operations are scoped by the actor's <code>user_id</code> inside app and never look at <code>users</code>: the gate already proved the user exists and is enabled. Sign-in, sign-out, rotation, verification, password change, admin list and disable: identity only.</li>
+    <li><strong>Reads that need both sides are composed by id in code, never by SQL.</strong> An admin page that wants todo counts per user calls <code>GET /users</code> and a counts endpoint and merges on <code>user_id</code>; that is the BFF composition rule (a view names the endpoints it reads). Lookups use <code>WHERE user_id IN (…)</code>, batched by 100 (D1's bound-parameter limit).</li>
+    <li><strong>Referential integrity is a process concern.</strong> Deleting an account removes app rows in one database and the user in the other: two transactions, no atomicity between them, exactly what the step record is for. Sign-up stays atomic because everything it writes is in identity.</li>
+    <li><strong>Per pillar.</strong> Security: all PII and every credential hash in one database business code never binds; a leak of the app database names nobody. Performance: the gate is still one round trip, and the app database can turn on read replicas later while identity stays primary-only. Maintainability: the identity half knows nothing about todos and is the reusable package. Reliability: a request needs two databases up instead of one, both fail closed.</li>
+    <li><strong>Not shared across products.</strong> One identity database per product. Sharing one is single sign-on by another name; the reusable part is the package, not the data.</li>
+  </ul>
+</section>
+
+<section id="s6" data-title="Authorization">
+  <h2><span class="num">6</span>Authorization, never a gate</h2>
+  <p><code>prd/todo/access.md</code> has one row per operation, with <code>requires</code> ∈ {anonymous, member, verified_member, admin} and <code>scope</code> ∈ {own, any, n/a}. It is generated into <code>packages/business/src/access.ts</code> as a property on each operation. A missing row fails generation: default deny.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>operation</th><th>requires</th><th>scope</th><th>source</th></tr></thead>
+    <tbody>
+      <tr><td><code>addTodo</code></td><td>member</td><td>own</td><td>brief</td></tr>
+      <tr><td><code>getTodo</code></td><td>member</td><td>own</td><td class="small">illustrative</td></tr>
+      <tr><td><code>listUsers</code></td><td>admin</td><td>any</td><td class="small">illustrative</td></tr>
+      <tr><td><code>disableUser</code></td><td>admin</td><td>any</td><td class="small">illustrative</td></tr>
+    </tbody>
+  </table></div>
+  <p class="small" style="margin-top:8px">Only <code>addTodo</code>'s row is stated in the brief. The others show the shape for the simulator; the real table is written in slice A.</p>
+
+  <div class="panel" style="margin-top:14px">
+    <div class="row" style="align-items:end">
+      <label class="ctl" for="sim-actor">Actor
+        <select id="sim-actor">
+          <option value="anonymous">anonymous</option>
+          <option value="member" selected>member (email not verified)</option>
+          <option value="verified_member">verified_member</option>
+          <option value="admin">admin</option>
+        </select>
+      </label>
+      <label class="ctl" for="sim-op">Operation
+        <select id="sim-op">
+          <option value="addTodo">addTodo</option>
+          <option value="getOwn">getTodo, as owner</option>
+          <option value="getOther">getTodo, not owner</option>
+          <option value="listUsers">listUsers</option>
+          <option value="disableUser">disableUser</option>
+        </select>
+      </label>
+    </div>
+    <div class="verdict" id="sim-out" aria-live="polite"></div>
+    <p class="small" style="margin:10px 0 0">Simulator assumption: an admin satisfies <code>member</code> and <code>verified_member</code>.</p>
+  </div>
+
+  <h3>How it is enforced</h3>
+  <ul class="tight">
+    <li>A shared runner in the operations layer applies <code>requires</code> before the body. It is an actor fact, so it gives 403-before-400.</li>
+    <li>The operation passes a typed <code>scope</code> to the store: <code>{ ownerId }</code>, <code>{ any: true }</code> for admin, later <code>{ memberOf }</code>. The store has no default scope.</li>
+    <li>Writes are scoped too: <code>UPDATE … WHERE id = ? AND user_id = ?</code> returning the change count, never read-then-write.</li>
+    <li>Wrong owner → <code>not_found</code>. "Yours but refused by state" → <code>forbidden</code> with a reason. State conditions (locked, trial expired) are declared in the use case and enforced in the operation body after the row loads.</li>
+    <li>Static checks: every operation has one row, every row names a real operation, the generated file matches the table. Dynamic check: each operation called as anonymous, member and admin with an empty body asserts the runner's verdict.</li>
+    <li>What the checks cannot verify: <code>own</code>, which lives in the store scope.</li>
+    <li>A delivery may mirror <code>requires</code> for ordering or OpenAPI <code>security</code>, but never decides.</li>
+  </ul>
+</section>
+
+<section id="s7" data-title="Identity methods">
+  <h2><span class="num">7</span>Identity methods</h2>
+  <p>All methods converge on one use case, "sign in with a verified identity", which calls <code>sessions.start</code>. Open a card for platform needs, library, BFF and state, and threats.</p>
+  <div class="cards" id="id-cards"></div>
+  <h3>Libraries rejected</h3>
+  <div class="rejected">
+    <div><b>Better Auth</b>Owns routes, cookies, a four-table schema; throws <code>APIError</code>. Vercel-owned since Jul 2026. Usable only as a provider behind the operation layer.</div>
+    <div><b>Auth.js</b>The BFF becomes the authority. Maintenance mode since Sep 2025.</div>
+    <div><b>Lucia</b>Deprecated Mar 2025. Now a guide whose single-file session design matches ours.</div>
+    <div><b>OpenAuth</b>A separate issuer Worker with JWTs. Stale.</div>
+  </div>
+</section>
+
+<section id="s8" data-title="Slices">
+  <h2><span class="num">8</span>Slices</h2>
+  <div class="road">
+    <div><div class="k">A<small>next</small></div><p style="margin:8px 0 0">Ownership without login (actor from a fixed dev session). Gates <code>requestId</code>, <code>bodyLimit</code>, <code>channel</code>, <code>authenticate</code>. Sessions table, <code>users</code> + <code>auth</code> areas, <code>access.md</code> + runner, log port + request id, config check.</p></div>
+    <div><div class="k">B</div><p style="margin:8px 0 0">Email/password sign-in, sign-out, sessions page.</p></div>
+    <div><div class="k">C</div><p style="margin:8px 0 0">Sign-up with email verification: the first process, plus outbox. Cloudflare Email Service beta first; Resend as the second adapter proving the port.</p></div>
+    <div><div class="k">D</div><p style="margin:8px 0 0">Roles and admin pages, disable user.</p></div>
+    <div><div class="k">E</div><p style="margin:8px 0 0">Second provider: passkeys or Google.</p></div>
+  </div>
+</section>
+
+<section id="s9" data-title="Threats">
+  <h2><span class="num">9</span>Threats</h2>
+  <div class="cover"><b id="cov-num">11/13</b><span class="small">rows with a test: the security number in the pillar view</span><div class="bar" aria-hidden="true"><div class="win" id="cov-bar"></div></div></div>
+  <div class="row" id="threat-filters" role="group" aria-label="Filter by home in the chain"></div>
+  <div class="row" style="margin-top:8px"><label class="small" for="has-test"><input type="checkbox" id="has-test"> Only rows with a test</label><span class="small" id="threat-count" aria-live="polite"></span></div>
+  <div class="tbl"><table class="wide">
+    <thead><tr><th>#</th><th>Threat</th><th>Mitigation</th><th>Source</th><th>Home</th><th>Test</th></tr></thead>
+    <tbody id="threat-body"></tbody>
+  </table></div>
+</section>
+
+<section id="s10" data-title="Pillars">
+  <h2><span class="num">10</span>Pillars</h2>
+  <p>Documented once, measured, never tagged. Each pillar has a signal read at each stage end, from outputs the lab already produces. The pillar view is a generated page, read before deciding the next stage. The direction of the code follows the signal.</p>
+  <div class="pillars" id="pillars"></div>
+  <h3>Design decisions against pillars</h3>
+  <div class="tbl"><table class="matrix" id="pmatrix"></table></div>
+</section>
+
+<section id="s11" data-title="Decided this week">
+  <h2><span class="num">11</span>Decided this week</h2>
+  <div class="decided">
+    <div><div class="lbl">Settled</div><b>Passwords in, with Argon2id</b>Rob is on the Paid plan, which can hold an OWASP-compliant hash.</div>
+    <div><div class="lbl">Settled</div><b>Email sender behind a port</b>Cloudflare Email Service first, Resend second.</div>
+    <div><div class="lbl">Settled</div><b>Both session timeouts</b>24 h idle, 30 d absolute. Refresh throttled and scheduled by the binding after the response.</div>
+    <div><div class="lbl">Verified</div><b>SvelteKit 3 changes the BFF's plumbing, not the design</b>The BFF calls <code>env.API.fetch(event.request)</code>; <code>cookies.set</code> defaults (httpOnly, secure, lax, path /) fit <code>__Host-</code>; CSRF is always on with <code>csrf.trustedOrigins</code> and still covers form content types only, so the api's <code>channel</code> gate stays; <code>handleError</code> now funnels every error, which is where the BFF writes every message; remote functions stay off.</div>
+    <div><div class="lbl">Settled</div><b>Two D1 databases from slice A</b>Identity (<code>users</code> + <code>auth</code> tables) and app (business rows). The user id is the only key between them; no query joins across; composition by id in code.</div>
+  </div>
+</section>
+
+<section id="s12" data-title="Glossary">
+  <h2><span class="num">G</span>Glossary</h2>
+  <dl class="gloss">
+    <dt>gate</dt><dd>Runs once per entry, before routing, for every request. Attaches a fact to the request or refuses in the error envelope.</dd>
+    <dt>binding</dt><dd>A gate's delivery part: Hono middleware in <code>apps/api/src/gates/*.ts</code>, or a token-file reader in a provider CLI. Construct lists bindings in order.</dd>
+    <dt>unit</dt><dd>A gate's decision over a port, in <code>packages/gates</code>. Today only <code>authenticate</code> has one. Also the thing an entry point calls: an operation or a process.</dd>
+    <dt>actor</dt><dd>Who the request acts for: <code>anonymous</code>, <code>Actor { userId, role, emailVerified }</code>, or a system actor <code>{ kind: 'system', source }</code>. A business type operations receive.</dd>
+    <dt>credential</dt><dd>What a request presents: the <code>__Host-sid</code> cookie or a bearer token. In the <code>auth</code> area, a <code>credentials</code> row (password, passkey, oauth).</dd>
+    <dt>channel</dt><dd>How the credential arrived: <code>cookie | bearer | none</code>. Attached by the <code>channel</code> gate; matches <code>sessions.channel</code>.</dd>
+    <dt>scope</dt><dd>The typed limit an operation passes to a store: <code>{ ownerId }</code>, <code>{ any: true }</code>, later <code>{ memberOf }</code>. Declared per operation in <code>access.md</code> as own, any or n/a.</dd>
+    <dt>process</dt><dd>A multi-step unit that composes operations, possibly across areas. Immediate today, durable (Cloudflare Workflows) later. Records steps.</dd>
+    <dt>step record</dt><dd><code>Step&lt;T&gt; = { name, attempt, started, finished, result }</code>, written per process step.</dd>
+  </dl>
+</section>
+</main>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var NS = 'http://www.w3.org/2000/svg';
+  function S(tag, attrs, text) {
+    var el = document.createElementNS(NS, tag);
+    for (var k in (attrs || {})) if (attrs[k] !== undefined && attrs[k] !== null) el.setAttribute(k, attrs[k]);
+    if (text !== undefined) el.textContent = text;
+    return el;
+  }
+  function $(id) { return document.getElementById(id); }
+  function svgRoot(w, h, label, markerId) {
+    var svg = S('svg', { viewBox: '0 0 ' + w + ' ' + h, role: 'group', 'aria-label': label });
+    var defs = S('defs');
+    var m = S('marker', { id: markerId, viewBox: '0 0 10 10', refX: '9', refY: '5', markerWidth: '7', markerHeight: '7', orient: 'auto-start-reverse' });
+    m.appendChild(S('path', { d: 'M0,0 L10,5 L0,10 z', 'class': 'ah' }));
+    defs.appendChild(m); svg.appendChild(defs);
+    return svg;
+  }
+  function node(svg, o) {
+    var g = S('g', { 'class': 'node' + (o.cls ? ' ' + o.cls : ''), 'data-stage': o.stage, 'data-id': o.id, transform: 'translate(' + o.x + ',' + o.y + ')' });
+    g.appendChild(S('rect', { width: o.w, height: o.h, rx: 6, 'class': o.dashed ? 'dashed' : null }));
+    var ty = o.sub ? o.h / 2 - 2 : o.h / 2 + 5;
+    g.appendChild(S('text', { x: o.w / 2, y: ty, 'text-anchor': 'middle', 'class': o.disp ? 't-disp' : 't-main' }, o.label));
+    if (o.sub) g.appendChild(S('text', { x: o.w / 2, y: o.h / 2 + 15, 'text-anchor': 'middle', 'class': 't-sub' }, o.sub));
+    if (o.badge) {
+      var bw = o.badge.length * 6.4 + 14;
+      g.appendChild(S('rect', { x: o.w - bw - 6, y: 6, width: bw, height: 17, rx: 8.5, 'class': o.badgeUnit ? 'b-unit' : 'b-bind', opacity: '0.2' }));
+      g.appendChild(S('text', { x: o.w - bw / 2 - 6, y: 18.5, 'text-anchor': 'middle', 'class': 't-badge', fill: 'currentColor', style: 'fill:var(--fg)' }, o.badge));
+    }
+    if (o.onClick) {
+      g.setAttribute('tabindex', '0'); g.setAttribute('role', 'button');
+      g.setAttribute('aria-label', o.label + (o.sub ? ', ' + o.sub : ''));
+      if (o.pressed !== undefined) g.setAttribute('aria-pressed', o.pressed ? 'true' : 'false');
+      g.addEventListener('click', o.onClick);
+      g.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); o.onClick(); } });
+    }
+    svg.appendChild(g);
+    return g;
+  }
+  function line(svg, x1, y1, x2, y2, mid, cls) {
+    svg.appendChild(S('line', { x1: x1, y1: y1, x2: x2, y2: y2, 'class': 'edge' + (cls ? ' ' + cls : ''), 'marker-end': mid ? 'url(#' + mid + ')' : null }));
+  }
+  function path(svg, d, mid, cls) {
+    svg.appendChild(S('path', { d: d, 'class': 'edge' + (cls ? ' ' + cls : ''), 'marker-end': mid ? 'url(#' + mid + ')' : null }));
+  }
+  function refocus(box, id) { if (!id) return; var n = box.querySelector('[data-id="' + id + '"]'); if (n) n.focus({ preventScroll: true }); }
+  function narrow(box, px) { return (box.clientWidth || window.innerWidth) < px; }
+
+  /* ---------- 1. Entry chain ---------- */
+  var STAGES = [
+    { id: 'startup', label: 'startup', sub: 'construct', stage: 'startup', name: 'startup',
+      html: '<p class="def"><code>construct</code>, the composition root. Runs once per isolate.</p><h4>Builds</h4><ul><li>Infra: id source, clock, log.</li><li>Stores, operations, gates, the route table.</li><li>Lists the gate bindings in order. That list is the gates\' address, as the route table is the routes\'.</li></ul>' },
+    { id: 'gates', label: 'gates', sub: '4, in order', stage: 'gate', name: 'gates',
+      html: '<p class="def">Runs once per entry, before routing, for every request.</p><h4>Rules</h4><ul><li>Does exactly two things: attach a fact to the request, or refuse in the error envelope.</li><li>Never reads business data for a business purpose.</li><li>Never decides what a request means.</li><li>No <code>Gate</code> interface, no registry. A binding, plus a unit when the gate has a decision over a port.</li></ul><p class="small" style="margin-top:8px">Select a gate in the diagram for its detail.</p>' },
+    { id: 'entry', label: 'entry point', sub: 'one route', stage: 'entry', name: 'entry point',
+      html: '<p class="def">One route.</p><h4>Rules</h4><ul><li>Decodes the body through <code>valid</code>.</li><li>Reads the actor the gate attached.</li><li>Calls the unit: an operation or a process.</li><li>Presents the result.</li></ul>' },
+    { id: 'process', label: '[process]', sub: 'when multi-step', stage: 'process', dashed: true, name: 'process',
+      html: '<p class="def">A multi-step unit that composes operations, possibly across areas.</p><h4>Rules</h4><ul><li>Immediate today; durable (Cloudflare Workflows) later.</li><li>Records steps as <code>Step&lt;T&gt;</code>.</li><li>A durable process resumed by Workflows crosses no gate. The actor captured at start travels in its input.</li></ul>' },
+    { id: 'operation', label: 'operation', sub: 'the authority', stage: 'operation', name: 'operation',
+      html: '<p class="def">The one authority for a business decision.</p><h4>Rules</h4><ul><li>Declares the ports it needs.</li><li>Receives an <code>Actor</code>, a business type. Never imports <code>gates</code>.</li><li>Returns a <code>Result</code>; never throws across a boundary.</li></ul>' },
+    { id: 'port', label: 'port', sub: 'interface', stage: 'port', name: 'port',
+      html: '<p class="def">An interface the operation asks.</p><h4>Rules</h4><ul><li><code>data</code> answers it.</li><li>The arrow points back: data answers the port, the port does not call out.</li></ul>' },
+    { id: 'data', label: 'data', sub: 'stores · D1', stage: 'data', name: 'data',
+      html: '<p class="def">Stores on D1.</p><h4>Rules</h4><ul><li>Report facts, never verdicts.</li><li>Never import <code>gates</code>.</li><li>No default scope; every read and write takes one.</li></ul>' }
+  ];
+  var GATES = [
+    { id: 'g-requestId', label: 'requestId', n: 1, unit: false,
+      html: '<p class="def">Gate 1. Mints a request id and binds a request-scoped logger.</p><ul><li>Binding only, no unit.</li></ul>' },
+    { id: 'g-bodyLimit', label: 'bodyLimit', n: 2, unit: false,
+      html: '<p class="def">Gate 2. Refuses oversized bodies before parse (413).</p><ul><li>Binding only.</li></ul>' },
+    { id: 'g-channel', label: 'channel', n: 3, unit: false,
+      html: '<p class="def">Gate 3. For cookie-bearing unsafe requests (POST/PUT/PATCH/DELETE), two independent checks.</p><ul><li><code>Sec-Fetch-Site</code> ∈ {same-origin, none}, with <code>Origin</code> equal to the BFF origin as fallback. Refuses when both headers are absent.</li><li>Content-type discipline: JSON endpoints accept only <code>application/json</code>, never <code>text/plain</code>.</li><li>Refuses in the envelope; attaches <code>channel: cookie | bearer | none</code>.</li><li>A bearer token is never ambient and needs no CSRF check.</li></ul>' },
+    { id: 'g-authenticate', label: 'authenticate', n: 4, unit: true,
+      html: '<p class="def">Gate 4. Binding + unit. <code>authenticate({ credential, now }, { sessions })</code> → <code>Result&lt;Actor, Unauthenticated | AccountDisabled&gt;</code>.</p><ul><li>One D1 statement: <code>sessions JOIN users</code> by hashed token, on the primary.</li><li>Also returns <code>refreshDue</code>.</li><li>The unit never writes. The binding schedules <code>sessions.touch</code> after the response.</li></ul>' }
+  ];
+  var chainSel = 'gates';
+  var chainBox = $('chain-box'), chainDetail = $('chain-detail');
+  function findStage(id) { for (var i = 0; i < STAGES.length; i++) if (STAGES[i].id === id) return STAGES[i]; for (var j = 0; j < GATES.length; j++) if (GATES[j].id === id) return GATES[j]; return null; }
+  function gatesOpen() { return chainSel === 'gates' || chainSel.indexOf('g-') === 0; }
+  function pickChain(id) { return function () { chainSel = id; renderChain(id); }; }
+  function renderChain(focusId) {
+    chainBox.innerHTML = '';
+    var nar = narrow(chainBox, 620), open = gatesOpen(), svg, M = 'ah-chain';
+    if (!nar) {
+      var w = 120, gap = 24, x0 = 8, y = 16, h = 66;
+      svg = svgRoot(1000, open ? 244 : 104, 'Entry chain', M);
+      STAGES.forEach(function (s, i) {
+        var x = x0 + i * (w + gap);
+        if (i > 0) {
+          if (s.id === 'data') line(svg, x - 2, y + h / 2, x - gap + 4, y + h / 2, M);
+          else line(svg, x - gap + 2, y + h / 2, x - 4, y + h / 2, M);
+        }
+        node(svg, { x: x, y: y, w: w, h: h, label: s.label, sub: s.sub, stage: s.stage, id: s.id, dashed: s.dashed, disp: true,
+          cls: (chainSel === s.id || (s.id === 'gates' && open)) ? 'on' : '', onClick: pickChain(s.id), pressed: chainSel === s.id });
+      });
+      if (open) {
+        var gx = x0 + (w + gap) + w / 2, sw = 214, sg = 22, sx0 = 24, sy = 150, sh = 66;
+        var c0 = sx0 + sw / 2, c3 = sx0 + 3 * (sw + sg) + sw / 2;
+        path(svg, 'M' + gx + ' ' + (y + h) + ' V 122');
+        path(svg, 'M' + c0 + ' 122 H ' + c3);
+        GATES.forEach(function (g, i) {
+          var x = sx0 + i * (sw + sg), cx = x + sw / 2;
+          line(svg, cx, 122, cx, sy - 4, M);
+          node(svg, { x: x, y: sy, w: sw, h: sh, label: g.n + ' ' + g.label, sub: g.unit ? 'binding + unit' : 'binding only', stage: 'gate', id: g.id,
+            cls: chainSel === g.id ? 'on' : '', onClick: pickChain(g.id), pressed: chainSel === g.id, badge: g.unit ? 'port' : null, badgeUnit: true });
+        });
+        svg.appendChild(S('text', { x: 500, y: 238, 'text-anchor': 'middle', 'class': 't-muted' }, 'runs left to right, before routing; any gate may refuse in the envelope'));
+      }
+    } else {
+      var W = 360, bx = 16, bw = 328, bh = 50, vg = 24, cy = 8, items = [];
+      STAGES.forEach(function (s) {
+        items.push({ s: s, sub: false });
+        if (s.id === 'gates' && open) GATES.forEach(function (g) { items.push({ s: g, sub: true }); });
+      });
+      var H = 8; items.forEach(function (it) { H += (it.sub ? 44 : bh) + (it.sub ? 10 : vg); });
+      svg = svgRoot(W, H, 'Entry chain', M);
+      var prevBottom = null, gateCenter = null;
+      items.forEach(function (it, idx) {
+        var s = it.s;
+        if (!it.sub) {
+          if (prevBottom !== null) {
+            if (s.id === 'data') line(svg, bx + 40, cy - 2, bx + 40, prevBottom + 4, M);
+            else line(svg, bx + 40, prevBottom + 2, bx + 40, cy - 4, M);
+          }
+          node(svg, { x: bx, y: cy, w: bw, h: bh, label: s.label, sub: s.sub, stage: s.stage, id: s.id, dashed: s.dashed, disp: true,
+            cls: (chainSel === s.id || (s.id === 'gates' && open)) ? 'on' : '', onClick: pickChain(s.id), pressed: chainSel === s.id });
+          prevBottom = cy + bh; cy += bh + vg;
+          if (s.id === 'gates') { gateCenter = cy - vg; cy -= vg - 10; }
+        } else {
+          var ix = 56, iw = 288, ih = 44;
+          path(svg, 'M' + (bx + 20) + ' ' + (prevBottom) + ' V ' + (cy + ih / 2) + ' H ' + (ix - 4), M);
+          node(svg, { x: ix, y: cy, w: iw, h: ih, label: s.n + ' ' + s.label, sub: s.unit ? 'binding + unit' : 'binding only', stage: 'gate', id: s.id,
+            cls: chainSel === s.id ? 'on' : '', onClick: pickChain(s.id), pressed: chainSel === s.id });
+          prevBottom = cy + ih; cy += ih + 10;
+          var nextIt = items[idx + 1];
+          if (nextIt && !nextIt.sub) cy += vg - 10;
+        }
+      });
+    }
+    chainBox.appendChild(svg);
+    var st = findStage(chainSel);
+    chainDetail.innerHTML = '<h4>' + (st.n ? 'gate ' + st.n : 'stage') + '</h4><h3 style="margin:0 0 8px"><code>' + (st.label || st.name) + '</code></h3>' + st.html;
+    refocus(chainBox, focusId);
+  }
+  var lg = $('chain-legend');
+  [['startup', 'startup'], ['gate', 'gate'], ['entry', 'entry point'], ['process', 'process'], ['operation', 'operation'], ['port', 'port'], ['data', 'data'], ['client', 'browser / BFF']].forEach(function (p) {
+    var sp = document.createElement('span'); sp.setAttribute('data-stage', p[0]); sp.innerHTML = '<i></i>' + p[1]; lg.appendChild(sp);
+  });
+
+  /* ---------- 2. Where gates run ---------- */
+  var WHERE = [
+    ['api', '<span class="yes">yes, all four</span>', 'Hono middleware', '<span class="yes">yes · sessions</span>', 'The front door and the one authority for "who is this". Bindings live in <code>apps/api/src/gates/*.ts</code>; <code>authenticate</code> asks the sessions store.'],
+    ['BFF', '<span class="no">no</span>', 'none', '<span class="no">no</span>', '<code>hooks.server.ts</code> forwards the browser request over the binding. It decides nothing. What it needs for the shell (signed in? role?) comes back from the api.'],
+    ['CLI consumer', '<span class="no">no</span>', 'none', '<span class="no">no</span>', 'Attaches <code>Authorization: Bearer</code> from a token file and calls the api over fetch. The api\'s gates run.'],
+    ['CLI provider', '<span class="yes">yes, authenticate</span>', 'token-file reader', '<span class="yes">yes · same store</span>', 'Runs operations in-process, so it runs the same <code>authenticate</code> unit with the same store.'],
+    ['Scheduled / queue handler (future)', '<span class="yes">yes</span>', 'system-actor gate', '<span class="no">no port</span>', 'A gate attaches a system actor <code>{ kind: \'system\', source }</code>. No port is asked.'],
+    ['Durable process resume', '<span class="no">no</span>', 'none', '<span class="no">no</span>', 'A process resumed by Workflows crosses no gate. The actor was captured when the process started and travels in its input.']
+  ];
+  var wb = $('where-body');
+  WHERE.forEach(function (r, i) {
+    var tr = document.createElement('tr'); tr.className = 'pick'; tr.tabIndex = 0; tr.id = 'where-' + i;
+    tr.setAttribute('aria-expanded', 'false'); tr.setAttribute('role', 'button');
+    tr.innerHTML = '<td><strong>' + r[0] + '</strong></td><td>' + r[1] + '</td><td>' + r[2] + '</td><td>' + r[3] + '</td>';
+    var ex = document.createElement('tr'); ex.className = 'explain'; ex.hidden = true;
+    ex.innerHTML = '<td colspan="4">' + r[4] + '</td>';
+    function toggle() { var o = ex.hidden; ex.hidden = !o; tr.setAttribute('aria-expanded', o ? 'true' : 'false'); }
+    tr.addEventListener('click', toggle);
+    tr.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
+    wb.appendChild(tr); wb.appendChild(ex);
+    if (i === 0) toggle();
+  });
+
+  /* ---------- 3. Walkthrough ---------- */
+  var WN = [
+    { id: 'browser', label: 'Browser', sub: '__Host-sid', stage: 'client' },
+    { id: 'bff', label: 'BFF', sub: 'hooks.server.ts', stage: 'client' },
+    { id: 'binding', label: 'binding', sub: 'service binding', stage: 'client' },
+    { id: 'requestId', label: 'requestId', sub: 'gate 1', stage: 'gate' },
+    { id: 'bodyLimit', label: 'bodyLimit', sub: 'gate 2', stage: 'gate' },
+    { id: 'channel', label: 'channel', sub: 'gate 3', stage: 'gate' },
+    { id: 'authenticate', label: 'authenticate', sub: 'gate 4', stage: 'gate' },
+    { id: 'entry', label: 'postTodos', sub: 'entry point', stage: 'entry' },
+    { id: 'runner', label: 'runner', sub: 'access', stage: 'operation' },
+    { id: 'operation', label: 'addTodo', sub: 'operation', stage: 'operation' },
+    { id: 'store', label: 'todos', sub: 'port → store', stage: 'port' },
+    { id: 'd1', label: 'D1', sub: 'primary', stage: 'data' }
+  ];
+  var HAPPY = [
+    { n: ['browser'], t: 'Browser POSTs the form to the BFF with the <code>__Host-sid</code> cookie.' },
+    { n: ['bff', 'binding'], t: 'BFF <code>hooks.server.ts</code> runs SvelteKit\'s own CSRF origin check (form content types, prod only). It forwards the <code>Request</code> over the service binding, headers intact: <code>Cookie</code>, <code>Origin</code>, <code>Sec-Fetch-Site</code>.' },
+    { n: ['requestId', 'bodyLimit'], t: 'api gate <code>requestId</code> mints a request id and binds a logger. Then <code>bodyLimit</code> checks the size before parse.' },
+    { n: ['channel'], t: 'api gate <code>channel</code>: unsafe method + cookie, so the origin check runs and passes. Attaches <code>channel: cookie</code>.' },
+    { n: ['authenticate', 'd1'], c: { rt: 1, rows: 2 }, t: 'api gate <code>authenticate</code> hashes the cookie value (SHA-256). One statement on the primary: <code>SELECT … FROM sessions JOIN users … WHERE token_hash = ? AND expires_at &gt; ? AND idle_until &gt; ?</code>. Actor <code>{ userId, role: member }</code>, <code>refreshDue: false</code>.' },
+    { n: ['entry'], t: 'Entry point <code>postTodos</code>: <code>valid.toNewTodo(body)</code> → <code>NewTodo</code> or <code>Problems</code>. Reads the actor from context.' },
+    { n: ['runner'], t: 'Access runner: <code>addTodo.access = { requires: \'member\', scope: \'own\' }</code>, generated from <code>access.md</code>. Actor is member, so proceed. Anonymous would get 403 here, before validation.' },
+    { n: ['operation'], t: 'Operation <code>addTodo({ actor, newTodo }, { todos })</code> passes scope <code>{ ownerId: actor.userId }</code> to the store.' },
+    { n: ['store', 'd1'], c: { op: 1 }, t: 'Store <code>addTodoUnlessFull(scope, row)</code>: one statement, scoped by <code>user_id</code>. Reports the fact: inserted or full.' },
+    { n: ['operation'], t: 'Operation decides <code>ok</code> or <code>limit</code> and returns a <code>Result</code>.' },
+    { n: ['entry', 'bff'], t: 'Entry point presents the envelope; the BFF renders. Had <code>refreshDue</code> been true, the <code>authenticate</code> binding would schedule <code>sessions.touch</code> via <code>ctx.waitUntil</code> after the response. Here it was false: 0 writes.' }
+  ];
+  function H(i) { return HAPPY[i]; }
+  var BRANCHES = {
+    happy: HAPPY,
+    a: [
+      { n: ['browser'], t: 'A cross-site page makes the browser POST with the cookie attached.' },
+      { n: ['bff', 'binding'], t: 'The BFF forwards the <code>Request</code> over the binding with headers intact, including <code>Origin</code> and <code>Sec-Fetch-Site</code>.' },
+      H(2),
+      { n: ['channel'], stop: 'channel', t: '<code>Sec-Fetch-Site</code> is cross-site and <code>Origin</code> is not the BFF origin. <code>channel</code> refuses before anything else; <code>authenticate</code> never runs.', r: '403 in the error envelope · 0 D1 reads' }
+    ],
+    b: [
+      { n: ['browser'], t: 'The user signed out in another tab, then submits this form. The browser still sends the old <code>__Host-sid</code>.' },
+      H(1), H(2), H(3),
+      { n: ['authenticate', 'd1'], c: { rt: 1, rows: 0 }, t: 'No live row matches <code>token_hash</code>. An unknown <strong>cookie</strong> is not an error: <code>anonymous</code> plus a <code>clearCookie</code> hint for the BFF.' },
+      { n: ['bff'], stop: 'bff', t: 'The reply carries <code>clearCookie</code>. The BFF clears the cookie and shows the sign-in page.', r: 'sign-in page, not an error' }
+    ],
+    c: [
+      { n: ['browser'], t: 'A browser with no session cookie POSTs the form.' },
+      H(1), H(2),
+      { n: ['channel'], t: 'No cookie, so there is no ambient credential to protect. <code>channel</code> attaches <code>channel: none</code>.' },
+      { n: ['authenticate'], t: 'No credential → <code>anonymous</code>. Nothing to look up.' },
+      { n: ['entry'], t: 'Entry point <code>postTodos</code> reads the <code>anonymous</code> actor and calls the unit.' },
+      { n: ['runner'], stop: 'runner', t: 'The runner applies <code>requires: \'member\'</code> before the body. Anonymous fails: 403-before-400, so validation problems never leak.', r: '403 from the runner, before validation' }
+    ],
+    d: [
+      { n: ['browser'], t: 'A member submits a change to a todo that belongs to someone else (an update operation, scope <code>own</code>).' },
+      H(1), H(2), H(3), H(4),
+      { n: ['entry'], t: 'The entry point decodes the body through <code>valid</code> and reads the member actor.' },
+      { n: ['runner'], t: 'The runner checks <code>requires: \'member\'</code>. Passes.' },
+      { n: ['operation'], t: 'The operation passes scope <code>{ ownerId: actor.userId }</code> to the store.' },
+      { n: ['store', 'd1'], c: { op: 1 }, t: 'Store: <code>UPDATE … WHERE id = ? AND user_id = ?</code> returns change count 0. The fact: no row in scope.' },
+      { n: ['operation'], stop: 'operation', t: 'The operation says <code>not_found</code>, never <code>forbidden</code>. Existence is not leaked.', r: 'not_found' }
+    ],
+    e: [
+      H(0), H(1), H(2), H(3),
+      { n: ['authenticate', 'd1'], c: { rt: 1, rows: 2 }, stop: 'authenticate', t: 'The session row is live, but the join sees <code>users.disabled</code>. The gate refuses. The join is the control, even if ending the rows lagged.', r: 'refuse account_disabled in the envelope' }
+    ]
+  };
+  var wState = { b: 'happy', i: 0 };
+  var walkBox = $('walk-box'), walkCap = $('walk-caption');
+  function renderWalk() {
+    var steps = BRANCHES[wState.b], step = steps[wState.i];
+    var nar = narrow(walkBox, 640);
+    var cols = nar ? 3 : 6, cw = nar ? 108 : 146, ch = 58, gx = nar ? 14 : 22, gy = 44, pad = 4;
+    var rows = Math.ceil(WN.length / cols);
+    var W = cols * cw + (cols - 1) * gx + 2 * pad, Hh = rows * ch + (rows - 1) * gy + 2 * pad;
+    var M = 'ah-walk', svg = svgRoot(W, Hh, 'Request path', M);
+    var seen = {};
+    for (var k = 0; k <= wState.i; k++) steps[k].n.forEach(function (id) { seen[id] = true; });
+    var on = {}; step.n.forEach(function (id) { on[id] = true; });
+    var pos = WN.map(function (n, i) { var c = i % cols, r = Math.floor(i / cols); return { x: pad + c * (cw + gx), y: pad + r * (ch + gy) }; });
+    for (var i = 1; i < WN.length; i++) {
+      var a = pos[i - 1], b = pos[i], hot = seen[WN[i].id] && seen[WN[i - 1].id];
+      if (a.y === b.y) line(svg, a.x + cw + 2, a.y + ch / 2, b.x - 4, b.y + ch / 2, M, hot ? 'hot' : '');
+      else path(svg, 'M' + (a.x + cw / 2) + ' ' + (a.y + ch + 2) + ' V ' + (a.y + ch + gy / 2) + ' H ' + (b.x + cw / 2) + ' V ' + (b.y - 4), M, hot ? 'hot' : '');
+    }
+    WN.forEach(function (n, i) {
+      var cls = on[n.id] ? 'on' : (seen[n.id] ? 'seen' : 'dim');
+      if (step.stop && step.stop === n.id) cls = 'stop';
+      node(svg, { x: pos[i].x, y: pos[i].y, w: cw, h: ch, label: n.label, sub: n.sub, stage: n.stage, id: n.id, cls: cls });
+    });
+    walkBox.innerHTML = ''; walkBox.appendChild(svg);
+    var tot = { rt: 0, rows: 0, w: 0, op: 0 };
+    for (var j = 0; j <= wState.i; j++) { var c = steps[j].c || {}; tot.rt += c.rt || 0; tot.rows += c.rows || 0; tot.op += c.op || 0; }
+    $('m-rt').querySelector('b').textContent = tot.rt;
+    $('m-rows').querySelector('b').textContent = tot.rows;
+    $('m-w').querySelector('b').textContent = tot.w;
+    $('m-op').querySelector('b').textContent = tot.op;
+    walkCap.className = 'caption' + (step.stop ? ' stopped' : '');
+    walkCap.innerHTML = '<div class="stepno">Step ' + (wState.i + 1) + ' of ' + steps.length + (step.stop ? ' · stops here' : '') + '</div><div>' + step.t + '</div>' + (step.r ? '<div class="reply">Reply: ' + step.r + '</div>' : '');
+    $('walk-prev').disabled = wState.i === 0;
+    $('walk-next').disabled = wState.i === steps.length - 1;
+  }
+  function walkMove(d) { var n = BRANCHES[wState.b].length; wState.i = Math.max(0, Math.min(n - 1, wState.i + d)); renderWalk(); }
+  $('walk-prev').addEventListener('click', function () { walkMove(-1); });
+  $('walk-next').addEventListener('click', function () { walkMove(1); });
+  $('walk-reset').addEventListener('click', function () { wState.i = 0; renderWalk(); });
+  $('branch').addEventListener('change', function (e) { wState.b = e.target.value; wState.i = 0; renderWalk(); });
+  $('walk').addEventListener('keydown', function (e) {
+    if (e.target.tagName === 'SELECT') return;
+    if (e.key === 'ArrowRight') { e.preventDefault(); walkMove(1); }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); walkMove(-1); }
+  });
+
+  /* ---------- 4. Session lifecycle ---------- */
+  var REASONS = ['sign_out', 'all_devices', 'disabled', 'password_changed', 'expired'];
+  var sess = { writes: 0 };
+  function sessCompute() {
+    var h = +$('idle-h').value, d = +$('age-d').value;
+    var idleExp = h >= 24, absExp = d >= 30, live = !idleExp && !absExp;
+    var due = live && (24 - h) < 12;
+    return { h: h, d: d, idleExp: idleExp, absExp: absExp, live: live, due: due };
+  }
+  function renderLife(st) {
+    var box = $('life-box'), M = 'ah-life', svg = svgRoot(440, 150, 'Session lifecycle', M);
+    svg.appendChild(S('text', { x: 10, y: 30, 'class': 't-muted' }, 'sign-in / re-auth'));
+    path(svg, 'M 40 38 V 62', M);
+    node(svg, { x: 6, y: 66, w: 118, h: 58, label: 'minted', sub: 'sessions.start', stage: 'operation', id: 'minted', cls: 'seen' });
+    node(svg, { x: 162, y: 66, w: 118, h: 58, label: 'live', sub: st.due ? 'refreshDue: true' : 'refreshDue: false', stage: 'port', id: 'live', cls: st.live ? 'on' : 'dim' });
+    node(svg, { x: 318, y: 66, w: 116, h: 58, label: 'ended', sub: st.live ? 'ended_reason' : 'expired', stage: 'data', id: 'ended', cls: st.live ? 'dim' : 'stop' });
+    line(svg, 126, 95, 158, 95, M);
+    line(svg, 282, 95, 314, 95, M);
+    path(svg, 'M 196 66 C 196 20, 246 20, 246 62', M, st.due ? 'hot' : '');
+    svg.appendChild(S('text', { x: 221, y: 22, 'text-anchor': 'middle', 'class': 't-muted' }, 'touch · ≤ 1 per 12 h'));
+    svg.appendChild(S('text', { x: 221, y: 144, 'text-anchor': 'middle', 'class': 't-muted' }, 'every sign-in mints a new row; the old row is ended'));
+    box.innerHTML = ''; box.appendChild(svg);
+    var er = $('ended-reasons'); er.innerHTML = '<span class="small">ended_reason:</span>';
+    REASONS.forEach(function (r) { var c = document.createElement('span'); c.className = 'chip' + (!st.live && r === 'expired' ? ' hot' : ''); c.textContent = r; er.appendChild(c); });
+  }
+  function renderSess() {
+    var st = sessCompute();
+    $('idle-h-out').textContent = st.h + ' h';
+    $('age-d-out').textContent = st.d + ' d';
+    $('idle-needle').style.left = (st.h / 30 * 100) + '%';
+    $('age-needle').style.left = (st.d / 33 * 100) + '%';
+    var flags = [];
+    flags.push('<span class="flag ' + (st.live ? 'ok' : 'x') + '">' + (st.live ? 'live' : (st.absExp ? 'expired · expires_at passed' : 'expired · idle_until passed')) + '</span>');
+    flags.push('<span class="flag ' + (st.due ? 't' : '') + '">refreshDue: ' + st.due + '</span>');
+    flags.push('<span class="flag">idle_until − now: ' + Math.max(0, 24 - st.h) + ' h</span>');
+    flags.push('<span class="flag">touch writes: ' + sess.writes + '</span>');
+    $('sess-state').innerHTML = flags.join('');
+    renderLife(st);
+  }
+  $('idle-h').addEventListener('input', renderSess);
+  $('age-d').addEventListener('input', renderSess);
+  $('sess-req').addEventListener('click', function () {
+    var st = sessCompute(), log = $('sess-log');
+    if (!st.live) log.textContent = 'No live row: a cookie gets anonymous + clearCookie. 0 writes.';
+    else if (st.due) { sess.writes++; $('idle-h').value = 0; log.textContent = 'refreshDue was true: sessions.touch scheduled after the response. 1 write; idle_until moves.'; }
+    else log.textContent = 'Live, more than half the idle window left: 0 writes, idle_until unchanged.';
+    renderSess();
+  });
+
+  /* ---------- 4b. Store comparison ---------- */
+  var STORES = [
+    ['D1', 'Strong on the primary. End a session by ending its row.', 'One hop to the primary (<code>wnam</code>).', '≈ $0', '≈ $0: 1.2B rows read/month, inside the 25B included', '<span class="pill chosen">chosen</span>'],
+    ['KV', 'Eventually consistent (60 s+). Cannot revoke; a cached "not found" delays visibility further.', 'Bills every read, cache hits included, at about 500× D1\'s per-row price.', '≈ $0 (inside the included reads)', '≈ $440/mo', '<span class="pill rej">rejected</span>'],
+    ['DO per user', 'Strong inside the object. Fine as a write authority later.', 'Wrong for reads: every request routes to the user\'s home colo, placed at first sign-in, never moves. Cold start after 10 s idle.', '$0 to $5/mo', '≈ $90 requests + $1.7k–9k/mo duration, depending on burstiness', '<span class="pill rej">rejected for reads</span>'],
+    ['Coordinator DO', 'Strong, but one colo for the whole planet and a single-threaded chokepoint.', 'Every request hops to one colo; peaks approach the 1,000 req/s per-object limit at scale B.', '≈ $0', '≈ $90/mo; fine at scale A, wrong at scale B', '<span class="pill rej">rejected</span>'],
+    ['Stateless signed cookie', 'Cannot be ended; contradicts sign-out and disable.', 'No store read.', '$0', '$0', '<span class="pill rej">rejected</span>'],
+    ['Short cookie + re-mint', 'Revocation lag ≤ 5 min; one operation still owns the decision.', '5-minute HMAC cookie with D1 re-mint. 0 steady reads, 1 per 5 min.', '≈ $0', '≈ $0', '<span class="pill res">reserve hybrid</span><div class="small">only if far-away latency fails its test</div>']
+  ];
+  var scale = 'b';
+  function renderStores() {
+    var tb = $('store-body'); tb.innerHTML = '';
+    STORES.forEach(function (r) {
+      var tr = document.createElement('tr');
+      tr.innerHTML = '<td><strong>' + r[0] + '</strong></td><td>' + r[1] + '</td><td>' + r[2] + '</td><td class="num" style="font-family:var(--f-body)">' + (scale === 'a' ? r[3] : r[4]) + '</td><td>' + r[5] + '</td>';
+      tb.appendChild(tr);
+    });
+    $('scale-a').setAttribute('aria-pressed', scale === 'a' ? 'true' : 'false');
+    $('scale-b').setAttribute('aria-pressed', scale === 'b' ? 'true' : 'false');
+  }
+  $('scale-a').addEventListener('click', function () { scale = 'a'; renderStores(); });
+  $('scale-b').addEventListener('click', function () { scale = 'b'; renderStores(); });
+
+  /* ---------- 5. Areas and processes ---------- */
+  var PROCS = [
+    { id: 'signUp', side: 'top', peak: 34, x0: 190, x1: 510, steps: [['users.create', 'users'], ['credentials.add', 'auth'], ['verifications.issue', 'auth'], ['send email', 'outbox']], note: 'The first process. Brings the step record and, in slice C, the outbox.' },
+    { id: 'verifyEmail', side: 'top', peak: 96, x0: 240, x1: 460, steps: [['auth.consumeVerification', 'auth'], ['users.markVerified', 'users']], note: 'Token consumed only on an explicit POST.' },
+    { id: 'changePassword', side: 'bottom', peak: 362, x0: 240, x1: 460, steps: [['verify current', 'auth'], ['rewrite credential', 'auth'], ['rotate session', 'auth'], ['offer end-others', 'auth'], ['notify', 'outbox']], note: 'Also invalidates reset links (threat 11).' },
+    { id: 'disableUser', side: 'bottom', peak: 424, x0: 190, x1: 510, steps: [['users.disable', 'users'], ['sessions.endAll', 'auth']], note: 'Ending sessions is hygiene. The gate\'s join on users.disabled is the control.' }
+  ];
+  var procSel = 'signUp';
+  function renderAreas(focusId) {
+    var box = $('areas-box'), svg = svgRoot(700, 456, 'Areas users and auth with processes', 'ah-areas');
+    var top = 140, bot = 290;
+    PROCS.forEach(function (p) {
+      var y0 = p.side === 'top' ? top : bot, cy = 2 * p.peak - y0, mx = (p.x0 + p.x1) / 2;
+      var g = S('g', { 'class': 'arcg' + (procSel === p.id ? ' on' : ''), 'data-id': p.id, tabindex: '0', role: 'button', 'aria-label': 'process ' + p.id, 'aria-pressed': procSel === p.id ? 'true' : 'false' });
+      var d = 'M ' + p.x0 + ' ' + y0 + ' Q ' + mx + ' ' + cy + ' ' + p.x1 + ' ' + y0;
+      g.appendChild(S('path', { d: d, 'class': 'arc-hit' }));
+      g.appendChild(S('path', { d: d, 'class': 'arc' }));
+      var lw = p.id.length * 9.2 + 22, lb = S('g', { 'class': 'arc-lbl' });
+      lb.appendChild(S('rect', { x: mx - lw / 2, y: p.peak - 14, width: lw, height: 28, rx: 14 }));
+      lb.appendChild(S('text', { x: mx, y: p.peak + 5, 'text-anchor': 'middle' }, p.id));
+      g.appendChild(lb);
+      var fn = function () { procSel = p.id; renderAreas(p.id); };
+      g.addEventListener('click', fn);
+      g.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn(); } });
+      svg.appendChild(g);
+    });
+    function area(x, title, tables) {
+      var g = S('g', { 'class': 'area' });
+      g.appendChild(S('rect', { x: x, y: top, width: 230, height: bot - top, rx: 8 }));
+      g.appendChild(S('text', { x: x + 18, y: top + 34, 'class': 't-disp' }, title));
+      tables.forEach(function (t, i) { g.appendChild(S('text', { x: x + 18, y: top + 62 + i * 20, 'class': 'tblname' }, t)); });
+      svg.appendChild(g);
+    }
+    area(40, 'users', ['users']);
+    area(430, 'auth', ['credentials', 'sessions', 'verifications']);
+    svg.appendChild(S('text', { x: 58, y: bot - 14, 'class': 't-muted' }, 'owns the person'));
+    svg.appendChild(S('text', { x: 448, y: bot - 14, 'class': 't-muted' }, 'owns proof and continuity'));
+    // no-import mark
+    line(svg, 286, 196, 414, 196, null, 'dash');
+    svg.appendChild(S('line', { x1: 340, y1: 184, x2: 360, y2: 208, 'class': 'forbid' }));
+    svg.appendChild(S('line', { x1: 360, y1: 184, x2: 340, y2: 208, 'class': 'forbid' }));
+    svg.appendChild(S('text', { x: 350, y: 176, 'text-anchor': 'middle', 'class': 't-muted' }, 'no imports, either way'));
+    path(svg, 'M 428 240 H 274', 'ah-areas');
+    svg.appendChild(S('text', { x: 350, y: 232, 'text-anchor': 'middle', 'class': 't-muted' }, 'actor via gate join'));
+    box.innerHTML = ''; box.appendChild(svg);
+    var p = PROCS.filter(function (q) { return q.id === procSel; })[0];
+    var html = '<h4>process</h4><h3 style="margin:0 0 6px"><code>' + p.id + '</code></h3><ol class="steps">';
+    p.steps.forEach(function (s) { html += '<li><code>' + s[0] + '</code><span class="tag ' + s[1] + '">' + s[1] + '</span></li>'; });
+    html += '</ol><p class="small" style="margin:10px 0 0">' + p.note + '</p>';
+    $('areas-detail').innerHTML = html;
+    refocus(box, focusId);
+  }
+
+  /* ---------- 6. Access simulator ---------- */
+  var OPS = {
+    addTodo: { requires: 'member', scope: 'own', label: 'addTodo' },
+    getOwn: { requires: 'member', scope: 'own', label: 'getTodo', owner: true },
+    getOther: { requires: 'member', scope: 'own', label: 'getTodo', owner: false },
+    listUsers: { requires: 'admin', scope: 'any', label: 'listUsers' },
+    disableUser: { requires: 'admin', scope: 'any', label: 'disableUser' }
+  };
+  function satisfies(actor, req) {
+    if (req === 'anonymous') return true;
+    if (req === 'member') return actor === 'member' || actor === 'verified_member' || actor === 'admin';
+    if (req === 'verified_member') return actor === 'verified_member' || actor === 'admin';
+    if (req === 'admin') return actor === 'admin';
+    return false;
+  }
+  function renderSim() {
+    var a = $('sim-actor').value, o = OPS[$('sim-op').value], out = $('sim-out'), status, ok, where;
+    if (!satisfies(a, o.requires)) {
+      status = '403'; ok = false;
+      where = '<strong>Runner, before validation.</strong> <code>' + o.label + '.access.requires = \'' + o.requires + '\'</code>; actor is <code>' + a + '</code>. 403-before-400: the body is never inspected.';
+    } else if (o.owner === false) {
+      status = '404'; ok = false;
+      where = '<strong>Store scope, then the operation.</strong> The runner passes. The operation sends <code>{ ownerId: actor.userId }</code>; the store finds no row in scope, so the operation says <code>not_found</code>. Never <code>forbidden</code>: existence is not leaked.';
+    } else {
+      status = '200'; ok = true;
+      where = '<strong>Runner passes; the operation decides.</strong> Scope <code>' + (o.scope === 'any' ? '{ any: true }' : '{ ownerId: actor.userId }') + '</code> goes to the store. Body validation and the business decision follow.';
+    }
+    out.innerHTML = '<div class="status ' + (ok ? 'ok' : 'bad') + '">' + status + '</div><div class="where">' + where + '</div>';
+  }
+  $('sim-actor').addEventListener('change', renderSim);
+  $('sim-op').addEventListener('change', renderSim);
+
+  /* ---------- 7. Identity cards ---------- */
+  var IDS = [
+    { t: 'Email + password', s: 'Argon2id, m=19456 KiB t=2 p=1, ≈ 20 ms', open: true,
+      plat: 'Paid plan: the Free plan (10 ms CPU) cannot hold an OWASP-compliant hash. Pepper by HMAC-SHA256 from a Workers secret. Production Workers cap WebCrypto PBKDF2 at 100,000 iterations (OWASP floor 600,000); local <code>wrangler dev</code> does not enforce it, so local tests cannot catch it.',
+      lib: '<code>@phi-ag/argon2</code>, WASM imported as a module. Not <code>hash-wasm</code>: it compiles base64 WASM at runtime and fails on workerd.',
+      state: 'PHC string stored with params; re-hash on sign-in when params change. The credential store reports verified / not verified / needs-rehash; the operation decides.',
+      thr: 'Enumeration (7): dummy hash when the user is missing. Credential stuffing (8). Password change (11).' },
+    { t: 'Passkeys', s: '@simplewebauthn/server 14',
+      plat: '<code>rpID</code> = the shared registrable domain.',
+      lib: '<code>@simplewebauthn/server</code> 14: pure functions; arrays for <code>expectedOrigin</code> and <code>expectedRPID</code>.',
+      state: 'Challenge row with a short TTL, single use. BFF offers conditional UI autofill.',
+      thr: 'Counter regression is a clone signal.' },
+    { t: 'Google OIDC', s: 'hand-rolled, ~100 lines',
+      plat: 'Exact redirect URI registered on the BFF.',
+      lib: 'None. Hand-rolled (~100 lines); Arctic deprecated Jul 2026.',
+      state: 'PKCE S256 + state + nonce stored per attempt. The BFF hands <code>code + verifier + nonce + state</code> to the operation. Link only when <code>email_verified</code>; key on <code>sub</code>.',
+      thr: 'Open redirect in OAuth (5): exact <code>redirect_uri</code>, state/PKCE, issuer check.' },
+    { t: 'Magic links', s: '≤ 10 min, single use, consumed on POST',
+      plat: 'An email sender behind a port: Cloudflare Email Service first, Resend second.',
+      lib: 'None named.',
+      state: 'Token hashed at rest. GET renders a confirm page; only an explicit POST consumes it, which defeats mail scanners. The reply is always "sent".',
+      thr: 'Verification tokens (9). Enumeration (7).' },
+    { t: 'Cloudflare Access', s: 'admin, on its own hostname',
+      plat: 'Its own hostname. <code>ctx.access</code> does not cross service bindings.',
+      lib: 'None named. Validate <code>Cf-Access-Jwt-Assertion</code>: RS256, <code>aud</code>, <code>iss</code>; keys rotate every 6 weeks.',
+      state: 'Declared as the gate for the admin hostname only.',
+      thr: 'Covered by the JWT checks above; no table row of its own.' }
+  ];
+  var cards = $('id-cards');
+  IDS.forEach(function (c, i) {
+    var d = document.createElement('details'); d.className = 'card'; d.id = 'id-card-' + i; if (c.open) d.open = true;
+    d.innerHTML = '<summary><span class="t">' + c.t + '</span><span class="s">' + c.s + '</span></summary><div class="body">' +
+      '<div><h4>Platform</h4><p>' + c.plat + '</p></div><div><h4>Library</h4><p>' + c.lib + '</p></div>' +
+      '<div><h4>BFF and state</h4><p>' + c.state + '</p></div><div><h4>Threats</h4><p>' + c.thr + '</p></div></div>';
+    cards.appendChild(d);
+  });
+
+  /* ---------- 9. Threats ---------- */
+  var TH = [
+    ['CSRF on the cookie api', 'Origin/Sec-Fetch-Site + content-type discipline', 'OWASP CSRF; ASVS 3.5.1–3.5.3', ['BFF', 'gate'], 'construct test with cross-site headers'],
+    ['SameSite=Lax top-level POST gap', 'Explicit SameSite=Lax; no state change on GET', 'rfc6265bis §5.6.7.2', ['BFF', 'operation'], ''],
+    ['Session fixation', 'New row per sign-in, old ended; server-minted ids only', 'ASVS 7.2.4', ['operation'], 'unit test'],
+    ['Cookie scope across Workers', '__Host-; api binding-only; workers_dev = false', 'ASVS 3.3.1/3.3.3/3.3.4', ['BFF', 'platform', 'gate'], 'config test'],
+    ['Open redirect in OAuth', 'Exact redirect_uri; state/PKCE; issuer check', 'RFC 9700', ['operation'], 'unit test (slice E)'],
+    ['Open redirect in returnTo', 'Same-origin path only', 'OWASP Redirects', ['BFF'], 'BFF unit test'],
+    ['Enumeration', 'Uniform body/status/timing; dummy hash when user missing; always "sent"', 'ASVS 6.3.8', ['operation', 'process'], 'integration test comparing replies'],
+    ['Credential stuffing', 'Per-account counter with backoff; Turnstile; Rate Limiting binding keyed on account; one WAF rule; breached-password check', 'ASVS 6.3.1/6.1.1/6.2.12', ['platform', 'operation'], 'unit test for the counter'],
+    ['Verification tokens', '256-bit, hashed, single use, ≤ 10 min, consumed on POST', 'ASVS 6.5.1/6.5.3/6.5.5/6.6.2', ['operation', 'store', 'BFF'], 'store test'],
+    ['Sign-out semantics', 'One row / all rows (re-auth); expiring Set-Cookie; Clear-Site-Data courtesy', 'ASVS 7.4.1/7.4.5/7.5.2', ['operation', 'BFF'], 'construct test'],
+    ['Password change leaves sessions alive', 'Current password required; rotate; offer end-others; notify; invalidate reset links', 'ASVS 6.2.3/7.4.3/6.3.7', ['process'], 'process test'],
+    ['Clickjacking / headers', 'CSP frame-ancestors \'none\' in the header from handle; HSTS 1 y; nosniff; COOP; Hono secureHeaders() on the api', 'ASVS 3.4.x', ['BFF', 'api'], 'header test'],
+    ['Subdomain takeover / cookie tossing', '__Host-; workers.dev is a public suffix; exact CORS strings; gate reads only the prefixed name', 'ASVS 3.3.3/3.5.4', ['BFF', 'platform', 'gate'], '']
+  ];
+  var HOMES = ['all', 'BFF', 'gate', 'entry point', 'operation', 'process', 'store', 'platform', 'api'];
+  var HOME_STAGE = { BFF: 'client', gate: 'gate', 'entry point': 'entry', operation: 'operation', process: 'process', store: 'data', platform: 'startup', api: 'port' };
+  var tFilter = 'all';
+  var withTest = TH.filter(function (r) { return r[4]; }).length;
+  $('cov-num').textContent = withTest + '/' + TH.length;
+  $('cov-bar').style.width = (withTest / TH.length * 100) + '%';
+  var tf = $('threat-filters');
+  HOMES.forEach(function (h) {
+    var n = h === 'all' ? TH.length : TH.filter(function (r) { return r[3].indexOf(h) >= 0; }).length;
+    var b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.id = 'tf-' + h.replace(/\s/g, '-');
+    b.textContent = h + ' · ' + n; b.setAttribute('aria-pressed', h === tFilter ? 'true' : 'false');
+    b.addEventListener('click', function () { tFilter = h; renderThreats(); });
+    tf.appendChild(b);
+  });
+  function renderThreats() {
+    var only = $('has-test').checked, tb = $('threat-body'); tb.innerHTML = '';
+    var shown = 0;
+    TH.forEach(function (r, i) {
+      if (tFilter !== 'all' && r[3].indexOf(tFilter) < 0) return;
+      if (only && !r[4]) return;
+      shown++;
+      var tr = document.createElement('tr');
+      tr.innerHTML = '<td class="num">' + (i + 1) + '</td><td><strong>' + r[0] + '</strong></td><td>' + r[1] + '</td><td class="small">' + r[2] + '</td><td><div class="homes">' +
+        r[3].map(function (h) { return '<span class="pill stage" data-stage="' + HOME_STAGE[h] + '">' + h + '</span>'; }).join('') + '</div></td><td>' + (r[4] ? '<span class="yes">' + r[4] + '</span>' : '<span class="bad">none</span>') + '</td>';
+      tb.appendChild(tr);
+    });
+    if (!shown) tb.innerHTML = '<tr><td colspan="6" class="small">No threat lives at this stage. Entry points carry no security decision of their own.</td></tr>';
+    $('threat-count').textContent = 'Showing ' + shown + ' of ' + TH.length;
+    Array.prototype.forEach.call(tf.children, function (b) { b.setAttribute('aria-pressed', b.id === 'tf-' + tFilter.replace(/\s/g, '-') ? 'true' : 'false'); });
+  }
+  $('has-test').addEventListener('change', renderThreats);
+
+  /* ---------- 10. Pillars ---------- */
+  var PIL = [
+    ['Reliability', 'Fails closed and stays correct under races.', 'Construct tests for fail-closed store-down and the sign-out race; <code>internal</code> failures in the integration suite; errors-as-values everywhere (no throw across a boundary).', 'One authority for identity; fail-closed gate; stale-cookie race handled; D1 strong consistency, no KV lag.'],
+    ['Security', 'Every threat has a home and a test.', 'Threats-table coverage (<span class="mono">' + withTest + '/' + TH.length + '</span>); ASVS ids answered.', 'Gates ordered with <code>channel</code> before <code>authenticate</code>; <code>__Host-</code>; hashed tokens; both timeouts; default-deny access; Argon2id; 13 threats with homes.'],
+    ['Performance', 'Budgets per entry chain, asserted by cheap tests.', 'Gate: 1 round trip, ≤ 2 rows, 0 writes. Sign-in: 1 hash ≈ 20 ms, 1 insert. Trend over stages.', 'One statement per gated request; zero writes steady; ≈ $0 at 300k users; no cross-region DO hops.'],
+    ['Maintainability', 'Every spec has an address and a check.', 'Specs with address + check (rules.md → validators, access.md → runner property, entry-chains index, join checks); drift counts; change frequency per package.', 'Same shape for gates and operations; generated access property; deliveries own transport (cookie vs keyring); areas with a one-way rule and processes crossing them; libraries avoided where they would own routes or schema.']
+  ];
+  var pw = $('pillars');
+  PIL.forEach(function (p) {
+    var d = document.createElement('div'); d.className = 'pillar';
+    d.innerHTML = '<div class="name">' + p[0] + '</div><div class="means">' + p[1] + '</div><div><h4>Signal we read</h4>' + p[2] + '</div><div><h4>How this design serves it</h4>' + p[3] + '</div>';
+    pw.appendChild(d);
+  });
+  var DEC = [
+    ['channel before authenticate', [0, 1, 0, 0]],
+    ['one D1 statement in the gate, 0 writes', [1, 0, 1, 0]],
+    ['D1 over KV / DO per user', [1, 1, 1, 0]],
+    ['__Host- cookie, hashed tokens, both timeouts', [0, 1, 0, 0]],
+    ['generated access property, default deny', [0, 1, 0, 1]],
+    ['areas one-way; processes cross them', [0, 0, 0, 1]],
+    ['no library that owns routes or schema', [0, 0, 0, 1]]
+  ];
+  var mt = '<thead><tr><th>Decision</th><th>Rel.</th><th>Sec.</th><th>Perf.</th><th>Maint.</th></tr></thead><tbody>';
+  DEC.forEach(function (d) { mt += '<tr><td>' + d[0] + '</td>' + d[1].map(function (v) { return '<td>' + (v ? '<span class="dot" aria-label="yes"></span>' : '') + '</td>'; }).join('') + '</tr>'; });
+  $('pmatrix').innerHTML = mt + '</tbody>';
+
+  /* ---------- nav ---------- */
+  var secs = Array.prototype.slice.call(document.querySelectorAll('main section'));
+  var nl = $('nav-list'), ns = $('nav-select');
+  secs.forEach(function (s) {
+    var num = s.querySelector('.num').textContent, title = s.getAttribute('data-title');
+    var li = document.createElement('li');
+    li.innerHTML = '<a href="#' + s.id + '" id="nav-' + s.id + '"><span>' + num + '</span>' + title + '</a>';
+    nl.appendChild(li);
+    var o = document.createElement('option'); o.value = s.id; o.textContent = num + '  ' + title; ns.appendChild(o);
+  });
+  ns.addEventListener('change', function () { var t = $(ns.value); if (t) t.scrollIntoView({ block: 'start' }); });
+  if ('IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function (ents) {
+      ents.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        Array.prototype.forEach.call(nl.querySelectorAll('a'), function (a) { a.classList.remove('active'); });
+        var a = $('nav-' + e.target.id); if (a) a.classList.add('active');
+        ns.value = e.target.id;
+      });
+    }, { rootMargin: '-20% 0px -70% 0px' });
+    secs.forEach(function (s) { io.observe(s); });
+  }
+
+  /* ---------- boot ---------- */
+  function renderAll() { renderChain(); renderWalk(); renderAreas(); }
+  renderAll(); renderSess(); renderStores(); renderSim(); renderThreats();
+  var lastNarrow = null, rt;
+  window.addEventListener('resize', function () {
+    clearTimeout(rt);
+    rt = setTimeout(renderAll, 150);
+  });
+  lastNarrow = window.innerWidth < 700;
+})();
+</script>

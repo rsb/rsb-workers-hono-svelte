@@ -25,6 +25,7 @@ Every todo as it now is.
 
 ## Refused
 - The store fails: `unavailable` or `server`. Nothing is changed.
+  shows: `todos.list.action_failed`
 
 ## Guarantees
 - `todos.order`

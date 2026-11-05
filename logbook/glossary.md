@@ -21,8 +21,10 @@ on OpenAPI, L24 on entry chains, L25 on use cases, L26 on the api
 spec, L27 on `valid`. L29–L35 were agreed in the specs session of
 2026-11-04: L29 on rule kinds, L30 on the use case's form, L31 on a
 rule's sources, L32 on the use case as the root, L33 on citing rules
-by id, L34 on the rules spec, L35 on what makes a spec. They are
-recorded in [the api story](the-api-story.md).
+by id, L34 on the rules spec, L35 on what makes a spec. L44–L46 were
+agreed in the PRD tree session of 2026-11-05: L44 on the PRD as a
+tree, L45 on feature, view, state and board, L46 on data cases. They
+are recorded in [the api story](the-api-story.md).
 
 Status:
 - **locked:** agreed, and the story follows it;
@@ -194,7 +196,12 @@ and `packages/operations` never imports it.
   the word), saga (suggests compensation only), pipeline (suggests a
   straight line).
 - **Status:** target (L18, L22). The todo app's first process is
-  "notify on add".
+  sign-up with email verification (slice C of the authentication
+  design), which brings the step record; "notify on add" stays the
+  worked example. A process is the use case of a feature's action, as
+  an operation is: sign-up, disable a user and delete an account are
+  the accounts features' processes. "The process from idea to code" is
+  not this word: that is the [PRD](#prd)'s layers (story, chapter 14).
 
 ### Operation
 
@@ -694,12 +701,26 @@ points and everything below them are written by hand.
 
 ### Data spec
 
-What each store call must guarantee, in markdown: its input and
-result in business types, what it keeps atomic, the order it returns,
-and its failures. Nothing is generated from it. Store functions would
-cite it, and a conformance suite would test each guarantee.
+What each store call must guarantee and what it costs, in markdown:
+one file per database, `prd/<app>/data/<database>.md`, of
+[data cases](#data-case). Nothing is generated from it; SQL stays
+hand-written. Store functions cite it, the budgets tests read its cost
+lines, and a conformance suite tests each guarantee.
 
-- **Status:** pending (L26), to be tried after the api spec is built.
+- **Status:** locked (L46); it settles what L26 left pending.
+  `prd/todo/data/app.md` is written; the citations, the budgets tests
+  reading it and the conformance suite are target.
+
+### Data case
+
+One store call's entry in the [data spec](#data-spec), with the id
+`<area>.<call>` (`todos.add_unless_full`): the port method, the use
+cases that use it, input and result in business types, the guarantee
+(what it keeps atomic, the order it returns, whether a retry is safe),
+the failures it can name, its cost (round trips, statements, rows, the
+index it relies on) and the guarantee rules it keeps.
+
+- **Status:** locked (L46). The seven todo store calls have one each.
 
 ### OpenAPI
 
@@ -840,8 +861,10 @@ exist), data spec (the conformance suite), and view (nothing yet, so
 not yet).
 
 - **Status:** locked (L35). The api spec's and the rules spec's checks
-  are built and the use case's in part; the rest are target, and the
-  data spec is pending.
+  are built and the use case's in part; the rest are target. The data
+  spec is written (L46) and its checks are target. A
+  [feature](#feature) is not a spec level: it has addresses and no
+  check (L44).
 
 ### Precedence
 
@@ -852,6 +875,76 @@ generated indexes are the arbiter.
 
 - **Status:** locked (L35). Its line in `AGENTS.md` waits for an rl-0009
   exception.
+
+## The PRD tree
+
+How the product is written down before it is built (L44, L45). The
+story's chapter 14 tells it.
+
+### PRD
+
+The product requirements, as a tree at `prd/<product>/`: a short root,
+`<product>.md` (purpose, areas, product-wide constraints, the error
+vocabulary, deviations, done per slice and amendments), and beside it
+`features/`, `use-cases/<area>/`, `rules.md`, `access.md`, `api.md`
+and `data/`. Each kind of document has its own address scheme and its
+own relationship to code. A feature changes the tree additively; a
+change to an existing line is a recorded deviation.
+
+- **Status:** locked (L44). Until stage 22 "the PRD" meant
+  `prd/todo.md` alone; it now means the tree, and the root is called
+  the root. Nothing checks the root or the features; the join check
+  covers use cases, rules and the api.
+
+### Feature
+
+One job a user does with the product, written in business terms:
+"keep a list of things to do". One file,
+`prd/<product>/features/feature-<area>-<name>.md`, from
+`prd/_templates/feature.md`: who may do it, its [views](#view) and
+their [states](#state), the inputs and the rules they cite, the reads
+and actions and the use cases behind them, the budget, and the
+acceptance scenarios that prove it. It cites the layers below and
+never restates them. The design is its visual twin.
+
+- **DDD:** none; closest to a user story with its acceptance criteria.
+- **Status:** locked (L45). `feature-todos-list.md` is shipped; the
+  five accounts features are written ahead of their slices, with
+  `open` states.
+
+### View
+
+One composition of behaviour: what one page or frame shows and lets
+the user do, with the id `<area>.<view>` (`todos.list`,
+`accounts.shell`). A state that needs a different composition is a
+different view. A frame placed in every page, such as `accounts.shell`,
+is a view of its own feature, cited by the others.
+
+- **Status:** locked (L45).
+
+### State
+
+What a [view](#view) shows at one moment, with the id
+`<area>.<view>.<state>` (`todos.list.full`). Each state is produced by
+the chain (a use case's result or refused kind) or owned by the BFF
+(pending, editing, a menu open); a state with no producer yet is
+marked `open`. A use case's Refused rows name the state that shows
+them (`shows:`), the BFF's view maps each state to a template branch,
+and the design's `state` enum is the feature's state list.
+
+- **Status:** locked (L45).
+
+### Board
+
+A [view](#view) at one [state](#state) under one viewport and theme:
+one picture in a design, named `<view>.<state>.<viewport>.<theme>`
+(`list.full.mobile.dark`), with the state's underscores written as
+hyphens. The name parses back to the state. Viewport and theme never
+appear in a spec. A design exported before the convention keeps its
+file names, and the feature carries a board map.
+
+- **Status:** locked (L45). The two existing exports are mapped, not
+  renamed.
 
 ## The BFF
 
@@ -893,7 +986,6 @@ To be settled in later sessions:
   - the contract and the OpenAPI document (`tooling/api-spec/`);
   - the extractor that reads construct, and the entry chain index
     (`tooling/entry-chains/`, stage 13);
-- whether the data spec earns its place, once tried;
 - authentication and authorization, as subsystems rather than rule
   kinds, modelled in their own session; the operation descriptor will
   carry `kind` and `resource`;

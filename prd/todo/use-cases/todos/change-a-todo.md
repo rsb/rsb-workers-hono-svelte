@@ -29,8 +29,10 @@ The todo as it now is.
 
 ## Refused
 - `todo.exists` does not hold: `not_found`. Nothing is changed.
+  shows: `todos.list.action_failed`
 - The store fails: `unavailable` or `server`. Whether the change was
   stored is not known to the caller.
+  shows: `todos.list.action_failed`
 
 ## Guarantees
 none

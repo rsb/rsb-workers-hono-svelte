@@ -40,7 +40,7 @@ suggested order is Claude's; the owner's order replaces it.
 | G | The process step record | S | nothing yet; prepares durable processes (L18) | the first process | with the first process |
 | H | Failures carry their parameters | S | the BFF's number-free `limit` wording; the CLI's wording of `limit` | a spec change to `prd/todo/api.md` | with the CLI or auth |
 | I | The CLI delivery (stage 12) | M–L | handoff 11, Q7–Q12 | the owner's answers to Q7–Q12 | owner's call |
-| J | The data spec | M | pending (L26); the budget's home for C | its form (questions below) | before auth adds tables |
+| J | The data spec | M | pending (L26); the budget's home for C | its form (questions below) | done, stage 22 (L46, `prd/todo/data/app.md`) |
 | K | Evaluate RPC over the service binding | M | nothing; a measured lab variant | the CLI's provider/consumer decision | last |
 | L | `tooling/` is type-checked: a factory that trusts its checkers should compile them (added at stage 17, Q4) | S | "nothing type-checks `tooling/`" (stage 15 and 16 tours); today it runs only under Node's type stripping | nothing | done, stage 18 (`194d666`) |
 | M | `@types/node` in the catalog: `apps/bff` and `tooling/` pin `26.6.6` each, by hand (added at stage 18, Q2) | S | two exact pins that can drift apart | nothing | done, stage 19 (`6879b7a`) |

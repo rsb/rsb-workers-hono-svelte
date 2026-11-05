@@ -25,6 +25,7 @@ one; possibly none.
 
 ## Refused
 - The store fails: `unavailable` or `server`.
+  shows: `accounts.error.failed` (the page's load fails)
 
 ## Guarantees
 - `todos.order`

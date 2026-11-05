@@ -239,6 +239,44 @@ The decisions behind this story are:
   is a deliberate edit, in the same commit as the code that changed
   the cost, with its reason in the commit message. Built in stage 21
   (chapter 8).
+- L37–L43 are the authentication decisions of handoff 23, recorded
+  when stage 23 builds them.
+- L44, agreed with the owner in the PRD tree session (2026-11-05): the
+  PRD is a tree. `prd/<product>/` holds documents of known kinds: a
+  short root (`<product>.md`: purpose, areas, product-wide limits, the
+  error vocabulary, done per slice, deviations and amendments),
+  `features/` (one per user job), `use-cases/<area>/` (one per
+  operation), `rules.md`, `access.md`, `api.md`, and `data/` (one file
+  per database, one entry per store call). Each kind has its own
+  address scheme and its own relationship to code. A feature changes
+  the tree additively; a change to an existing line is a recorded
+  deviation. Nothing checks the root or the features: the join check
+  covers use cases, rules and the api, and the number of requirement
+  lines no use case cites is reported, not failed. Built in stage 22
+  (chapter 14).
+- L45, agreed with the owner in the PRD tree session (2026-11-05):
+  feature, view, state, board. A feature is one job a user does,
+  written in business terms, citing the layers below and never
+  restating them. A view is one composition of behaviour. A state is
+  what the chain produces for it, or what the BFF owns itself
+  (pending, empty). A board is a view at one state under one viewport
+  and theme. Ids are `<area>.<view>.<state>` and belong to the state;
+  boards take their names from them, `<view>.<state>.<viewport>.<theme>`,
+  so a board name parses back to its state. A use case's Refused rows
+  say which state shows them (`shows:`); the BFF's view maps each
+  state to a template branch; the design's `state` enum is the
+  feature's state list. Viewport and theme never appear in a spec. A
+  state that needs a different composition is a different view. Built
+  in stage 22 (chapter 14).
+- L46, agreed with the owner in the PRD tree session (2026-11-05):
+  data cases are the data spec. One file per database, one entry per
+  store call: the port method, the use cases that use it, input and
+  result, guarantee, failures, cost. SQL stays hand-written; the
+  budgets tests read the cost lines; a conformance suite holds one test
+  per guarantee. Chains cite the data cases they use. This settles the
+  data spec L26 left pending. Built in stage 22 for the app database,
+  `prd/todo/data/app.md`; the conformance suite and the budgets tests
+  reading the cost lines are target (chapters 8 and 14).
 
 After slice 2 (Add and list), the code followed chapters 1–10
 throughout, except for config, which has nothing to hold yet
@@ -1546,15 +1584,17 @@ root of every failure it meets (chapter 13).
 Data makes no ids and decides no rules. It maps, and it reports facts
 (D13, chapter 6).
 
-**Pending (L26).** A data spec, to be tried after the api spec is
-built. It would state, in markdown, what each store call must
-guarantee and not how: its name and the use cases that use it, its
-input and result in business types, what it keeps atomic, the order
-it returns, and its failures. Nothing would be generated from it. SQL
-stays hand-written, because the engine-specific choices in it are made
-for performance (DB1, DB6). Each store function's doc comment would
-cite its section, and a conformance suite would hold one test per
-guarantee, run against D1 now and Postgres later.
+**The data spec is the data cases (L46).** `prd/todo/data/app.md`
+states, for each store call, what it must guarantee and not how: its
+port method and the use cases that use it, its input and result in
+business types, what it keeps atomic, the order it returns, its
+failures and its cost. Nothing is generated from it. SQL stays
+hand-written, because the engine-specific choices in it are made for
+performance (DB1, DB6). One file per database: `app.md` now, and
+`identity.md` when slice A adds the identity database. **Target.**
+Each store function's doc comment cites its entry, the budgets tests
+read the Cost lines instead of repeating them, and a conformance suite
+holds one test per guarantee, run against D1 now and any later store.
 
 A guarantee is a rule of kind `guarantee` (L29): a promise the store
 makes, such as `todos.order` (lists come in the order todos were
@@ -1685,10 +1725,11 @@ So one `POST /todos` from the page costs 1 api call × 1 store call ×
 counts only when it succeeds: a refused request can stop short of its
 cost. A second call in a unit fails its budget test, naming the unit,
 the budget and the spend. The budget is then edited in the same commit,
-with the reason (L36). Until the data spec exists (L26, above), the
-data table is the home of the data level's numbers. When it exists,
-each store call's entry carries its cost line. A cross-level column
-(api calls × store calls × trips) in `entry-chains.md` is later.
+with the reason (L36). Since stage 22 each store call's data case
+carries the same numbers as its Cost line (L46); until the data table
+reads them from there, the two are edited together. A cross-level
+column (api calls × store calls × trips) in `entry-chains.md` is
+later.
 
 **Target.** Each data package is a workspace package of its own under
 `packages/data/` (A1). `data/d1` is the first. `data/memory` was the
@@ -2113,8 +2154,8 @@ The levels, and what binds each:
 | use case | one unit: input, given, effects, result | the entry-chains index, the triangle |
 | api spec | the wire | `gen:api --check`, the examples replayed |
 | rules spec | ids, parameters, kinds, violations | generated validators and table; cited ids exist |
-| data spec | what a store call guarantees | the conformance suite |
-| view | what a page composes | nothing yet, so not yet |
+| feature | one user job: its views, states and boards | nothing; the design is its visual twin (L44, L45) |
+| data spec | what a store call guarantees and costs | the conformance suite; the budgets tests (L46) |
 
 Today the api spec's check exists. The use case is bound in part:
 `check:entry-chains` fails when the index drifts, but nothing yet
@@ -2122,8 +2163,11 @@ checks the triangle (chapter 9). The rules spec's check exists:
 `pnpm check:rules` regenerates and compares, and lints the use cases'
 citations (stage 15). `pnpm check:join` binds the citations to what
 runs: `Assumes` to `Applies:` to the route's validator, and `Given`
-to a passed test (stage 16). The rest of the use-case lint and the data spec
-are **Target.** A view spec waits for a check.
+to a passed test (stage 16). The rest of the use-case lint and the data spec's
+checks are **Target.** A feature has addresses (state ids, board
+names) but no check (L44), so it is not a spec level. Its states are bound from below, through the `shows:`
+line of each Refused row, and from the side, through the design's
+`state` enum (chapter 14).
 
 **Precedence.** When a spec and the code disagree:
 - for a generated artefact, the spec wins, and the artefact is
@@ -2613,3 +2657,152 @@ so a new rule does not compile until every delivery has words for it.
   kind of their own, or they will be retried over and over.
 - The BFF's failures, in refactor B: the bff-api has the same need,
   and its data client already adds `unavailable` (chapter 8).
+
+## 14. From idea to code
+
+The chapters before this one follow a request through the code. This
+one follows a piece of the product from the idea to the code, through
+six layers. Each layer answers one question, each is written in
+order, and each cites the one above it (L44):
+
+1. **Concept:** why, and for whom; what changes for the user; what it
+   is not. It lives in the planning chat and the explainer it
+   produces (for accounts,
+   `logbook/reports/2026-11-05-22-auth-design.html`). The story links
+   it; nothing checks it.
+2. **Decisions:** how, and within what constraints, tested against
+   research. They are the story's L entries and the glossary.
+3. **Features:** what the product does, seen from each view, in the
+   user's terms (`prd/<product>/features/`). The design is their
+   visual twin.
+4. **Use cases:** what each operation promises (L30), citing the
+   features, rules and access they serve
+   (`prd/<product>/use-cases/<area>/`).
+5. **Checkable specs:** `rules.md`, `access.md`, `api.md` and `data/`.
+   They are generated into the validators, the access property, the
+   contract and the budgets' expectations, and checked against the
+   code (L35).
+6. **Code,** with little left to decide, and a handoff that names
+   which of the layers above a stage adds.
+
+What went wrong before: a ticket written from an idea skips layers 2
+to 5. Every question those layers would have answered is then
+answered by the builder, silently, at the point of least leverage. The
+authentication design nearly did it again: it went from concept to
+decisions to research to an explainer and a handoff, and left "PRD
+lines" as a build item. Layer 3 was missing. Stage 22 adds it.
+
+### The PRD is a tree (L44)
+
+`prd/todo/` holds documents of known kinds, each with its own address:
+
+| Kind | Where | Address | Relationship to code |
+| --- | --- | --- | --- |
+| root | `prd/todo.md` | its sections, deviation numbers, scenario 1 | none: it is cited |
+| feature | `features/feature-<area>-<name>.md` | `<area>.<view>.<state>` | the BFF's view maps each state to a template branch; nothing checks it |
+| use case | `use-cases/<area>/<name>.md` | its path | realized by one unit, whose doc comment cites it |
+| rules | `rules.md` | rule id | generated into `valid` and the rule table |
+| access | `access.md` (slice A) | operation | generated into the access property |
+| api | `api.md` | endpoint key | generated into the contract and OpenAPI |
+| data | `data/<database>.md` | `<area>.<call>` | target: cited by store functions, read by the budgets tests |
+
+The root keeps what is product-wide: purpose, source and licence,
+constraints (C-design holds the design lines every page keeps),
+deviations, the envelope, security, shape, the database, slices, done,
+out of scope and amendments. Stage 22 moved the API table to `api.md`,
+the Design section's screens to the feature, and scenarios 2 to 8 to
+the feature's Done, keeping their numbers so "scenario 2.6" still
+names the same scenario. Scenario 1 stays in the root: health is a
+probe, not a user job.
+
+A feature changes the tree additively: new files, new rows. A change
+to an existing line is a deviation, recorded in the root.
+
+### Feature, view, state, board (L45)
+
+A **feature** is one job a user does: "keep a list of things to do",
+"sign in to my list". It is written in business terms and cites the
+layers below by name. It never restates them: the bound on a title is
+`title.length`, never "1 to 256".
+
+A **view** is one composition of behaviour. The todo page is one view,
+`todos.list`. The account menu and the top bar are not part of it:
+they are `accounts.shell`, a view of its own that frames every page,
+and every other feature cites it.
+
+A **state** is what the chain produces for a view, or what the BFF
+owns itself:
+
+| State | Produced by |
+| --- | --- |
+| `todos.list.empty` | list-todos › result, none |
+| `todos.list.full` | add-a-todo › refused `limit` |
+| `todos.list.input_error` | bff (`valid` › `title.length`), before the api is called |
+| `todos.list.editing` | bff: no chain runs until save |
+| `todos.list.action_failed` | any action › refused `unavailable` or `server` |
+
+The column is the point. A state with nothing in it is a design that
+promises something the chain cannot produce. A refusal with no state
+is a chain result the person never sees explained. Stage 22 found
+both in the first feature: `input_error` claimed a refusal no use case
+makes, since `title.length` is assumed, not refused; and the BFF's
+"Something went wrong. Try again." on a failed row action had no
+state. It is now `action_failed`.
+
+A **board** is a view at one state under one viewport and theme:
+`list.full.mobile.dark`. Its name parses back to the state, so the
+design and the feature can be compared mechanically. A design made
+from `design/_templates/design-brief.md` names its boards this way.
+The two exports from before the convention keep their file names, and
+each feature carries a board map, complete both ways: every file is a
+board or says what else it is, and every state has a board or says
+`not drawn`.
+
+Viewport and theme never appear in a spec. A state that needs a
+different composition is a different view.
+
+**`shows:`** joins the use case to the feature. Each Refused row names
+the state that shows it:
+
+```
+- `todos.cap` does not hold: `limit`. Nothing is stored.
+  shows: `todos.list.full`
+```
+
+A state id has three parts and a rule id two, so the rules lint, which
+reads every backticked id on a Refused line as a rule, passes over
+state ids without a change.
+
+The use case cites its own kinds (`unavailable`, `server`), never the
+wire's; `api.md` holds the one mapping from them to the envelope's
+(`internal`).
+
+### Open states
+
+The accounts features were written before any of their use cases.
+Where the design draws a state that no use case or BFF code produces
+yet, the Produced by column says `open`, with the slice that will
+produce it: `open: B (sign in › refused, the credentials do not
+match)`. An `open` state is a question the slice must answer before
+its code, not a gap to fill while coding. Slice A produces only the
+shell's `signed_out`, `member` and `admin`, and the error view's
+`not_found` and `failed`.
+
+### Data cases (L46)
+
+`prd/todo/data/app.md` holds one entry per store call: the port
+method, the use cases that use it, input and result, the guarantee,
+the failures, the cost, and the guarantee rules it keeps. It says what
+the call promises and never how; the SQL stays hand-written in the
+data package (chapter 8). Its Cost lines are the numbers the data
+budgets test asserts.
+
+**Open.**
+- The conformance suite (one test per guarantee) and the budgets
+  tests reading the Cost lines are target.
+- The BFF renders a failed page load inside the todo view today; the
+  feature says it renders `accounts.error.failed`, which slice A
+  builds.
+- Nothing yet compares a design's `state` enum with its feature's
+  state list. The two accounts maps were checked by a script once, in
+  stage 22; the check is not kept.

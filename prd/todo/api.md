@@ -1,9 +1,18 @@
 # Todo api
 
 The `todo-api` Worker, reached only through the BFF's `API` binding
-(PRD, API). Written in the vocabulary of the api story, chapter 11
+(PRD, Shape). Written in the vocabulary of the api story, chapter 11
 (L26). The contract and `apps/api/openapi.json` are generated from
-this file.
+this file. Since stage 22 it is also the home of what the PRD root's
+API section held (L44).
+
+What a use case refuses reaches the wire as the kind of the same name:
+`limit` and `not_found`. Its `unavailable` and `server` reach the wire
+as `internal`. Use cases and features cite the use case's kinds; this
+paragraph is the one place they are mapped to the envelope's.
+
+A body that is not JSON is refused as `validation`, with the field
+`body`, by every endpoint that takes a body.
 
 ## Every endpoint
 
