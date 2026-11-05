@@ -31,7 +31,7 @@ What the view is for, in one line.
 
 | State | The user sees | Produced by | Board |
 | --- | --- | --- | --- |
-| `<area>.<view>.<state>` | one line, in the user's terms | a use case's result or refused kind (`add-a-todo › limit`), or `bff` for pending, empty and the like | `<view>.<state>` |
+| `<area>.<view>.<state>` | one line, in the user's terms | a use case's result or refused kind (`add-a-todo › limit`), or `bff` for pending, empty and the like | `<view>.<state>`, or `not drawn` when the design has no board for it |
 
 ## Inputs
 What the user types or picks, and the rule each one cites. The rule
@@ -62,3 +62,11 @@ page load, statements per call. Numbers, not adjectives.
 ## Done
 The acceptance scenarios that prove the feature, through the BFF, each
 citing the PRD line or deviation it comes from. Numbered.
+
+## Board map
+Only for a design exported before the naming convention: each export
+file and the board it is, `<view>.<state>.<viewport>.<theme>`. The map
+is complete both ways: every file is a board or says what else it is,
+and every state above has a board or says `not drawn`. A design made
+from `design/_templates/design-brief.md` names its boards by the
+convention and needs no map; leave this section out.

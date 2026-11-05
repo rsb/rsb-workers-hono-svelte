@@ -26,6 +26,7 @@ every todo. No todos at all is two zeros.
 
 ## Refused
 - The store fails: `unavailable` or `server`.
+  shows: `accounts.error.failed` (the page's load fails)
 
 ## Guarantees
 none

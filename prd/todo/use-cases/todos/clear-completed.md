@@ -24,6 +24,7 @@ The todos left.
 
 ## Refused
 - The store fails: `unavailable` or `server`. Nothing is removed.
+  shows: `todos.list.action_failed`
 
 ## Guarantees
 - `todos.order`

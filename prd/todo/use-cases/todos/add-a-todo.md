@@ -25,8 +25,10 @@ The stored todo.
 
 ## Refused
 - `todos.cap` does not hold: `limit`. Nothing is stored.
+  shows: `todos.list.full`
 - The store fails: `unavailable` or `server`. Whether the todo was
   stored is not known to the caller.
+  shows: `todos.list.action_failed`
 
 ## Guarantees
 - `todos.order`

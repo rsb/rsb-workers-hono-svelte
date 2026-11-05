@@ -24,8 +24,11 @@ The id of the todo removed.
 ## Refused
 - `todo.exists` does not hold, including for a todo already removed:
   `not_found`. Nothing is removed.
+  shows: `todos.list.default` or `todos.list.empty`: the todo is gone,
+  as asked, so the page treats it as done
 - The store fails: `unavailable` or `server`. Whether the todo was
   removed is not known to the caller.
+  shows: `todos.list.action_failed`
 
 ## Guarantees
 none
