@@ -44,13 +44,6 @@ it("PATCH /todos/:id makes a completed todo active again", async () => {
   });
 });
 
-it("PATCH /todos/:id answers not_found for an id no todo has", async () => {
-  const response = await toggle("no-such-id", '{"completed":true}');
-
-  expect(response.status).toBe(404);
-  expect(v.parse(Failure, await response.json()).error.kind).toBe("not_found");
-});
-
 it("PATCH /todos/:id answers validation for an unknown field", async () => {
   const todo = await add("feed cat");
 

@@ -3,7 +3,7 @@ import { exports } from "cloudflare:workers";
 import * as v from "valibot";
 import { expect, it } from "vitest";
 
-it("a body over the limit returns too_large", async () => {
+it("the body limit runs before routing: 413 on a path with no route, D16", async () => {
   const response = await exports.default.fetch("https://todo-api/health", {
     method: "POST",
     body: "x".repeat(BODY_LIMIT_BYTES + 1),
