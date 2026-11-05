@@ -31,7 +31,22 @@ What the view is for, in one line.
 
 | State | The user sees | Produced by | Board |
 | --- | --- | --- | --- |
-| `<area>.<view>.<state>` | one line, in the user's terms | a use case's result or refused kind (`add-a-todo › limit`), or `bff` for pending, empty and the like | `<view>.<state>`, or `not drawn` when the design has no board for it |
+| `<area>.<view>.<state>` | one line, in the user's terms | one of the five forms below | `<view>.<state>`, or `not drawn` when the design has no board for it |
+
+State ids are snake_case (`input_error`). A board name spells the view
+and the state with hyphens for underscores, and nothing else changes:
+`todos.list.input_error` → `list.input-error`.
+
+`Produced by` takes one of five forms, and no other:
+- `<use case> › <result | refused kind>`: what the chain returns
+  (`add-a-todo › limit`).
+- `bff`: the BFF alone, for pending, empty and the like.
+- `<gate> › <result>`: a gate's result, where no use case runs
+  (`authenticate › member`).
+- `bff, over <source> › <kind>`: the BFF choosing a state over a result
+  it is given (`bff, over the runner › forbidden`).
+- `open: <slice> (…)`: nothing produces it yet; the slice that will, and
+  why in a few words.
 
 ## Inputs
 What the user types or picks, and the rule each one cites. The rule
@@ -51,9 +66,9 @@ What the view needs before it can render, and where it comes from.
 ## Actions
 What the user can do, and what runs.
 
-| Action | Endpoint | Use case | Leads to |
-| --- | --- | --- | --- |
-| add | `POST /todos` | add-a-todo | `<area>.<view>.<state>` on success, `…` on `limit` |
+| Action | Endpoint | Use case | Data cases | Leads to |
+| --- | --- | --- | --- | --- |
+| add | `POST /todos` | add-a-todo | `todos.add_unless_full` | `<area>.<view>.<state>` on success, `…` on `limit` |
 
 ## Budget
 What one visit costs, as the budgets tests assert it: api calls per
@@ -62,6 +77,9 @@ page load, statements per call. Numbers, not adjectives.
 ## Done
 The acceptance scenarios that prove the feature, through the BFF, each
 citing the PRD line or deviation it comes from. Numbered.
+
+A feature written ahead of its slice writes one line here, naming the
+slice: "None yet. Slice B writes the scenarios."
 
 ## Board map
 Only for a design exported before the naming convention: each export

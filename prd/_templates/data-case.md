@@ -18,9 +18,15 @@ One line: what the call does, as a fact it reports.
 - Port: `<Port>.<method>`
 - Used by: `<use case>`, `<use case>`
 - Input: in business types or a named read shape (`TodoFilter`)
+- Scope: the typed scope the call takes, in store terms (`{ ownerId }`,
+  `{ any: true }`), or `none` for a call no actor owns. Not
+  `access.md`'s `own | any | n/a`: those say who may call; this says
+  what the store is told.
 - Result: the fact reported (`inserted | full`, the rows, the change count)
 - Guarantee: what it keeps atomic; the isolation it needs; the order it
-  returns; whether a retry is safe
+  returns
+- Retry safety: what happens when the call is sent again after an
+  unknown outcome (`safe`, or what a second call does)
 - Failures: the kinds it can name (`unavailable`, `server`)
 - Cost: round trips; rows read and written on the expected path; the
   index it relies on

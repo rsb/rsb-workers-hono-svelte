@@ -17,6 +17,14 @@ The features, by id, and the views they contain:
   state list for that view, last segment only (`default`, `wrong`,
   `pending`, `empty`). No state the feature does not name; no state the
   feature names left out.
+- Multi-word states are snake_case in the enum, as in the feature
+  (`field_errors`, not `fieldErrors`); the board spells the same state
+  with hyphens (`field-errors`).
+- A view has one `state` prop and no other prop that picks what is
+  drawn. Where the BFF draws a state over a chain state (a menu open
+  over a signed-in shell), that is its own state in the enum, and its
+  Variants line names the one chain state it is drawn over. Draw it
+  over that state only.
 - One board per view × state × viewport × theme that the brief asks
   for, named with four segments in this order and nothing else:
   `<view>.<state>.<viewport>.<theme>` (`sign-in.wrong.desktop.dark`).
@@ -36,6 +44,7 @@ user's view of it), and which variants to draw.
 | --- | --- | --- |
 | `default` | | desktop + mobile, light + dark |
 | `<state>` | | desktop light only |
+| `<bff_state>` | | desktop light, over `<chain state>` |
 
 ## Inputs and their wording
 The inputs the view holds and the message each problem shows, written
