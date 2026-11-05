@@ -16,6 +16,13 @@ in `logbook/profile-notes.md` as deliberate variants, not drift.
 
 Once agreed, this file is frozen.
 
+Since stage 22 the PRD is a tree (L44). This file keeps what is
+product-wide; the rest lives beside it in `prd/todo/`:
+`features/` (one per user job, with its views, states and acceptance
+scenarios), `use-cases/<area>/` (one per operation), `rules.md`,
+`api.md` and `data/` (one file per database). `access.md` is added in
+slice A.
+
 ## Source and licence
 Behaviour comes from the TodoMVC application specification,
 `app-spec.md` lines 80–122 (the `## Functionality` section), at
@@ -107,8 +114,31 @@ deviation that cannot is dropped.
 - **C-secure** Security and reliability are high priorities in the
   profile's patterns: every input the API accepts is bounded, and
   nothing a client sends can grow the API's memory without limit.
-- **C-design** The design in `design/2026-11-02-ui/` (see Design): how
-  the page looks, its wording, and the interactions its screens show.
+- **C-design** The design in `design/2026-11-02-ui/`: how the page
+  looks, its wording, and the interactions its screens show. Each
+  feature names its design and maps its boards; these lines hold for
+  every page:
+  - **Theme.** Light or dark follows the system setting
+    (`prefers-color-scheme`); the page has no theme switch.
+  - **Tokens.** One accent colour. The colours, type sizes and spacing
+    are those of `todo-app.html`, defined once as CSS custom
+    properties.
+  - **Type.** Instrument Sans (SIL OFL 1.1), served by the BFF, never
+    from a third-party host.
+  - **Wording.** The heading reads "Todos"; the input placeholder
+    reads "What needs doing?"; a single item is a "to-do" in labels
+    and messages ("New to-do", "Edit to-do", "Remove ‘title’").
+  - **Completion.** A completed todo is shown by the check, a
+    strike-through and a dimmed title, never by colour alone. The
+    check animates once when ticked.
+  - **Motion.** Every transition and animation is off under
+    `prefers-reduced-motion`.
+  - **Focus.** Every control is reachable by keyboard and has a
+    visible focus ring in the accent colour.
+  - **Where the design's prototype differs** from this file on how the
+    page is built (hash links, state held in the browser), this file
+    wins: routes stay real paths (4) and every mutation stays a form
+    action (12).
 
 ## Deviations
 One per line, each with its constraint.
@@ -173,60 +203,13 @@ One per line, each with its constraint.
     shown only when there are todos (C-design).
 
 ## Design
-The design is the export of the owner's Claude Design session, kept in
-`design/2026-11-02-ui/`: `todo-app.html` and one PNG per screen. Where
-its prototype differs from this file on how the page is built (hash
-links, state held in the browser), this file wins: routes stay real
-paths (4) and every mutation stays a form action (12).
-- **Screens.** Empty, a list with some completed, editing a row, an
-  input error, and the list full at 500; desktop and mobile; light and
-  dark.
-- **Theme.** Light or dark follows the system setting
-  (`prefers-color-scheme`); the page has no theme switch.
-- **Tokens.** One accent colour. The colours, type sizes and spacing
-  are those of `todo-app.html`, defined once as CSS custom properties.
-- **Type.** Instrument Sans (SIL OFL 1.1), served by the BFF, never
-  from a third-party host.
-- **Wording.** The heading reads "Todos"; the input placeholder reads
-  "What needs doing?"; a single item is a "to-do" in labels and
-  messages ("New to-do", "Edit to-do", "Remove ‘title’").
-- **Completion.** A completed todo is shown by the check, a
-  strike-through and a dimmed title, never by colour alone. The check
-  animates once when ticked.
-- **Motion.** Every transition and animation is off under
-  `prefers-reduced-motion`.
-- **Focus.** Every control is reachable by keyboard and has a visible
-  focus ring in the accent colour.
+The page's screens are the views and states of
+`prd/todo/features/feature-todos-list.md`, which names its design and
+maps its boards. The lines that hold for every page are C-design.
 
 ## API
-All paths are on the `todo-api` Worker, reached through the BFF's `API`
-binding. A todo is `{ id: string, title: string, completed: boolean }`.
-
-| Route | Body or query | Success | Errors |
-|---|---|---|---|
-| `GET /health` | | 200 `{ ok: true }` (data) | |
-| `GET /todos` | `completed?=true\|false` | 200 the todos, in creation order | 422 `completed` |
-| `GET /todos/counts` | | 200 `{ active, completed }` | |
-| `POST /todos` | `{ title }` | 201 the todo | 422 `title`; 409 `limit` |
-| `PATCH /todos/:id` | `{ title?, completed? }`, at least one | 200 the todo | 422 field; 404 |
-| `DELETE /todos/:id` | | 200 `{ id }` | 404 |
-| `PATCH /todos` | `{ completed }` | 200 all todos | 422 `completed` |
-| `DELETE /todos` | `completed=true` | 200 the remaining todos | 422 `completed` |
-
-Rules that apply to every route:
-- A title is trimmed, then must be 1–256 characters. The limit is
-  defined once in the contract, and both the BFF and the API use it.
-- A query on `GET /todos` other than `completed=true` or
-  `completed=false` is a 422 with `field: "completed"`; no query
-  returns all.
-- `DELETE /todos` without `completed=true` is a 422 with
-  `field: "completed"`, never "delete all".
-- A body that is not JSON, or has unknown fields, is a 422.
-- Any body over 8 KiB is a 413 `too_large`, before it is parsed.
-- An unknown route is a 404 `not_found`.
-- Editing a title to empty leaves it unchanged, in the BFF, without
-  calling the API (19); the API's PATCH rejects an empty title with a
-  422.
+`prd/todo/api.md`: every endpoint, its body, reply, errors and
+examples, and how a use case's refusals map to the envelope's kinds.
 
 ## Envelope
 - Success: `{ "ok": true, "data": <reply> }`.
@@ -287,8 +270,9 @@ Slice 2 was built before the design; it is restyled to the design
 before slice 3 starts.
 
 ## Acceptance scenarios
-E2e runs exactly these, through the BFF. Each cites the upstream
-sentence, or the deviation, it comes from.
+E2e runs these, through the BFF, with the scenarios under each
+feature's Done. Each cites the upstream sentence, or the deviation, it
+comes from.
 
 ### 1 Health
 1. *Given* both Workers are running, *when* I open `/health`, *then* I
@@ -299,121 +283,16 @@ case is not an e2e scenario, because `test:e2e` starts both Workers; it
 is covered by slice 1's unit test of the page load, with a fake binding
 that fails (a declared failure, so it belongs to that tier).
 
-### 2 Add and list
-1. *Given* no todos, *when* I open `/`, *then* there is no list and no
-   footer, and a message points to the input. ("When there are no
-   todos, `#main` and `#footer` should be hidden."; 15)
-2. *Given* I open `/`, *then* the new-todo input has focus. ("The input
-   element should be focused when the page is loaded")
-3. *Given* no todos, *when* I type "buy milk" and press Enter, *then*
-   the list shows "buy milk" and the input is empty. ("Pressing Enter
-   creates the todo, appends it to the todo list, and clears the
-   input.")
-4. *Given* "buy milk", *when* I add "walk dog", *then* "walk dog" is
-   below "buy milk". ("appends it to the todo list")
-5. *When* I add "  buy milk  ", *then* the list shows "buy milk".
-   ("Make sure to `.trim()` the input")
-6. *When* I press Enter on an input of only spaces, *then* no todo is
-   added and I see "Title must be 1 to 256 characters". ("check that
-   it's not empty before creating a new todo"; 16)
-7. *When* I add a title of 257 characters, *then* no todo is added, I
-   see "Title must be 1 to 256 characters", and the input still holds
-   what I typed. (7, 16)
-8. *Given* "buy milk", *when* I reload, *then* "buy milk" is still
-   there. (Persistence; 3)
-
-### 3 Toggle one and counter
-1. *Given* "buy milk", active, *when* I click its checkbox, *then* it
-   shows as completed. ("Clicking the checkbox marks the todo as
-   complete")
-2. *Given* "buy milk", completed, *when* I click its checkbox, *then*
-   it shows as active. (same sentence, the toggle)
-3. *Given* one active todo, *then* the counter reads "1 item left".
-   ("`1 item`")
-4. *Given* two active todos, *then* it reads "2 items left". ("`2 items`")
-5. *Given* one todo, completed, *then* it reads "0 items left".
-   ("`0 items`")
-
-### 4 Edit
-1. *Given* "buy milk", *when* I double-click its title, *then* an input
-   holding "buy milk" appears with focus and the remove button is
-   hidden. ("Double-clicking the `<label>` activates editing mode";
-   "bring forward an input that contains the todo title, which should
-   be focused"; 18)
-2. *When* I change it to "buy oat milk" and press Enter, *then* the list
-   shows "buy oat milk". ("The edit should be saved on both blur and
-   enter")
-3. *When* I change it to "buy oat milk" and click elsewhere, *then* the
-   list shows "buy oat milk". (same sentence, blur)
-4. *When* I change it to "  buy oat milk  " and press Enter, *then* the
-   list shows "buy oat milk". ("Make sure to `.trim()` the input")
-5. *When* I clear it and press Enter, *then* the list still shows "buy
-   milk". (19)
-6. *When* I change it and press Escape, *then* the list shows "buy
-   milk". ("If escape is pressed during the edit … any changes be
-   discarded.")
-7. *When* I change it to 257 characters and press Enter, *then* the
-   title is unchanged and I see "Title must be 1 to 256 characters"
-   under the input. (7, 16)
-8. *Given* I am editing, *when* I reload, *then* no todo is in editing
-   mode. ("Editing mode should not be persisted.")
-9. *Given* "buy milk", *when* I focus its title and press Enter,
-   *then* an input holding "buy milk" appears with focus. (17)
-
-### 5 Delete
-1. *Given* "buy milk" and "walk dog", *when* I hover over "buy milk"
-   and click its remove button, *then* only "walk dog" is left.
-   ("Hovering over the todo shows the remove button"; 11)
-2. *Given* only "buy milk", *when* I remove it, *then* there is no list
-   and no footer. ("When there are no todos … hidden.")
-
-### 6 Mark all as complete
-1. *Given* two active todos, *when* I press "Mark all as complete",
-   *then* both are completed. ("This checkbox toggles all the todos to
-   the same state as itself."; 20)
-2. *Given* two completed todos, *when* I press it again, *then* both
-   are active. (same sentence; 20)
-3. *Given* two active todos, *when* I check each one, *then* "Mark all"
-   is pressed. ("When all the todos are checked it should also get
-   checked."; 20)
-4. *Given* all completed and "Mark all" pressed, *when* I uncheck one
-   todo, *then* "Mark all" is not pressed. ("should also be updated
-   when single todo items are checked/unchecked"; 20)
-
-### 7 Clear completed
-1. *Given* no completed todos, *then* "Clear completed" is not shown.
-   ("Should be hidden when there are no completed todos.")
-2. *Given* "buy milk" completed and "walk dog" active, *when* I click
-   "Clear completed", *then* only "walk dog" is left. ("Removes
-   completed todos when clicked.")
-3. *Given* all completed and "Mark all" pressed, *when* I click "Clear
-   completed", *then* "Mark all" is not shown, because no todos are
-   left. ("Make sure to clear the checked state after the "Clear
-   completed" button is clicked."; 20)
-
-### 8 Filter
-1. *Given* one active and one completed todo, *when* I open `/active`,
-   *then* only the active one is listed. ("`#/active`"; 4, 5)
-2. *When* I open `/completed`, *then* only the completed one is listed.
-   ("`#/completed`"; 4, 5)
-3. *When* I open `/`, *then* both are listed. ("`#/` (all - default)")
-4. *Given* I am on `/active`, *then* the "Active" filter link is marked
-   as current, and no other is. ("the `selected` class on the filter
-   links should be toggled"; 10)
-5. *Given* I am on `/active`, *when* I check a todo, *then* it is no
-   longer listed. ("if the filter is `Active` and the item is checked,
-   it should be hidden.")
-6. *Given* I am on `/completed`, *when* I reload, *then* I am still on
-   `/completed` with the same list. ("Make sure the active filter is
-   persisted on reload.")
-7. *Given* I am on `/active`, *then* the counter and "Clear completed"
-   reflect all todos, not only those listed. (Counter, Clear completed;
-   5: they come from `GET /todos/counts`)
+### 2 to 8
+Moved to `prd/todo/features/feature-todos-list.md` › Done, with their
+numbers: they are that feature's done criteria. Scenario 1 stays here:
+health is a probe, not a user job.
 
 ## Done
 All eight slices work locally, and the tests pass at every tier: unit,
-integration, and the acceptance scenarios above end to end through the
-BFF.
+integration, and end to end through the BFF. End to end runs scenario
+1 above and every scenario under a feature's Done in
+`prd/todo/features/`; this file keeps no copy of them.
 
 ## Out of scope
 - Deploying, staging, production, a public site.
@@ -433,3 +312,13 @@ BFF.
   widened, deviations 15–20, a Design section, the API rule on an
   empty edit, the slice table, and scenarios 2.1, 2.6, 2.7, 4.1, 4.5,
   4.7, 4.9, 6.1–6.4 and 7.3.
+- 2026-11-05, stage 22: the PRD becomes a tree (L44). The Design
+  section's product-wide lines move into C-design and the section
+  points at the feature; the API section's table and rules move to
+  `prd/todo/api.md`, which held every endpoint already; scenarios 2
+  to 8 move under `prd/todo/features/feature-todos-list.md` › Done
+  with their numbers; Done points at the features' Done sections. No
+  line's meaning changes. The accounts features are written ahead of
+  their slices; "Sign-in and users" leaves Out of scope in the
+  amendment that starts slice A
+  (`logbook/handoffs/2026-11-05-22-prd-tree.md`).
