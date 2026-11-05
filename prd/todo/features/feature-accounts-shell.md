@@ -59,8 +59,8 @@ line, a title, a sentence, and "Try again" or "Go to your to-dos".
 | State | The user sees | Produced by | Board |
 | --- | --- | --- | --- |
 | `accounts.error.not_found` | "404", "This page doesn’t exist", "The address may be mistyped, or the page has moved." | bff: no page has that path | `error.not-found` |
-| `accounts.error.forbidden` | "403", "You don’t have access to this page", "It’s limited to some accounts. If you think you should have access, ask an admin." | a page's read › refused by the runner: a signed-in actor without the `requires` its operation names; open until D, since every todo operation requires only `member` | `error.forbidden` |
-| `accounts.error.admin_only` | "403 · /users", "Users is for admins", and who the person is signed in as, and their role | the users page's read › refused by the runner: it requires `admin`; open until D | `error.admin-only` |
+| `accounts.error.forbidden` | "403", "You don’t have access to this page", "It’s limited to some accounts. If you think you should have access, ask an admin." | a page's read › the runner's `forbidden`: a signed-in actor without the `requires` its operation names; the bff shows this state for every route but the users pages. Open until D, since every todo operation requires only `member` | `error.forbidden` |
+| `accounts.error.admin_only` | "403 · /users", "Users is for admins", and who the person is signed in as, and their role | the same runner `forbidden` as `forbidden`: the chain does not tell the two apart. The bff chooses `admin_only` over `forbidden` from the route, when the refused read is a users page's. Open until D | `error.admin-only` |
 | `accounts.error.failed` | "Something went wrong", "That didn’t go through — nothing was changed. Try again.", with "Try again" | a page's read › refused `unavailable` or `server` (for the todos page: list-todos or count-todos) | `error.failed` |
 
 ## Inputs
