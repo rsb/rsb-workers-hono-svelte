@@ -394,7 +394,9 @@ In the code:
   then `serve(…)`. Both run once, when the isolate loads the module.
 - The second half is whatever `serve` registers with `app.use`. Today
   that is only the body limit, which runs before routing so that an
-  oversized body is a 413 on any path (D16).
+  oversized body is a 413 on any path (D16). `too-large.test.ts`
+  proves it on a path with no route, which the spec's 413 example,
+  replayed on `POST /todos`, cannot.
 
 Whatever the first half builds lives as long as the isolate. Since
 stage 06 that is only objects, never state: the `DbStore` holds the D1
@@ -2035,7 +2037,7 @@ Only these import a contract:
 - **endpoints** (A4), generated into `endpoints.ts`;
 - **examples**: the spec's worked examples as plain data, generated
   into `examples.ts`. `index.ts` does not export them: they are for
-  tests.
+  tests, which import `@todo/contract-api/examples` (since stage 20).
 
 An endpoint is plain data, keyed by method and path as the spec
 writes them (`"PATCH /todos/{id}"`):
@@ -2328,7 +2330,20 @@ Checks keep the spec, the generated files and the code in step:
   example (`tooling/api-spec/emit-openapi.test.ts`). Done;
 - **target:** a pinned OpenAPI linter, such as Redocly, run with
   `npx` so the lockfile does not change;
-- **target:** an api test replays each example against the api;
+- an api test replays each example against the api
+  (`apps/api/test/integration/examples.test.ts`). Done, stage 20.
+  The catch: the examples share one database (DB9), and the spec does
+  not say what each one starts from. So a failure must answer the
+  example's whole reply, and a success only its status and a reply
+  the endpoint's schema accepts; exact data stays in the hand-written
+  tests. A succeeding example whose path names an id gets a todo with
+  that id first, through the store. Two examples are not replayed,
+  each named with what covers it: "the list is full" (`todos.cap`'s
+  test, which needs 500 adds) and "the server fails" (nothing provokes
+  a 500 without a fault port). A guard test fails on a list entry that
+  names no example, and on a shared example with no way to be sent.
+  A hand-written test stays when it sends a request no example sends,
+  asserts more than the replay does, or proves a decision;
 - every endpoint has exactly one route, and every route an endpoint.
   The compiler holds this: construct's `Routes` is a `Record` over the
   contract's `EndpointKey` (chapter 4). `emitOpenApi` checks it again

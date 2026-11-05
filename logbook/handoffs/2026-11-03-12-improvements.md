@@ -32,7 +32,7 @@ suggested order is Claude's; the owner's order replaces it.
 | # | Improvement | Size | Closes or unblocks | Needs first | Suggested order |
 | --- | --- | --- | --- | --- | --- |
 | A | The route table as self-describing data | S | entry-chains index (L24), routes-vs-spec test (L26), `operationId`/`x-unit` source | nothing | done, stage 13 (`933871e`) |
-| B | The spec's examples as the integration suite | S–M | "example replay" target (chapter 11), the growth of hand-written integration tests | nothing | 2 |
+| B | The spec's examples as the integration suite | S–M | "example replay" target (chapter 11), the growth of hand-written integration tests | nothing | done, stage 20 (`3b6706d`, `3e2ec75`) |
 | C | Statement budgets per entry chain (L11 as a number) | S | gives L11 its sensor; feeds the data spec | nothing | 3 |
 | D | A `log` port and a request id | S | F5 (`console.error` in `serverFailure`), logging open item (chapter 5) | nothing; pairs with auth's middleware | 4 |
 | E | Fail into the envelope: `config:check` in CI, `construct` returns a `Result`, 503 for `unavailable` | M | config-at-load (chapter 2), `unavailable` → 503 (item 41) | the first real config value (auth) | with auth |
