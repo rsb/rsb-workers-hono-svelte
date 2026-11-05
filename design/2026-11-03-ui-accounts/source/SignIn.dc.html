@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sign in</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./app.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="app page {{themeClass}}">
+<dc-import name="TopBar" theme="{{themeName}}" account="out" current="none" open="{{ false }}" hint-size="100%,64px"></dc-import>
+
+<sc-if value="{{isForm}}" hint-placeholder-val="{{ true }}">
+<main class="auth">
+<div style="display: flex; flex-direction: column; gap: 8px">
+<h1 class="h1">Sign in</h1>
+<p class="lede">Pick up your list where you left it.</p>
+</div>
+
+<sc-if value="{{banner}}" hint-placeholder-val="{{ false }}">
+<div class="notice notice-error" role="alert" tabindex="-1" ref="{{bannerRef}}">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7.5v5.5M12 16.5v.01"></path></svg>
+<p>That email and password don’t match an account. Check both and try again.</p>
+</div>
+</sc-if>
+
+<section aria-labelledby="m-password" style="display: flex; flex-direction: column; gap: 18px">
+<h2 id="m-password" class="vh">Email and password</h2>
+<form class="form" action="/sign-in" method="post" noValidate="{{ true }}" onSubmit="{{submit}}" aria-busy="{{pending}}">
+<div class="field">
+<label class="label" for="si-email">Email</label>
+<input id="si-email" ref="{{emailRef}}" class="input {{emailMods}}" type="email" name="email" autocomplete="username" inputmode="email" spellcheck="false" value="{{email}}" onChange="{{onEmail}}" readOnly="{{pending}}" autoFocus="{{autoFocus}}" aria-invalid="{{emailInvalid}}" aria-describedby="si-email-err">
+<sc-if value="{{emailInvalid}}" hint-placeholder-val="{{ false }}">
+<p id="si-email-err" class="ferr"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7.5v5.5M12 16.5v.01"></path></svg>{{emailErr}}</p>
+</sc-if>
+</div>
+<div class="field">
+<div class="label-row">
+<label class="label" for="si-password">Password</label>
+<a href="#forgot-password">Forgot password?</a>
+</div>
+<input id="si-password" ref="{{pwRef}}" class="input" type="password" name="password" autocomplete="current-password" value="{{pw}}" onChange="{{onPw}}" readOnly="{{pending}}" aria-invalid="{{pwInvalid}}" aria-describedby="si-password-err">
+<sc-if value="{{pwInvalid}}" hint-placeholder-val="{{ false }}">
+<p id="si-password-err" class="ferr"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7.5v5.5M12 16.5v.01"></path></svg>{{pwErr}}</p>
+</sc-if>
+</div>
+<button type="submit" class="btn btn-primary btn-block {{btnMods}}" aria-disabled="{{pending}}">
+<sc-if value="{{pending}}" hint-placeholder-val="{{ false }}"><svg class="spinner" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-opacity=".3" stroke-width="2.5"></circle><path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"></path></svg><span>Signing in…</span></sc-if>
+<sc-if value="{{notPending}}" hint-placeholder-val="{{ true }}">Sign in</sc-if>
+</button>
+</form>
+</section>
+
+<div class="divider" aria-hidden="true">or</div>
+
+<section aria-labelledby="m-other">
+<h2 id="m-other" class="vh">Other ways to sign in</h2>
+<ul class="slots">
+<li><button type="button" class="slot" aria-disabled="true" aria-describedby="m-coming"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18"></path><path d="M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"></path></svg>Continue with Google<span class="tag">Coming</span></button></li>
+<li><button type="button" class="slot" aria-disabled="true" aria-describedby="m-coming"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="15" r="4"></circle><path d="M11 12l9-9"></path><path d="M17 6l3 3"></path><path d="M15 8l2 2"></path></svg>Use a passkey<span class="tag">Coming</span></button></li>
+</ul>
+<p id="m-coming" class="vh">Not available yet.</p>
+</section>
+
+<p class="foot">New here? <a href="SignUp.dc.html">Create an account</a></p>
+<p class="vh" role="status" aria-live="polite">{{live}}</p>
+</main>
+</sc-if>
+
+<sc-if value="{{isVerify}}" hint-placeholder-val="{{ false }}">
+<main class="center">
+<span class="icon-badge" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5"></rect><path d="M4 7l8 6 8-6"></path></svg></span>
+<h1 class="h1">Check your email</h1>
+<p class="lede">This account isn’t verified yet. We sent a verification link to <strong>{{email}}</strong>. Open it, then sign in again.</p>
+<sc-if value="{{resent}}" hint-placeholder-val="{{ false }}">
+<p class="notice notice-ok" role="status"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M8 12.5l2.8 2.8L16.5 9.5"></path></svg><span>Sent again. It can take a minute to arrive — check spam too.</span></p>
+</sc-if>
+<div class="row-actions" style="margin-top: 8px">
+<form action="/verify/resend" method="post" onSubmit="{{resend}}" style="margin: 0">
+<button type="submit" class="btn btn-secondary {{resendMods}}" aria-disabled="{{resending}}">
+<sc-if value="{{resending}}" hint-placeholder-val="{{ false }}"><svg class="spinner" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-opacity=".3" stroke-width="2.5"></circle><path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"></path></svg><span>Sending…</span></sc-if>
+<sc-if value="{{notResending}}" hint-placeholder-val="{{ true }}">Resend email</sc-if>
+</button>
+</form>
+<button type="button" class="btn btn-quiet" onClick="{{backToForm}}">Back to sign in</button>
+</div>
+</main>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Theme"},"state":{"editor":"enum","options":["default","fieldErrors","wrong","pending","unverified"],"default":"default","section":"State"},"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.timer = null;
+    this.els = {};
+    this.emailRef = (el) => { this.els.email = el; };
+    this.pwRef = (el) => { this.els.pw = el; };
+    this.bannerRef = (el) => { this.els.banner = el; if (el && this.wantBanner) { this.wantBanner = false; el.focus(); } };
+    this.state = this.init(props.state);
+  }
+  init(st) {
+    const base = { email: '', pw: '', emailErr: '', pwErr: '', banner: false, pending: false, view: 'form', resent: false, resending: false, hint: true };
+    if (st === 'fieldErrors') return Object.assign(base, { email: 'maya@example', emailErr: 'Enter a valid email address', pwErr: 'Password is required' });
+    if (st === 'wrong') return Object.assign(base, { email: 'maya@example.com', banner: true });
+    if (st === 'pending') return Object.assign(base, { email: 'maya@example.com', pw: 'correct-horse-staple', pending: true });
+    if (st === 'unverified') return Object.assign(base, { email: 'lee@example.com', view: 'verify' });
+    return base;
+  }
+  componentDidUpdate(prev) { if (prev.state !== this.props.state) { clearTimeout(this.timer); this.setState(this.init(this.props.state)); } }
+  componentWillUnmount() { clearTimeout(this.timer); }
+  submit(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    const s = this.state;
+    if (s.pending) return;
+    const email = s.email.trim();
+    const emailErr = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? '' : 'Enter a valid email address';
+    const pwErr = s.pw.length ? '' : 'Password is required';
+    if (emailErr || pwErr) {
+      this.setState({ emailErr: emailErr, pwErr: pwErr, banner: false, hint: false });
+      const first = emailErr ? this.els.email : this.els.pw;
+      if (first) first.focus();
+      return;
+    }
+    this.setState({ pending: true, banner: false, emailErr: '', pwErr: '', hint: false });
+    this.timer = setTimeout(() => {
+      if (email.indexOf('lee@') === 0) { this.setState({ pending: false, view: 'verify' }); return; }
+      this.wantBanner = true;
+      this.setState({ pending: false, banner: true, pw: '' });
+    }, 1200);
+  }
+  renderVals() {
+    const s = this.state;
+    const theme = (this.props.theme || 'light') === 'dark' ? 'dark' : 'light';
+    const st = this.props.state || 'default';
+    return {
+      themeClass: theme, themeName: theme,
+      isForm: s.view === 'form', isVerify: s.view === 'verify',
+      email: s.email, pw: s.pw,
+      emailErr: s.emailErr, pwErr: s.pwErr,
+      emailInvalid: !!s.emailErr, pwInvalid: !!s.pwErr,
+      emailMods: s.hint && st === 'default' ? 'is-focused' : '',
+      autoFocus: st === 'default',
+      banner: s.banner,
+      pending: s.pending, notPending: !s.pending,
+      btnMods: s.pending ? 'is-pending' : '',
+      live: s.pending ? 'Signing in…' : '',
+      resent: s.resent, resending: s.resending, notResending: !s.resending,
+      resendMods: s.resending ? 'is-pending' : '',
+      emailRef: this.emailRef, pwRef: this.pwRef, bannerRef: this.bannerRef,
+      submit: (e) => this.submit(e),
+      onEmail: (e) => { const v = e.target.value; this.setState({ email: v, emailErr: '', hint: false }); },
+      onPw: (e) => { const v = e.target.value; this.setState({ pw: v, pwErr: '', hint: false }); },
+      resend: (e) => {
+        if (e && e.preventDefault) e.preventDefault();
+        if (this.state.resending) return;
+        this.setState({ resending: true, resent: false });
+        this.timer = setTimeout(() => this.setState({ resending: false, resent: true }), 1000);
+      },
+      backToForm: () => this.setState({ view: 'form', pw: '', resent: false })
+    };
+  }
+}
+</script>
+</body>
+</html>

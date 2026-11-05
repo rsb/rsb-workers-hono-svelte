@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Create an account</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./app.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="app page {{themeClass}}">
+<dc-import name="TopBar" theme="{{themeName}}" account="out" current="none" open="{{ false }}" hint-size="100%,64px"></dc-import>
+
+<sc-if value="{{isForm}}" hint-placeholder-val="{{ true }}">
+<main class="auth">
+<div style="display: flex; flex-direction: column; gap: 8px">
+<h1 class="h1">Create an account</h1>
+<p class="lede">One list, yours, on every device.</p>
+</div>
+<section aria-labelledby="su-m-password">
+<h2 id="su-m-password" class="vh">Email and password</h2>
+<form class="form" action="/sign-up" method="post" noValidate="{{ true }}" onSubmit="{{submit}}" aria-busy="{{pending}}">
+<div class="field">
+<label class="label" for="su-name">Display name</label>
+<input id="su-name" ref="{{nameRef}}" class="input {{nameMods}}" type="text" name="displayName" autocomplete="name" value="{{name}}" onChange="{{onName}}" readOnly="{{pending}}" autoFocus="{{autoFocus}}" aria-invalid="{{nameInvalid}}" aria-describedby="su-name-msg">
+<sc-if value="{{nameInvalid}}" hint-placeholder-val="{{ false }}">
+<p id="su-name-msg" class="ferr"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7.5v5.5M12 16.5v.01"></path></svg>{{nameErr}}</p>
+</sc-if>
+<sc-if value="{{nameOk}}" hint-placeholder-val="{{ true }}">
+<p id="su-name-msg" class="hint">How you appear to admins. You can change it later.</p>
+</sc-if>
+</div>
+<div class="field">
+<label class="label" for="su-email">Email</label>
+<input id="su-email" ref="{{emailRef}}" class="input" type="email" name="email" autocomplete="email" inputmode="email" spellcheck="false" value="{{email}}" onChange="{{onEmail}}" readOnly="{{pending}}" aria-invalid="{{emailInvalid}}" aria-describedby="su-email-err">
+<sc-if value="{{emailInvalid}}" hint-placeholder-val="{{ false }}">
+<p id="su-email-err" class="ferr"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7.5v5.5M12 16.5v.01"></path></svg>{{emailErr}}</p>
+</sc-if>
+</div>
+<div class="field">
+<label class="label" for="su-password">Password</label>
+<input id="su-password" ref="{{pwRef}}" class="input" type="password" name="password" autocomplete="new-password" value="{{pw}}" onChange="{{onPw}}" readOnly="{{pending}}" aria-invalid="{{pwInvalid}}" aria-describedby="su-password-msg">
+<sc-if value="{{pwInvalid}}" hint-placeholder-val="{{ false }}">
+<p id="su-password-msg" class="ferr"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7.5v5.5M12 16.5v.01"></path></svg>{{pwErr}}</p>
+</sc-if>
+<sc-if value="{{pwOk}}" hint-placeholder-val="{{ true }}">
+<p id="su-password-msg" class="hint">At least 12 characters</p>
+</sc-if>
+</div>
+<button type="submit" class="btn btn-primary btn-block {{btnMods}}" aria-disabled="{{pending}}">
+<sc-if value="{{pending}}" hint-placeholder-val="{{ false }}"><svg class="spinner" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-opacity=".3" stroke-width="2.5"></circle><path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"></path></svg><span>Creating account…</span></sc-if>
+<sc-if value="{{notPending}}" hint-placeholder-val="{{ true }}">Create account</sc-if>
+</button>
+</form>
+</section>
+<div class="divider" aria-hidden="true">or</div>
+<section aria-labelledby="su-m-other">
+<h2 id="su-m-other" class="vh">Other ways to create an account</h2>
+<ul class="slots">
+<li><button type="button" class="slot" aria-disabled="true" aria-describedby="su-coming"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18"></path><path d="M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"></path></svg>Continue with Google<span class="tag">Coming</span></button></li>
+<li><button type="button" class="slot" aria-disabled="true" aria-describedby="su-coming"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="15" r="4"></circle><path d="M11 12l9-9"></path><path d="M17 6l3 3"></path><path d="M15 8l2 2"></path></svg>Use a passkey<span class="tag">Coming</span></button></li>
+</ul>
+<p id="su-coming" class="vh">Not available yet.</p>
+</section>
+<p class="foot">Already have an account? <a href="SignIn.dc.html">Sign in</a></p>
+<p class="vh" role="status" aria-live="polite">{{live}}</p>
+</main>
+</sc-if>
+
+<sc-if value="{{isSent}}" hint-placeholder-val="{{ false }}">
+<main class="center">
+<span class="icon-badge" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5"></rect><path d="M4 7l8 6 8-6"></path></svg></span>
+<h1 class="h1">Verify your email</h1>
+<p class="lede">We sent a verification email to <strong>{{email}}</strong>. Open the link in it to finish creating your account.</p>
+<sc-if value="{{resent}}" hint-placeholder-val="{{ false }}">
+<p class="notice notice-ok" role="status"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M8 12.5l2.8 2.8L16.5 9.5"></path></svg><span>Sent again. It can take a minute to arrive.</span></p>
+</sc-if>
+<p class="lede" style="font-size: 15px">Didn’t get it? Check your spam folder, or send it again.</p>
+<div class="row-actions" style="margin-top: 4px">
+<form action="/verify/resend" method="post" onSubmit="{{resend}}" style="margin: 0">
+<button type="submit" class="btn btn-secondary {{resendMods}}" aria-disabled="{{resending}}">
+<sc-if value="{{resending}}" hint-placeholder-val="{{ false }}"><svg class="spinner" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-opacity=".3" stroke-width="2.5"></circle><path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"></path></svg><span>Sending…</span></sc-if>
+<sc-if value="{{notResending}}" hint-placeholder-val="{{ true }}">Resend email</sc-if>
+</button>
+</form>
+<button type="button" class="btn btn-quiet" onClick="{{startOver}}">Use a different email</button>
+</div>
+</main>
+</sc-if>
+
+<sc-if value="{{isVerified}}" hint-placeholder-val="{{ false }}">
+<main class="center">
+<span class="icon-badge" aria-hidden="true" style="color: var(--accent)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg></span>
+<h1 class="h1">Email verified</h1>
+<p class="lede">Your account is ready. Sign in to start your list.</p>
+<div class="row-actions" style="margin-top: 8px">
+<a href="SignIn.dc.html" class="btn btn-primary">Sign in</a>
+</div>
+</main>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Theme"},"state":{"editor":"enum","options":["default","fieldErrors","pending","sent","resent","verified"],"default":"default","section":"State"},"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.timer = null;
+    this.els = {};
+    this.nameRef = (el) => { this.els.name = el; };
+    this.emailRef = (el) => { this.els.email = el; };
+    this.pwRef = (el) => { this.els.pw = el; };
+    this.state = this.init(props.state);
+  }
+  init(st) {
+    const base = { name: '', email: '', pw: '', nameErr: '', emailErr: '', pwErr: '', pending: false, view: 'form', resent: false, resending: false, hint: true };
+    if (st === 'fieldErrors') return Object.assign(base, { email: 'maya@', pw: 'tulips26', nameErr: 'Enter a display name', emailErr: 'Enter a valid email address', pwErr: 'Use at least 12 characters — this one has 8' });
+    if (st === 'pending') return Object.assign(base, { name: 'Maya Chen', email: 'maya@example.com', pw: 'correct-horse-staple', pending: true });
+    if (st === 'sent') return Object.assign(base, { email: 'maya@example.com', view: 'sent' });
+    if (st === 'resent') return Object.assign(base, { email: 'maya@example.com', view: 'sent', resent: true });
+    if (st === 'verified') return Object.assign(base, { view: 'verified' });
+    return base;
+  }
+  componentDidUpdate(prev) { if (prev.state !== this.props.state) { clearTimeout(this.timer); this.setState(this.init(this.props.state)); } }
+  componentWillUnmount() { clearTimeout(this.timer); }
+  submit(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    const s = this.state;
+    if (s.pending) return;
+    const name = s.name.trim();
+    const email = s.email.trim();
+    const nameErr = name.length < 1 ? 'Enter a display name' : (name.length > 64 ? 'Display name must be 1 to 64 characters' : '');
+    const emailErr = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? '' : 'Enter a valid email address';
+    const n = s.pw.length;
+    const pwErr = n >= 12 ? '' : (n === 0 ? 'Use at least 12 characters' : 'Use at least 12 characters — this one has ' + n);
+    if (nameErr || emailErr || pwErr) {
+      this.setState({ nameErr: nameErr, emailErr: emailErr, pwErr: pwErr, hint: false });
+      const first = nameErr ? this.els.name : (emailErr ? this.els.email : this.els.pw);
+      if (first) first.focus();
+      return;
+    }
+    this.setState({ pending: true, hint: false });
+    this.timer = setTimeout(() => this.setState({ pending: false, view: 'sent', pw: '' }), 1400);
+  }
+  renderVals() {
+    const s = this.state;
+    const theme = (this.props.theme || 'light') === 'dark' ? 'dark' : 'light';
+    const st = this.props.state || 'default';
+    return {
+      themeClass: theme, themeName: theme,
+      isForm: s.view === 'form', isSent: s.view === 'sent', isVerified: s.view === 'verified',
+      name: s.name, email: s.email, pw: s.pw,
+      nameErr: s.nameErr, emailErr: s.emailErr, pwErr: s.pwErr,
+      nameInvalid: !!s.nameErr, nameOk: !s.nameErr,
+      emailInvalid: !!s.emailErr,
+      pwInvalid: !!s.pwErr, pwOk: !s.pwErr,
+      nameMods: s.hint && st === 'default' ? 'is-focused' : '',
+      autoFocus: st === 'default',
+      pending: s.pending, notPending: !s.pending,
+      btnMods: s.pending ? 'is-pending' : '',
+      live: s.pending ? 'Creating account…' : '',
+      resent: s.resent, resending: s.resending, notResending: !s.resending,
+      resendMods: s.resending ? 'is-pending' : '',
+      nameRef: this.nameRef, emailRef: this.emailRef, pwRef: this.pwRef,
+      submit: (e) => this.submit(e),
+      onName: (e) => { const v = e.target.value; this.setState({ name: v, nameErr: '', hint: false }); },
+      onEmail: (e) => { const v = e.target.value; this.setState({ email: v, emailErr: '', hint: false }); },
+      onPw: (e) => { const v = e.target.value; this.setState({ pw: v, pwErr: '', hint: false }); },
+      resend: (e) => {
+        if (e && e.preventDefault) e.preventDefault();
+        if (this.state.resending) return;
+        this.setState({ resending: true, resent: false });
+        this.timer = setTimeout(() => this.setState({ resending: false, resent: true }), 1000);
+      },
+      startOver: () => this.setState({ view: 'form', resent: false, hint: false })
+    };
+  }
+}
+</script>
+</body>
+</html>

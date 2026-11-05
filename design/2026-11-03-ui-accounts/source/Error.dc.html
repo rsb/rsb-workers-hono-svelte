@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Error page</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./app.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="app page {{themeClass}}">
+<dc-import name="TopBar" theme="{{themeName}}" account="{{account}}" current="none" open="{{ false }}" hint-size="100%,64px"></dc-import>
+<main class="center">
+<p class="code">{{codeLine}}</p>
+<h1 class="h1">{{title}}</h1>
+<p class="lede">{{body}}</p>
+<div class="row-actions" style="margin-top: 8px">
+<sc-if value="{{isServer}}" hint-placeholder-val="{{ false }}">
+<button type="button" class="btn btn-primary {{retryMods}}" aria-disabled="{{retrying}}" onClick="{{retry}}">
+<sc-if value="{{retrying}}" hint-placeholder-val="{{ false }}"><svg class="spinner" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-opacity=".3" stroke-width="2.5"></circle><path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"></path></svg><span>Trying again…</span></sc-if>
+<sc-if value="{{idle}}" hint-placeholder-val="{{ true }}">Try again</sc-if>
+</button>
+<a href="Main.dc.html" class="btn btn-secondary">Go to your to-dos</a>
+</sc-if>
+<sc-if value="{{notServer}}" hint-placeholder-val="{{ true }}">
+<a href="Main.dc.html" class="btn btn-primary">{{homeLabel}}</a>
+</sc-if>
+</div>
+<p class="vh" role="status" aria-live="polite">{{live}}</p>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Theme"},"code":{"editor":"enum","options":["404","403","403users","500"],"default":"404","section":"State"},"account":{"editor":"enum","options":["out","member","admin"],"default":"member","section":"State"},"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.timer = null;
+    this.state = { retrying: false, tries: 0 };
+  }
+  componentWillUnmount() { clearTimeout(this.timer); }
+  renderVals() {
+    const theme = (this.props.theme || 'light') === 'dark' ? 'dark' : 'light';
+    const code = this.props.code || '404';
+    const account = this.props.account || 'member';
+    const copy = {
+      '404': { codeLine: '404', title: 'This page doesn’t exist', body: 'The address may be mistyped, or the page has moved.', home: 'Go to your to-dos' },
+      '403': { codeLine: '403', title: 'You don’t have access to this page', body: 'It’s limited to some accounts. If you think you should have access, ask an admin.', home: 'Back to your to-dos' },
+      '403users': { codeLine: '403 · /users', title: 'Users is for admins', body: 'You’re signed in as Maya Chen, a member. If you need to manage accounts, ask an admin to change your role.', home: 'Back to your to-dos' },
+      '500': { codeLine: 'Error', title: 'Something went wrong', body: 'That didn’t go through — nothing was changed. Try again.', home: 'Go to your to-dos' }
+    }[code] || {};
+    const s = this.state;
+    return {
+      themeClass: theme, themeName: theme, account: account,
+      codeLine: copy.codeLine, title: copy.title, body: copy.body, homeLabel: copy.home,
+      isServer: code === '500', notServer: code !== '500',
+      retrying: s.retrying, idle: !s.retrying,
+      retryMods: s.retrying ? 'is-pending' : '',
+      live: s.retrying ? 'Trying again…' : (s.tries ? 'Still not working. Try again in a minute.' : ''),
+      retry: () => {
+        if (this.state.retrying) return;
+        this.setState({ retrying: true });
+        this.timer = setTimeout(() => this.setState((p) => ({ retrying: false, tries: (p.tries || 0) + 1 })), 1200);
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>

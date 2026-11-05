@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Users</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./app.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="app page {{themeClass}}">
+<dc-import name="TopBar" theme="{{themeName}}" account="admin" current="users" open="{{ false }}" hint-size="100%,64px"></dc-import>
+<main class="wrap wide">
+<div class="head">
+<h1 class="h1">Users</h1>
+<p class="count" role="status" aria-live="polite">{{countLine}}</p>
+</div>
+
+<form class="toolbar" role="search" action="/users" method="get" onSubmit="{{noop}}">
+<div class="field grow">
+<label class="label" for="u-q">Search</label>
+<span class="search-wrap">
+<svg class="lead" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="M16 16l4.5 4.5"></path></svg>
+<input id="u-q" class="input" type="search" name="q" placeholder="Name or email" autocomplete="off" spellcheck="false" value="{{q}}" onChange="{{onQ}}" aria-describedby="u-count">
+<sc-if value="{{pending}}" hint-placeholder-val="{{ false }}"><svg class="spinner trail" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-opacity=".3" stroke-width="2.5"></circle><path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"></path></svg></sc-if>
+</span>
+</div>
+<div class="field fixed">
+<label class="label" for="u-role">Role</label>
+<span class="select-wrap">
+<select id="u-role" class="input" name="role" value="{{role}}" onChange="{{onRole}}">
+<option value="all">All roles</option>
+<option value="member">Member</option>
+<option value="admin">Admin</option>
+</select>
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg>
+</span>
+</div>
+<div class="field fixed">
+<label class="label" for="u-status">Status</label>
+<span class="select-wrap">
+<select id="u-status" class="input" name="status" value="{{status}}" onChange="{{onStatus}}">
+<option value="all">All statuses</option>
+<option value="active">Active</option>
+<option value="disabled">Disabled</option>
+<option value="unverified">Unverified</option>
+</select>
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg>
+</span>
+</div>
+</form>
+<p id="u-count" class="vh">{{countLine}}</p>
+
+<sc-if value="{{hasRows}}" hint-placeholder-val="{{ true }}">
+<div class="tbox" aria-busy="{{pending}}">
+<table class="table">
+<caption class="vh">Users, {{countLine}}</caption>
+<thead>
+<tr><th scope="col">Name</th><th scope="col">Email</th><th scope="col">Role</th><th scope="col">Status</th><th scope="col">Last sign-in</th></tr>
+</thead>
+<tbody>
+<tr hidden="{{u1.hidden}}"><td><div class="ucell"><span class="avatar" aria-hidden="true">SO</span><a href="UserDetail.dc.html" class="ulink">Sam Ortiz</a><span class="you">You</span></div></td><td class="muted">sam@example.com</td><td>Admin</td><td><span class="state"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: var(--accent)"><circle cx="12" cy="12" r="9"></circle><path d="M8 12.5l2.8 2.8L16.5 9.5"></path></svg>Active</span></td><td class="muted">Today, 9:12 AM</td></tr>
+<tr hidden="{{u2.hidden}}"><td><div class="ucell"><span class="avatar" aria-hidden="true">MC</span><a href="UserDetail.dc.html" class="ulink">Maya Chen</a></div></td><td class="muted">maya@example.com</td><td>Member</td><td><span class="state"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: var(--accent)"><circle cx="12" cy="12" r="9"></circle><path d="M8 12.5l2.8 2.8L16.5 9.5"></path></svg>Active</span></td><td class="muted">Today, 8:40 AM</td></tr>
+<tr hidden="{{u3.hidden}}"><td><div class="ucell"><span class="avatar" aria-hidden="true">JL</span><a href="UserDetail.dc.html" class="ulink">Jordan Lee</a></div></td><td class="muted">jordan.lee@example.com</td><td>Member</td><td><span class="state"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: var(--accent)"><circle cx="12" cy="12" r="9"></circle><path d="M8 12.5l2.8 2.8L16.5 9.5"></path></svg>Active</span></td><td class="muted">Yesterday, 5:05 PM</td></tr>
+<tr hidden="{{u4.hidden}}"><td><div class="ucell"><span class="avatar" aria-hidden="true">PN</span><a href="UserDetail.dc.html" class="ulink">Priya Natarajan</a></div></td><td class="muted">priya@example.com</td><td>Admin</td><td><span class="state"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: var(--accent)"><circle cx="12" cy="12" r="9"></circle><path d="M8 12.5l2.8 2.8L16.5 9.5"></path></svg>Active</span></td><td class="muted">Nov 2, 2026</td></tr>
+<tr hidden="{{u5.hidden}}"><td><div class="ucell"><span class="avatar" aria-hidden="true">TH</span><a href="UserDetail.dc.html" class="ulink">Tomás Herrera</a></div></td><td class="muted">tomas@example.com</td><td>Member</td><td><span class="state off"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M6 18L18 6"></path></svg>Disabled</span></td><td class="muted">Oct 21, 2026</td></tr>
+<tr hidden="{{u6.hidden}}"><td><div class="ucell"><span class="avatar" aria-hidden="true">AK</span><a href="UserDetail.dc.html" class="ulink">Ana Kovač</a></div></td><td class="muted">ana.kovac@example.com</td><td>Member</td><td><span class="state"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: var(--accent)"><circle cx="12" cy="12" r="9"></circle><path d="M8 12.5l2.8 2.8L16.5 9.5"></path></svg>Active</span></td><td class="muted">Oct 30, 2026</td></tr>
+<tr hidden="{{u7.hidden}}"><td><div class="ucell"><span class="avatar" aria-hidden="true">LB</span><a href="UserDetail.dc.html" class="ulink">Lee Brooks</a></div></td><td class="muted">lee@example.com</td><td>Member</td><td><span class="state off"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke-dasharray="3 3"></circle></svg>Unverified</span></td><td class="muted">Never</td></tr>
+<tr hidden="{{u8.hidden}}"><td><div class="ucell"><span class="avatar" aria-hidden="true">NH</span><a href="UserDetail.dc.html" class="ulink">Noor Haddad</a></div></td><td class="muted">noor@example.com</td><td>Member</td><td><span class="state off"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M6 18L18 6"></path></svg>Disabled</span></td><td class="muted">Sep 14, 2026</td></tr>
+</tbody>
+</table>
+</div>
+
+<ul class="urows" aria-label="Users" aria-busy="{{pending}}">
+<sc-for list="{{rows}}" as="r" hint-placeholder-count="6">
+<li>
+<a href="UserDetail.dc.html" class="urow">
+<span class="avatar" aria-hidden="true">{{r.initials}}</span>
+<span class="mtext"><span class="mname">{{r.name}}</span><span class="msub">{{r.email}}</span><span class="msub">{{r.meta}}</span></span>
+<svg class="go" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg>
+</a>
+</li>
+</sc-for>
+</ul>
+</sc-if>
+
+<sc-if value="{{isEmpty}}" hint-placeholder-val="{{ false }}">
+<div class="empty">
+<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: var(--fg2)"><circle cx="9" cy="8" r="3.5"></circle><path d="M2.5 19c1-3 3.5-4.5 6.5-4.5s5.5 1.5 6.5 4.5"></path><path d="M19 8v6M16 11h6"></path></svg>
+<p class="t">Just you so far.</p>
+<p class="d">People appear here once they create an account.</p>
+</div>
+</sc-if>
+
+<sc-if value="{{noResults}}" hint-placeholder-val="{{ false }}">
+<div class="empty">
+<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" style="color: var(--fg2)"><circle cx="11" cy="11" r="6.5"></circle><path d="M16 16l4.5 4.5"></path></svg>
+<p class="t">{{noResultsTitle}}</p>
+<p class="d">Check the spelling, or clear the search and filters.</p>
+<button type="button" class="btn btn-secondary btn-sm" onClick="{{clearAll}}" style="margin-top: 6px">Clear search and filters</button>
+</div>
+</sc-if>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Theme"},"state":{"editor":"enum","options":["default","pending","noResults","empty"],"default":"default","section":"State"},"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.timer = null;
+    this.users = [
+      { id: 1, name: 'Sam Ortiz', initials: 'SO', email: 'sam@example.com', role: 'admin', status: 'active', last: 'Today, 9:12 AM' },
+      { id: 2, name: 'Maya Chen', initials: 'MC', email: 'maya@example.com', role: 'member', status: 'active', last: 'Today, 8:40 AM' },
+      { id: 3, name: 'Jordan Lee', initials: 'JL', email: 'jordan.lee@example.com', role: 'member', status: 'active', last: 'Yesterday, 5:05 PM' },
+      { id: 4, name: 'Priya Natarajan', initials: 'PN', email: 'priya@example.com', role: 'admin', status: 'active', last: 'Nov 2, 2026' },
+      { id: 5, name: 'Tomás Herrera', initials: 'TH', email: 'tomas@example.com', role: 'member', status: 'disabled', last: 'Oct 21, 2026' },
+      { id: 6, name: 'Ana Kovač', initials: 'AK', email: 'ana.kovac@example.com', role: 'member', status: 'active', last: 'Oct 30, 2026' },
+      { id: 7, name: 'Lee Brooks', initials: 'LB', email: 'lee@example.com', role: 'member', status: 'unverified', last: 'Never' },
+      { id: 8, name: 'Noor Haddad', initials: 'NH', email: 'noor@example.com', role: 'member', status: 'disabled', last: 'Sep 14, 2026' }
+    ];
+    this.state = this.init(props.state);
+  }
+  init(st) {
+    const b = { q: '', role: 'all', status: 'all', pending: false, onlyMe: false };
+    if (st === 'pending') return Object.assign(b, { q: 'jo', pending: true });
+    if (st === 'noResults') return Object.assign(b, { q: 'zebra' });
+    if (st === 'empty') return Object.assign(b, { onlyMe: true });
+    return b;
+  }
+  componentDidUpdate(prev) { if (prev.state !== this.props.state) { clearTimeout(this.timer); this.setState(this.init(this.props.state)); } }
+  componentWillUnmount() { clearTimeout(this.timer); }
+  change(patch) {
+    clearTimeout(this.timer);
+    this.setState(Object.assign({ pending: true }, patch));
+    this.timer = setTimeout(() => this.setState({ pending: false }), 450);
+  }
+  renderVals() {
+    const s = this.state;
+    const theme = (this.props.theme || 'light') === 'dark' ? 'dark' : 'light';
+    const all = s.onlyMe ? this.users.slice(0, 1) : this.users;
+    const q = s.q.trim().toLowerCase();
+    const match = (u) => (!q || u.name.toLowerCase().indexOf(q) !== -1 || u.email.indexOf(q) !== -1)
+      && (s.role === 'all' || u.role === s.role)
+      && (s.status === 'all' || u.status === s.status);
+    const shown = all.filter(match);
+    const ids = {};
+    shown.forEach((u) => { ids[u.id] = true; });
+    const vals = {};
+    this.users.forEach((u) => { vals['u' + u.id] = { hidden: !ids[u.id] }; });
+    const filtered = !!q || s.role !== 'all' || s.status !== 'all';
+    const label = (n) => n + (n === 1 ? ' user' : ' users');
+    const statusLabel = { active: 'Active', disabled: 'Disabled', unverified: 'Unverified' };
+    return Object.assign(vals, {
+      themeClass: theme, themeName: theme,
+      q: s.q, role: s.role, status: s.status, pending: s.pending,
+      countLine: s.pending ? 'Searching…' : (filtered ? shown.length + ' of ' + label(all.length) : label(all.length)),
+      hasRows: shown.length > 0,
+      isEmpty: s.onlyMe && !filtered,
+      noResults: shown.length === 0 && filtered,
+      noResultsTitle: q ? 'No users match “' + s.q.trim() + '”.' : 'No users match these filters.',
+      rows: shown.map((u) => ({
+        initials: u.initials, name: u.id === 1 ? u.name + ' (you)' : u.name, email: u.email,
+        meta: (u.role === 'admin' ? 'Admin' : 'Member') + ' · ' + statusLabel[u.status] + ' · ' + (u.last === 'Never' ? 'Never signed in' : 'Last sign-in ' + u.last)
+      })),
+      onQ: (e) => this.change({ q: e.target.value }),
+      onRole: (e) => this.change({ role: e.target.value }),
+      onStatus: (e) => this.change({ status: e.target.value }),
+      clearAll: () => this.setState({ q: '', role: 'all', status: 'all', pending: false }),
+      noop: (e) => { if (e && e.preventDefault) e.preventDefault(); }
+    });
+  }
+}
+</script>
+</body>
+</html>
