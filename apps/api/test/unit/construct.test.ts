@@ -1,72 +1,9 @@
 import { DeletedReply, Failure, TodoCountsReply, TodoListReply, TodoReply, envelope } from "@todo/contract-api";
-import { ok } from "@todo/business/result.ts";
-import type { Todo } from "@todo/business/todos/todo.ts";
-import type { DbStore } from "@todo/data-d1/store.ts";
 import * as v from "valibot";
 import { expect, it } from "vitest";
 import { constructApi, constructOperations, constructRoutes } from "../../src/construct.ts";
 import { serve } from "../../src/http.ts";
-
-/**
- * A fake `DbStore` that keeps todos in an array. It reports facts as the
- * real one does: whether a todo was inserted, the todos a filter keeps in
- * order, how many are active and completed, a
- * todo as it is after a patch is applied, every todo after all are set,
- * whether a todo was deleted, and the todos left after a clear.
- */
-const fakeDbStore = (): DbStore => {
-  const todos: Todo[] = [];
-  return {
-    addTodoUnlessFull: async (todo, limit) => {
-      if (todos.length >= limit) {
-        return ok(false);
-      }
-      todos.push(todo);
-      return ok(true);
-    },
-    listTodos: async (filter) => {
-      if (filter.completed === undefined) {
-        return ok([...todos]);
-      }
-      const kept = todos.filter((todo) => todo.completed === filter.completed);
-      return ok(kept);
-    },
-    countTodos: async () => {
-      const completed = todos.filter((todo) => todo.completed).length;
-      const active = todos.length - completed;
-      return ok({ active, completed });
-    },
-    updateTodo: async (id, patch) => {
-      const index = todos.findIndex((todo) => todo.id === id);
-      const found = todos[index];
-      if (found === undefined) {
-        return ok(null);
-      }
-      const updated = { ...found, ...patch };
-      todos[index] = updated;
-      return ok(updated);
-    },
-    setAllCompleted: async (completed) => {
-      for (const [index, todo] of todos.entries()) {
-        todos[index] = { ...todo, completed };
-      }
-      return ok([...todos]);
-    },
-    deleteTodo: async (id) => {
-      const index = todos.findIndex((todo) => todo.id === id);
-      if (index === -1) {
-        return ok(false);
-      }
-      todos.splice(index, 1);
-      return ok(true);
-    },
-    deleteCompleted: async () => {
-      const left = todos.filter((todo) => !todo.completed);
-      todos.splice(0, todos.length, ...left);
-      return ok([...todos]);
-    },
-  };
-};
+import { fakeDbStore } from "./fake-db-store.ts";
 
 // The whole route table on a fake store, entered below `constructInfra`
 // (A10): no workerd, no database, and a fixed id so the reply is exact.

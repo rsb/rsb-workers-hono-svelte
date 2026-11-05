@@ -186,6 +186,12 @@ The BFF's one real thing is the API, reached through the binding.
 Data maps the wire to the BFF's business objects. They are the same
 types today (chapter 7), so the mapping is the schema parse.
 
+Each page load's and each form action's calls to the API are budgeted
+in `test/unit/budgets.test.ts`, on a counting fake binding (L36 in the
+api story, chapter 8): `/` makes 1, `/active` and `/completed` make 2
+(deviation 5), and each action makes 1. The reload after an action
+counts against the load. `/health`'s load is not budgeted yet.
+
 **Open.**
 - `call.ts` needs one cast, because TypeScript cannot reduce valibot's
   generic object output (findings 02).

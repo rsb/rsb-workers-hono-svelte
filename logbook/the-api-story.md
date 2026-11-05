@@ -77,7 +77,10 @@ The decisions behind this story are:
   - L11: performance is a design input. A DDD concept is taken only
     when it costs nothing at run time or pays for what it costs: one
     intent per port, plain types rather than hydrated objects, one
-    translation per boundary.
+    translation per boundary. Since stage 21 the cheap tier has a
+    sensor for it: each level's cost is written down as a budget, and
+    a unit that calls the level below more often fails `test:unit`
+    (L36, chapter 8).
   - L12: validate once. The entry point validates against the wire
     shape and the business rules and builds the input shape.
     Everything below it trusts what it receives (chapter 5).
@@ -225,6 +228,17 @@ The decisions behind this story are:
   check. When a spec and the code disagree, the spec wins for
   generated artefacts and the code wins for hand-written ones; the
   generated indexes are the arbiter (chapter 11).
+- L36, agreed with the owner in the budgets session (2026-11-04):
+  budgets make cost changes visible; they do not forbid them. A budget
+  is the most round trips a unit makes to the level below it, written
+  down as the current cost, in one `budgets.test.ts` per level: each
+  `DbStore` method's trips to D1 and the statements they carry, each
+  api endpoint's `DbStore` calls, and each BFF page load's and form
+  action's api calls. Each table is typed by the units it budgets, so
+  a new unit without a budget does not compile. A change to a number
+  is a deliberate edit, in the same commit as the code that changed
+  the cost, with its reason in the commit message. Built in stage 21
+  (chapter 8).
 
 After slice 2 (Add and list), the code followed chapters 1–10
 throughout, except for config, which has nothing to hold yet
@@ -1653,12 +1667,36 @@ the mapping, and that failures are classified with their context.
 They do not prove that the SQL is right. Only a real D1 can, which
 today means the api's integration and e2e tests.
 
+**Budgets (L11, L36).** The fake also records each round trip: an
+`all` or a `run` outside a batch is one trip of one statement, and a
+`batch` is one trip of as many statements as it holds. A trip is cost
+on a Worker; a statement is cost on D1. Since stage 21 each level's
+cost is written down and checked in the unit tier, one table per
+level, each a `Record` keyed by the units it budgets:
+
+| Level | The table | The unit | Its cost today |
+|---|---|---|---|
+| Data | `packages/data/d1/test/unit/budgets.test.ts` | each `DbStore` method, called through `createDbStore` on the fake `D1Database` | 1 trip of 1 statement; `setAllCompleted` and `deleteCompleted` 1 trip of 2 (one batch) |
+| Api | `apps/api/test/unit/budgets.test.ts` | each `EndpointKey`, one request through the real route table on a counting `DbStore` | 1 store call; `GET /health` 0 |
+| BFF | `apps/bff/test/unit/budgets.test.ts` | each page load (`Filter`) and each form action, on a counting `API` binding | `/` 1, `/active` and `/completed` 2 (deviation 5); each action 1 |
+
+So one `POST /todos` from the page costs 1 api call × 1 store call ×
+1 trip, plus the page's reload, which counts against the load. A unit
+counts only when it succeeds: a refused request can stop short of its
+cost. A second call in a unit fails its budget test, naming the unit,
+the budget and the spend. The budget is then edited in the same commit,
+with the reason (L36). Until the data spec exists (L26, above), the
+data table is the home of the data level's numbers. When it exists,
+each store call's entry carries its cost line. A cross-level column
+(api calls × store calls × trips) in `entry-chains.md` is later.
+
 **Target.** Each data package is a workspace package of its own under
 `packages/data/` (A1). `data/d1` is the first. `data/memory` was the
 first until stage 06 deleted it. It was kept for tests at first (DB4),
 then the owner chose to delete it. Its places in the tests are taken
 by a fake `D1Database` in the d1 unit tests and an array-backed fake
-`DbStore` in `construct.test.ts`.
+`DbStore` in `apps/api/test/unit/fake-db-store.ts`, which
+`construct.test.ts` and the api's `budgets.test.ts` import.
 
 Another system of ours is a real thing too. Calling the api from the
 BFF is a concrete call over the network, so the client belongs in

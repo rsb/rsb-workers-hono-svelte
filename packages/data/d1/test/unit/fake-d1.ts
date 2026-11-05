@@ -11,13 +11,18 @@ export type Answer = {
 
 /**
  * A fake `D1Database` with only `prepare` and `batch`, recording every
- * statement and, for each batch, how many statements it ran. It
+ * statement, for each batch how many statements it ran, and each round trip
+ * to D1: an `all` or a `run` outside a batch is one trip of one statement,
+ * a `batch` is one trip of as many statements as it holds. A trip is
+ * recorded even when D1 throws: the call still went out. It
  * proves what we send to D1 and how we read its answer, never that the SQL
  * is right: the SQL is proven against a real D1 (integration, still open).
  */
 export const fakeD1 = (answer: Answer = {}) => {
   const prepared: Prepared[] = [];
   const batches: number[] = [];
+  // One entry per round trip, holding how many statements it carried.
+  const trips: number[] = [];
 
   const prepare = (sql: string) => {
     const record: Prepared = { sql, bound: [] };
@@ -32,12 +37,14 @@ export const fakeD1 = (answer: Answer = {}) => {
         return statement;
       },
       all: async () => {
+        trips.push(1);
         if (answer.throws) {
           throw answer.throws;
         }
         return { success: true, meta: {}, results: answer.rows ?? [] };
       },
       run: async () => {
+        trips.push(1);
         if (answer.throws) {
           throw answer.throws;
         }
@@ -49,6 +56,7 @@ export const fakeD1 = (answer: Answer = {}) => {
 
   // Every statement in a batch answers alike: the rows and the changes.
   const batch = async (statements: unknown[]) => {
+    trips.push(statements.length);
     if (answer.throws) {
       throw answer.throws;
     }
@@ -62,5 +70,5 @@ export const fakeD1 = (answer: Answer = {}) => {
 
   // The fake has only what our code calls, so it is cast to the full type.
   const db = { prepare, batch } as unknown as D1Database;
-  return { db, prepared, batches };
+  return { db, prepared, batches, trips };
 };
