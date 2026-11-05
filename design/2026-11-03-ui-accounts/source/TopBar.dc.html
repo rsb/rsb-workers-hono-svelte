@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Top bar</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./app.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<header class="app topbar {{themeClass}}" onKeyDown="{{onKey}}">
+<div class="topbar-in">
+<a href="{{homeHref}}" class="brand"><span class="brand-mark" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg></span>Todo</a>
+<sc-if value="{{signedIn}}" hint-placeholder-val="{{ true }}">
+<nav aria-label="Main" class="nav-main">
+<a href="Main.dc.html" class="nav-link {{todosMods}}" aria-current="{{todosCur}}">Todos</a>
+<sc-if value="{{isAdmin}}" hint-placeholder-val="{{ true }}">
+<a href="Users.dc.html" class="nav-link {{usersMods}}" aria-current="{{usersCur}}">Users</a>
+</sc-if>
+</nav>
+</sc-if>
+<div class="acct-wrap">
+<sc-if value="{{showSignIn}}" hint-placeholder-val="{{ false }}">
+<a href="SignIn.dc.html" class="btn btn-secondary btn-sm">Sign in</a>
+</sc-if>
+<sc-if value="{{signedIn}}" hint-placeholder-val="{{ true }}">
+<button type="button" class="acct" ref="{{btnRef}}" aria-expanded="{{open}}" aria-controls="account-menu" aria-label="{{acctLabel}}" onClick="{{toggle}}"><span class="avatar" aria-hidden="true">{{initials}}</span><span class="acct-name" aria-hidden="true">{{name}}</span><svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></button>
+<sc-if value="{{open}}" hint-placeholder-val="{{ false }}">
+<div id="account-menu" class="menu">
+<div class="menu-head">
+<p class="menu-name">{{name}}</p>
+<p class="menu-email">{{email}}</p>
+<sc-if value="{{isAdmin}}" hint-placeholder-val="{{ false }}"><span class="tag menu-role">Admin</span></sc-if>
+</div>
+<ul class="menu-list menu-mobile" aria-label="Main">
+<li><a href="Main.dc.html" class="menu-item {{todosMods}}" aria-current="{{todosCur}}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"></path><path d="M4 6h.01M4 12h.01M4 18h.01"></path></svg>Todos</a></li>
+<sc-if value="{{isAdmin}}" hint-placeholder-val="{{ false }}">
+<li><a href="Users.dc.html" class="menu-item {{usersMods}}" aria-current="{{usersCur}}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"></circle><path d="M2.5 19c1-3 3.5-4.5 6.5-4.5s5.5 1.5 6.5 4.5"></path><path d="M16 4.5a3.5 3.5 0 0 1 0 7"></path><path d="M18 14.8c1.8.6 3 2 3.5 4.2"></path></svg>Users</a></li>
+</sc-if>
+</ul>
+<hr class="menu-sep menu-mobile">
+<ul class="menu-list">
+<li><a href="Profile.dc.html" class="menu-item {{profileMods}}" aria-current="{{profileCur}}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 20c1.5-3.5 4.5-5 8-5s6.5 1.5 8 5"></path></svg>Profile</a></li>
+<li>
+<form action="/sign-out" method="post" onSubmit="{{signOut}}" style="margin: 0">
+<button type="submit" class="menu-item {{signOutMods}}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"></path><path d="M10 17l-5-5 5-5"></path><path d="M5 12h11"></path></svg>Sign out</button>
+</form>
+</li>
+</ul>
+</div>
+</sc-if>
+</sc-if>
+</div>
+</div>
+</header>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Theme"},"account":{"editor":"enum","options":["out","member","admin"],"default":"admin","section":"State"},"current":{"editor":"enum","options":["todos","users","profile","none"],"default":"todos","section":"State"},"open":{"editor":"boolean","default":false,"section":"State"},"focusSignOut":{"editor":null},"$preview":{"width":1280,"height":64}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { open: !!props.open, hint: true };
+    this.btn = null;
+    this.btnRef = (el) => { this.btn = el; };
+  }
+  componentDidUpdate(prev) {
+    if (prev.open !== this.props.open) this.setState({ open: !!this.props.open, hint: true });
+  }
+  close(focus) {
+    this.setState({ open: false, hint: false });
+    if (focus && this.btn) this.btn.focus();
+  }
+  renderVals() {
+    const acc = this.props.account || 'admin';
+    const cur = this.props.current || 'todos';
+    const theme = (this.props.theme || 'light') === 'dark' ? 'dark' : 'light';
+    const person = acc === 'admin'
+      ? { name: 'Sam Ortiz', email: 'sam@example.com', initials: 'SO' }
+      : { name: 'Maya Chen', email: 'maya@example.com', initials: 'MC' };
+    const signedIn = acc !== 'out';
+    const open = !!this.state.open;
+    return {
+      themeClass: theme,
+      homeHref: signedIn ? 'Main.dc.html' : 'Shell-SignedOut.dc.html',
+      signedIn: signedIn,
+      showSignIn: acc === 'out' && cur !== 'none',
+      isAdmin: acc === 'admin',
+      name: person.name, email: person.email, initials: person.initials,
+      acctLabel: 'Account: ' + person.name,
+      open: open,
+      todosMods: cur === 'todos' ? 'is-current' : '', todosCur: cur === 'todos' ? 'page' : false,
+      usersMods: cur === 'users' ? 'is-current' : '', usersCur: cur === 'users' ? 'page' : false,
+      profileMods: cur === 'profile' ? 'is-current' : '', profileCur: cur === 'profile' ? 'page' : false,
+      signOutMods: this.state.hint && this.props.focusSignOut ? 'is-focused' : '',
+      btnRef: this.btnRef,
+      toggle: () => this.setState((s) => ({ open: !(s && s.open), hint: false })),
+      onKey: (e) => { if (e.key === 'Escape' && this.state.open) { e.preventDefault(); this.close(true); } },
+      signOut: (e) => { if (e && e.preventDefault) e.preventDefault(); this.close(false); }
+    };
+  }
+}
+</script>
+</body>
+</html>

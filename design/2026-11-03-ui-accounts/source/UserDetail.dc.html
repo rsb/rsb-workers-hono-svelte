@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>User · Jordan Lee</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./app.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="app page {{themeClass}}">
+<dc-import name="TopBar" theme="{{themeName}}" account="admin" current="users" open="{{ false }}" hint-size="100%,64px"></dc-import>
+<main class="wrap" style="max-width: 720px; gap: 44px">
+<div style="display: flex; flex-direction: column; gap: 20px">
+<a href="Users.dc.html" class="back"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg>Users</a>
+<div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap">
+<span class="avatar lg" aria-hidden="true">JL</span>
+<div style="display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1">
+<h1 class="h1">Jordan Lee</h1>
+<p class="lede" style="overflow-wrap: anywhere">jordan.lee@example.com</p>
+</div>
+</div>
+<sc-if value="{{hasNotice}}" hint-placeholder-val="{{ false }}">
+<p class="notice notice-ok" role="status"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M8 12.5l2.8 2.8L16.5 9.5"></path></svg><span>{{notice}}</span></p>
+</sc-if>
+</div>
+
+<section class="sec" aria-labelledby="d-details">
+<h2 id="d-details" class="sec-h">Details</h2>
+<ul class="rows">
+<li class="prow"><span class="prow-k">Email</span><span class="prow-v">jordan.lee@example.com<span class="sub">Verified Oct 3, 2026</span></span><span></span></li>
+<li class="prow">
+<label class="prow-k" for="d-role">Role</label>
+<form action="/users/3/role" method="post" onSubmit="{{saveRole}}" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 0">
+<span class="select-wrap" style="width: 180px">
+<select id="d-role" class="input" name="role" value="{{role}}" onChange="{{onRole}}" disabled="{{roleLocked}}" aria-describedby="d-role-hint">
+<option value="member">Member</option>
+<option value="admin">Admin</option>
+</select>
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg>
+</span>
+<button type="submit" class="btn btn-primary btn-sm {{roleBtnMods}}" aria-disabled="{{roleUnchanged}}">
+<sc-if value="{{rolePending}}" hint-placeholder-val="{{ false }}"><svg class="spinner" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-opacity=".3" stroke-width="2.5"></circle><path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"></path></svg><span>Saving…</span></sc-if>
+<sc-if value="{{roleIdle}}" hint-placeholder-val="{{ true }}">Save role</sc-if>
+</button>
+<p id="d-role-hint" class="hint" style="flex-basis: 100%">Admins can see and change every account.</p>
+</form>
+<span></span>
+</li>
+<li class="prow">
+<span class="prow-k">Status</span>
+<span class="prow-v">
+<sc-if value="{{isActive}}" hint-placeholder-val="{{ true }}"><span class="state"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: var(--accent)"><circle cx="12" cy="12" r="9"></circle><path d="M8 12.5l2.8 2.8L16.5 9.5"></path></svg>Active</span></sc-if>
+<sc-if value="{{isDisabled}}" hint-placeholder-val="{{ false }}"><span class="state off"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M6 18L18 6"></path></svg>Disabled</span><span class="sub">Reason: {{reasonShown}}</span></sc-if>
+</span>
+<span></span>
+</li>
+<li class="prow"><span class="prow-k">Last sign-in</span><span class="prow-v">Yesterday, 5:05 PM</span><span></span></li>
+<li class="prow"><span class="prow-k">Created</span><span class="prow-v">Oct 3, 2026</span><span></span></li>
+</ul>
+</section>
+
+<section class="sec" aria-labelledby="d-access">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<h2 id="d-access" class="sec-h">Access</h2>
+<sc-if value="{{isActive}}" hint-placeholder-val="{{ true }}"><p class="sec-p">Disabling signs Jordan out everywhere and stops them signing in. Their to-dos are kept.</p></sc-if>
+<sc-if value="{{isDisabled}}" hint-placeholder-val="{{ false }}"><p class="sec-p">Enabling lets Jordan sign in again with their existing methods.</p></sc-if>
+</div>
+<sc-if value="{{showDisableBtn}}" hint-placeholder-val="{{ true }}">
+<div><button type="button" class="btn btn-danger" aria-expanded="false" aria-controls="d-disable" onClick="{{openDisable}}">Disable account…</button></div>
+</sc-if>
+<sc-if value="{{disOpen}}" hint-placeholder-val="{{ false }}">
+<form id="d-disable" class="danger" action="/users/3/disable" method="post" noValidate="{{ true }}" onSubmit="{{submitDisable}}" aria-busy="{{disPending}}">
+<div class="field">
+<label class="label" for="d-reason">Reason</label>
+<textarea id="d-reason" ref="{{reasonRef}}" class="input {{reasonMods}}" name="reason" rows="3" value="{{reason}}" onChange="{{onReason}}" readOnly="{{disPending}}" aria-invalid="{{reasonInvalid}}" aria-describedby="d-reason-msg"></textarea>
+<sc-if value="{{reasonInvalid}}" hint-placeholder-val="{{ false }}">
+<p id="d-reason-msg" class="ferr"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7.5v5.5M12 16.5v.01"></path></svg>{{reasonErr}}</p>
+</sc-if>
+<sc-if value="{{reasonOk}}" hint-placeholder-val="{{ true }}">
+<p id="d-reason-msg" class="hint">Recorded in the audit list below. Jordan doesn’t see it.</p>
+</sc-if>
+</div>
+<div class="row-actions">
+<button type="submit" class="btn btn-danger-solid {{disBtnMods}}" aria-disabled="{{disPending}}">
+<sc-if value="{{disPending}}" hint-placeholder-val="{{ false }}"><svg class="spinner" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-opacity=".3" stroke-width="2.5"></circle><path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"></path></svg><span>Disabling…</span></sc-if>
+<sc-if value="{{disIdle}}" hint-placeholder-val="{{ true }}">Disable account</sc-if>
+</button>
+<button type="button" class="btn btn-quiet" onClick="{{closeDisable}}" aria-disabled="{{disPending}}">Cancel</button>
+</div>
+</form>
+</sc-if>
+<sc-if value="{{isDisabled}}" hint-placeholder-val="{{ false }}">
+<form action="/users/3/enable" method="post" onSubmit="{{enable}}" style="margin: 0"><button type="submit" class="btn btn-secondary">Enable account</button></form>
+</sc-if>
+</section>
+
+<section class="sec" aria-labelledby="d-sessions">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<h2 id="d-sessions" class="sec-h">Sessions</h2>
+<p class="sec-p">{{sessionsLine}}</p>
+</div>
+<form action="/users/3/sessions/sign-out-all" method="post" onSubmit="{{signOutAll}}" style="margin: 0">
+<button type="submit" class="btn btn-secondary" aria-disabled="{{noSessions}}">Sign out everywhere</button>
+</form>
+</section>
+
+<section class="sec" aria-labelledby="d-audit">
+<h2 id="d-audit" class="sec-h">Recent changes</h2>
+<ul class="audit">
+<sc-for list="{{audit}}" as="a" hint-placeholder-count="5">
+<li><span><span class="who">{{a.who}}</span> {{a.what}}</span><time datetime="{{a.iso}}">{{a.when}}</time>
+<sc-if value="{{a.hasWhy}}" hint-placeholder-val="{{ false }}"><span class="why">Reason: {{a.why}}</span></sc-if>
+</li>
+</sc-for>
+</ul>
+</section>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Theme"},"state":{"editor":"enum","options":["default","reason","pending","disabled"],"default":"default","section":"State"},"$preview":{"width":1280,"height":1500}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.timer = null;
+    this.reasonEl = null;
+    this.reasonRef = (el) => { this.reasonEl = el; if (el && this.wantReason) { this.wantReason = false; el.focus(); } };
+    this.base = [
+      { who: 'Sam Ortiz', what: 'changed role from Admin to Member', when: 'Nov 3, 2026, 4:12 PM', iso: '2026-11-03T16:12' },
+      { who: 'Priya Natarajan', what: 'signed Jordan out everywhere', when: 'Oct 28, 2026, 10:03 AM', iso: '2026-10-28T10:03' },
+      { who: 'Jordan Lee', what: 'changed display name from “Jordan L.” to “Jordan Lee”', when: 'Oct 12, 2026, 7:30 PM', iso: '2026-10-12T19:30' },
+      { who: 'Jordan Lee', what: 'verified their email', when: 'Oct 3, 2026, 9:01 AM', iso: '2026-10-03T09:01' },
+      { who: 'Jordan Lee', what: 'created the account', when: 'Oct 3, 2026, 8:58 AM', iso: '2026-10-03T08:58' }
+    ];
+    this.state = this.init(props.state);
+  }
+  init(st) {
+    const b = { role: 'member', savedRole: 'member', rolePending: false, status: 'active', disOpen: false, reason: '', reasonShown: '', reasonErr: '', disPending: false, notice: '', devices: 3, extra: [], hint: true };
+    if (st === 'reason') return Object.assign(b, { disOpen: true, reasonErr: 'Give a reason for disabling this account' });
+    if (st === 'pending') return Object.assign(b, { disOpen: true, reason: 'Left the team on Nov 3.', disPending: true });
+    if (st === 'disabled') return Object.assign(b, { status: 'disabled', reasonShown: 'Left the team on Nov 3.', devices: 0, notice: 'Account disabled. Jordan was signed out everywhere.', extra: [{ who: 'Sam Ortiz', what: 'disabled the account and signed Jordan out everywhere', when: 'Just now', iso: '2026-11-04T10:20', why: 'Left the team on Nov 3.' }] });
+    return b;
+  }
+  componentDidUpdate(prev) { if (prev.state !== this.props.state) { clearTimeout(this.timer); this.setState(this.init(this.props.state)); } }
+  componentWillUnmount() { clearTimeout(this.timer); }
+  log(entry) { return [Object.assign({ who: 'Sam Ortiz', when: 'Just now', iso: '2026-11-04T10:20' }, entry)].concat(this.state.extra); }
+  renderVals() {
+    const s = this.state;
+    const theme = (this.props.theme || 'light') === 'dark' ? 'dark' : 'light';
+    const roleName = (r) => r === 'admin' ? 'Admin' : 'Member';
+    const audit = s.extra.concat(this.base).map((a) => Object.assign({ hasWhy: !!a.why, why: a.why || '' }, a));
+    return {
+      themeClass: theme, themeName: theme,
+      notice: s.notice, hasNotice: !!s.notice,
+      role: s.role, roleLocked: s.rolePending,
+      roleUnchanged: s.role === s.savedRole || s.rolePending,
+      rolePending: s.rolePending, roleIdle: !s.rolePending,
+      roleBtnMods: s.rolePending ? 'is-pending' : '',
+      isActive: s.status === 'active', isDisabled: s.status === 'disabled',
+      reasonShown: s.reasonShown,
+      showDisableBtn: s.status === 'active' && !s.disOpen,
+      disOpen: s.disOpen && s.status === 'active',
+      reason: s.reason, reasonErr: s.reasonErr,
+      reasonInvalid: !!s.reasonErr, reasonOk: !s.reasonErr,
+      reasonMods: s.hint && this.props.state === 'reason' ? 'is-focused' : '',
+      disPending: s.disPending, disIdle: !s.disPending,
+      disBtnMods: s.disPending ? 'is-pending' : '',
+      sessionsLine: s.devices > 0 ? 'Signed in on ' + s.devices + ' devices.' : 'Not signed in anywhere.',
+      noSessions: s.devices === 0,
+      audit: audit,
+      reasonRef: this.reasonRef,
+      onRole: (e) => { const v = e.target.value; this.setState({ role: v, notice: '', hint: false }); },
+      saveRole: (e) => {
+        if (e && e.preventDefault) e.preventDefault();
+        const st = this.state;
+        if (st.role === st.savedRole || st.rolePending) return;
+        this.setState({ rolePending: true, notice: '' });
+        this.timer = setTimeout(() => {
+          const r = this.state.role;
+          this.setState({ rolePending: false, savedRole: r, notice: 'Role changed to ' + roleName(r) + '.', extra: this.log({ what: 'changed role from ' + roleName(this.state.savedRole) + ' to ' + roleName(r) }) });
+        }, 900);
+      },
+      openDisable: () => { this.wantReason = true; this.setState({ disOpen: true, reason: '', reasonErr: '', notice: '', hint: false }); },
+      closeDisable: () => { if (!this.state.disPending) this.setState({ disOpen: false, reasonErr: '', hint: false }); },
+      onReason: (e) => { const v = e.target.value; this.setState({ reason: v, reasonErr: '', hint: false }); },
+      submitDisable: (e) => {
+        if (e && e.preventDefault) e.preventDefault();
+        const st = this.state;
+        if (st.disPending) return;
+        const r = st.reason.trim();
+        if (!r) { this.setState({ reasonErr: 'Give a reason for disabling this account', hint: false }); if (this.reasonEl) this.reasonEl.focus(); return; }
+        this.setState({ disPending: true, hint: false });
+        this.timer = setTimeout(() => this.setState({ disPending: false, disOpen: false, status: 'disabled', reasonShown: r, devices: 0, notice: 'Account disabled. Jordan was signed out everywhere.', extra: this.log({ what: 'disabled the account and signed Jordan out everywhere', why: r }) }), 1200);
+      },
+      enable: (e) => { if (e && e.preventDefault) e.preventDefault(); this.setState({ status: 'active', reasonShown: '', notice: 'Account enabled. Jordan can sign in again.', extra: this.log({ what: 'enabled the account' }) }); },
+      signOutAll: (e) => {
+        if (e && e.preventDefault) e.preventDefault();
+        if (this.state.devices === 0) return;
+        this.setState({ devices: 0, notice: 'Jordan was signed out on 3 devices.', extra: this.log({ what: 'signed Jordan out everywhere' }) });
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>

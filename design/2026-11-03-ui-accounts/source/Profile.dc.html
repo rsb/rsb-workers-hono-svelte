@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Profile</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./app.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="app page {{themeClass}}">
+<dc-import name="TopBar" theme="{{themeName}}" account="member" current="profile" open="{{ false }}" hint-size="100%,64px"></dc-import>
+<main class="wrap">
+<h1 class="h1">Profile</h1>
+
+<section class="sec" aria-labelledby="p-account">
+<h2 id="p-account" class="sec-h">Account</h2>
+<ul class="rows">
+<li class="prow">
+<span class="prow-k" id="p-name-k">Display name</span>
+<div class="prow-v">
+<sc-if value="{{notEditing}}" hint-placeholder-val="{{ true }}">
+<button type="button" class="inline-title" aria-describedby="p-name-k" onClick="{{startEdit}}" onDoubleClick="{{startEdit}}"><span>{{name}}</span><span class="vh">, press Enter to edit</span><svg class="pen" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4z"></path><path d="M13.5 6.5l4 4"></path></svg></button>
+</sc-if>
+<sc-if value="{{editing}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<label for="p-name" class="vh">Display name</label>
+<input id="p-name" ref="{{nameRef}}" class="edit {{editMods}}" type="text" autocomplete="name" value="{{draft}}" onChange="{{onDraft}}" onKeyDown="{{onEditKey}}" onBlur="{{onEditBlur}}" aria-invalid="{{nameInvalid}}" aria-describedby="p-name-msg">
+<sc-if value="{{nameInvalid}}" hint-placeholder-val="{{ false }}">
+<p id="p-name-msg" class="ferr"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7.5v5.5M12 16.5v.01"></path></svg>{{nameErr}}</p>
+</sc-if>
+<sc-if value="{{nameOk}}" hint-placeholder-val="{{ true }}">
+<p id="p-name-msg" class="hint">Enter to save · Esc to cancel</p>
+</sc-if>
+</div>
+</sc-if>
+</div>
+<span></span>
+</li>
+<li class="prow">
+<span class="prow-k">Email</span>
+<div class="prow-v">maya@example.com<span class="sub">Verified. Changing your email is coming later.</span></div>
+<span></span>
+</li>
+</ul>
+<p class="vh" role="status" aria-live="polite">{{nameLive}}</p>
+</section>
+
+<section class="sec" aria-labelledby="p-password">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<h2 id="p-password" class="sec-h">Password</h2>
+<p class="sec-p">Changing it signs you out on your other devices.</p>
+</div>
+<sc-if value="{{pwSaved}}" hint-placeholder-val="{{ false }}">
+<p class="notice notice-ok" role="status"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M8 12.5l2.8 2.8L16.5 9.5"></path></svg><span>Password changed. Your other device was signed out.</span></p>
+</sc-if>
+<form class="form" action="/profile/password" method="post" noValidate="{{ true }}" onSubmit="{{submitPw}}" aria-busy="{{pwPending}}" style="max-width: 400px">
+<div class="field">
+<label class="label" for="p-cur">Current password</label>
+<input id="p-cur" ref="{{curRef}}" class="input" type="password" autocomplete="current-password" value="{{cur}}" onChange="{{onCur}}" readOnly="{{pwPending}}" aria-invalid="{{curInvalid}}" aria-describedby="p-cur-err">
+<sc-if value="{{curInvalid}}" hint-placeholder-val="{{ false }}">
+<p id="p-cur-err" class="ferr"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7.5v5.5M12 16.5v.01"></path></svg>{{curErr}}</p>
+</sc-if>
+</div>
+<div class="field">
+<label class="label" for="p-new">New password</label>
+<input id="p-new" ref="{{nextRef}}" class="input" type="password" autocomplete="new-password" value="{{next}}" onChange="{{onNext}}" readOnly="{{pwPending}}" aria-invalid="{{nextInvalid}}" aria-describedby="p-new-msg">
+<sc-if value="{{nextInvalid}}" hint-placeholder-val="{{ false }}">
+<p id="p-new-msg" class="ferr"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7.5v5.5M12 16.5v.01"></path></svg>{{nextErr}}</p>
+</sc-if>
+<sc-if value="{{nextOk}}" hint-placeholder-val="{{ true }}">
+<p id="p-new-msg" class="hint">At least 12 characters</p>
+</sc-if>
+</div>
+<div class="row-actions">
+<button type="submit" class="btn btn-primary {{pwBtnMods}}" aria-disabled="{{pwPending}}">
+<sc-if value="{{pwPending}}" hint-placeholder-val="{{ false }}"><svg class="spinner" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-opacity=".3" stroke-width="2.5"></circle><path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"></path></svg><span>Changing password…</span></sc-if>
+<sc-if value="{{pwIdle}}" hint-placeholder-val="{{ true }}">Change password</sc-if>
+</button>
+</div>
+</form>
+</section>
+
+<section class="sec" aria-labelledby="p-methods">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<h2 id="p-methods" class="sec-h">Sign-in methods</h2>
+<p class="sec-p">Ways you can sign in to this account.</p>
+</div>
+<ul class="rows" style="border-top: 1px solid var(--line)">
+<li class="mrow">
+<span class="micon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5"></rect><path d="M4 7l8 6 8-6"></path></svg></span>
+<div class="mtext"><p class="mname">Email and password <span class="tag">Linked</span></p><p class="msub" id="p-only">maya@example.com · You need at least one way to sign in, so this can’t be removed yet.</p></div>
+<button type="button" class="btn btn-secondary btn-sm" aria-disabled="true" aria-describedby="p-only">Remove</button>
+</li>
+<li class="mrow is-placeholder">
+<span class="micon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18"></path><path d="M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"></path></svg></span>
+<div class="mtext"><p class="mname">Google <span class="tag">Coming</span></p><p class="msub" id="p-g">Not linked</p></div>
+<button type="button" class="btn btn-secondary btn-sm" aria-disabled="true" aria-describedby="p-g">Link</button>
+</li>
+<li class="mrow is-placeholder">
+<span class="micon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"></circle><path d="M11 12l9-9"></path><path d="M17 6l3 3"></path><path d="M15 8l2 2"></path></svg></span>
+<div class="mtext"><p class="mname">Passkey <span class="tag">Coming</span></p><p class="msub" id="p-pk">Not linked</p></div>
+<button type="button" class="btn btn-secondary btn-sm" aria-disabled="true" aria-describedby="p-pk">Add</button>
+</li>
+</ul>
+</section>
+
+<section class="sec" aria-labelledby="p-sessions">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<h2 id="p-sessions" class="sec-h">Sessions</h2>
+<p class="sec-p">{{sessionsLine}}</p>
+</div>
+<ul class="rows">
+<li class="mrow">
+<span class="micon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="11" rx="1.5"></rect><path d="M2 19h20"></path></svg></span>
+<div class="mtext"><p class="mname">Firefox on Linux <span class="tag">This device</span></p><p class="msub">Los Angeles · Active now</p></div>
+</li>
+<sc-if value="{{twoDevices}}" hint-placeholder-val="{{ true }}">
+<li class="mrow">
+<span class="micon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="3" width="10" height="18" rx="2"></rect><path d="M11 18h2"></path></svg></span>
+<div class="mtext"><p class="mname">Safari on iPhone</p><p class="msub">Los Angeles · Last active 3 hours ago</p></div>
+</li>
+</sc-if>
+</ul>
+<form action="/profile/sessions/sign-out-all" method="post" onSubmit="{{noop}}" style="margin: 0; display: flex; flex-direction: column; gap: 8px; align-items: flex-start">
+<button type="submit" class="btn btn-secondary" aria-describedby="p-all-hint">Sign out everywhere</button>
+<p id="p-all-hint" class="hint">Includes this device. You’ll need to sign in again.</p>
+</form>
+</section>
+
+<section class="danger" aria-labelledby="p-danger">
+<h2 id="p-danger" class="sec-h"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4l9 16H3z"></path><path d="M12 10v4M12 17v.01"></path></svg>Delete account</h2>
+<p class="sec-p">Deletes your account and every to-do in it. This can’t be undone.</p>
+<sc-if value="{{delClosed}}" hint-placeholder-val="{{ true }}">
+<div><button type="button" class="btn btn-danger" aria-expanded="false" aria-controls="p-del" onClick="{{openDel}}">Delete account…</button></div>
+</sc-if>
+<sc-if value="{{delOpen}}" hint-placeholder-val="{{ false }}">
+<form id="p-del" class="confirm" action="/profile/delete" method="post" noValidate="{{ true }}" onSubmit="{{submitDel}}">
+<div class="field" style="max-width: 400px">
+<label class="label" for="p-del-email">Type your email to confirm</label>
+<input id="p-del-email" ref="{{delRef}}" class="input {{delMods}}" type="email" autocomplete="off" spellcheck="false" placeholder="maya@example.com" value="{{delText}}" onChange="{{onDel}}" aria-describedby="p-del-hint">
+<p id="p-del-hint" class="hint">{{delHint}}</p>
+</div>
+<div class="row-actions">
+<button type="submit" class="btn btn-danger-solid" aria-disabled="{{delBlocked}}">Delete account permanently</button>
+<button type="button" class="btn btn-quiet" onClick="{{closeDel}}">Cancel</button>
+</div>
+</form>
+</sc-if>
+</section>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Theme"},"state":{"editor":"enum","options":["default","editName","passwordError","passwordPending","passwordSaved","deleteConfirm"],"default":"default","section":"State"},"$preview":{"width":1280,"height":1900}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.timer = null;
+    this.skipBlur = false;
+    this.els = {};
+    this.nameRef = (el) => { this.els.name = el; if (el && this.wantName) { this.wantName = false; el.focus(); try { el.setSelectionRange(el.value.length, el.value.length); } catch (_) {} } };
+    this.curRef = (el) => { this.els.cur = el; };
+    this.nextRef = (el) => { this.els.next = el; };
+    this.delRef = (el) => { this.els.del = el; if (el && this.wantDel) { this.wantDel = false; el.focus(); } };
+    this.state = this.init(props.state);
+  }
+  init(st) {
+    const b = { name: 'Maya Chen', editing: false, draft: '', nameErr: '', nameLive: '', cur: '', next: '', curErr: '', nextErr: '', pwPending: false, pwSaved: false, devices: 2, delOpen: false, delText: '', hint: true };
+    if (st === 'editName') return Object.assign(b, { editing: true, draft: '', nameErr: 'Display name must be 1 to 64 characters' });
+    if (st === 'passwordError') return Object.assign(b, { cur: 'tulips-and-tea', next: 'a-much-longer-passphrase', curErr: 'Current password is incorrect' });
+    if (st === 'passwordPending') return Object.assign(b, { cur: 'tulips-and-tea-2026', next: 'a-much-longer-passphrase', pwPending: true });
+    if (st === 'passwordSaved') return Object.assign(b, { pwSaved: true, devices: 1 });
+    if (st === 'deleteConfirm') return Object.assign(b, { delOpen: true, delText: 'maya@exam' });
+    return b;
+  }
+  componentDidUpdate(prev) { if (prev.state !== this.props.state) { clearTimeout(this.timer); this.setState(this.init(this.props.state)); } }
+  componentWillUnmount() { clearTimeout(this.timer); }
+  commit() {
+    const t = this.state.draft.trim();
+    if (t.length < 1 || t.length > 64) { this.setState({ nameErr: 'Display name must be 1 to 64 characters', hint: false }); return false; }
+    this.setState({ name: t, editing: false, nameErr: '', nameLive: 'Display name saved', hint: false });
+    return true;
+  }
+  submitPw(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    const s = this.state;
+    if (s.pwPending) return;
+    const curErr = s.cur.length ? '' : 'Enter your current password';
+    const n = s.next.length;
+    const nextErr = n >= 12 ? '' : (n === 0 ? 'Use at least 12 characters' : 'Use at least 12 characters — this one has ' + n);
+    if (curErr || nextErr) {
+      this.setState({ curErr: curErr, nextErr: nextErr, pwSaved: false, hint: false });
+      const f = curErr ? this.els.cur : this.els.next;
+      if (f) f.focus();
+      return;
+    }
+    this.setState({ pwPending: true, pwSaved: false, curErr: '', nextErr: '', hint: false });
+    this.timer = setTimeout(() => this.setState({ pwPending: false, pwSaved: true, cur: '', next: '', devices: 1 }), 1200);
+  }
+  renderVals() {
+    const s = this.state;
+    const theme = (this.props.theme || 'light') === 'dark' ? 'dark' : 'light';
+    const delMatch = s.delText.trim().toLowerCase() === 'maya@example.com';
+    return {
+      themeClass: theme, themeName: theme,
+      name: s.name, draft: s.draft,
+      editing: s.editing, notEditing: !s.editing,
+      editMods: s.hint && s.editing ? 'is-focused' : '',
+      nameErr: s.nameErr, nameInvalid: !!s.nameErr, nameOk: !s.nameErr, nameLive: s.nameLive,
+      cur: s.cur, next: s.next, curErr: s.curErr, nextErr: s.nextErr,
+      curInvalid: !!s.curErr, nextInvalid: !!s.nextErr, nextOk: !s.nextErr,
+      pwPending: s.pwPending, pwIdle: !s.pwPending, pwSaved: s.pwSaved,
+      pwBtnMods: s.pwPending ? 'is-pending' : '',
+      twoDevices: s.devices === 2,
+      sessionsLine: s.devices === 2 ? 'Signed in on 2 devices.' : 'Signed in on this device only.',
+      delOpen: s.delOpen, delClosed: !s.delOpen, delText: s.delText,
+      delBlocked: !delMatch,
+      delMods: s.hint && s.delOpen ? 'is-focused' : '',
+      delHint: delMatch ? 'Matches. Deleting signs you out everywhere.' : 'Type maya@example.com exactly.',
+      nameRef: this.nameRef, curRef: this.curRef, nextRef: this.nextRef, delRef: this.delRef,
+      startEdit: (e) => { if (e && e.type === 'click' && e.detail > 1) return; this.wantName = true; this.skipBlur = false; this.setState({ editing: true, draft: this.state.name, nameErr: '', nameLive: '', hint: false }); },
+      onDraft: (e) => { const v = e.target.value; this.setState({ draft: v, nameErr: '', hint: false }); },
+      onEditKey: (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); if (this.commit()) this.skipBlur = true; }
+        else if (e.key === 'Escape') { e.preventDefault(); this.skipBlur = true; this.setState({ editing: false, nameErr: '', hint: false }); }
+      },
+      onEditBlur: () => { if (this.skipBlur) { this.skipBlur = false; return; } this.commit(); },
+      submitPw: (e) => this.submitPw(e),
+      onCur: (e) => { const v = e.target.value; this.setState({ cur: v, curErr: '', hint: false }); },
+      onNext: (e) => { const v = e.target.value; this.setState({ next: v, nextErr: '', hint: false }); },
+      noop: (e) => { if (e && e.preventDefault) e.preventDefault(); },
+      openDel: () => { this.wantDel = true; this.setState({ delOpen: true, delText: '', hint: false }); },
+      closeDel: () => this.setState({ delOpen: false, delText: '', hint: false }),
+      onDel: (e) => { const v = e.target.value; this.setState({ delText: v, hint: false }); },
+      submitDel: (e) => { if (e && e.preventDefault) e.preventDefault(); }
+    };
+  }
+}
+</script>
+</body>
+</html>
