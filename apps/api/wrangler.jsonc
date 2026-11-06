@@ -8,7 +8,8 @@
   "preview_urls": false,
   // Configuration (src/config.ts). Not secrets: an origin and a cookie's
   // name. Local dev serves the BFF over http, so `.dev.vars` names the
-  // cookie `sid`.
+  // cookie `sid`; `pnpm check:config` reads the two together as the api
+  // does. These alone are not a deployed config: BFF_ORIGIN is local dev's.
   "vars": {
     "BFF_ORIGIN": "http://localhost:5173",
     "SESSION_COOKIE": "__Host-sid"
