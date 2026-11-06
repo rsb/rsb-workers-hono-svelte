@@ -198,6 +198,9 @@ importers:
       '@todo/fail':
         specifier: workspace:*
         version: link:../../packages/fail
+      '@todo/gates':
+        specifier: workspace:*
+        version: link:../../packages/gates
       '@todo/operations':
         specifier: workspace:*
         version: link:../../packages/operations
@@ -318,6 +321,22 @@ importers:
         version: 5.0.5(@types/node@26.6.6)(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2))
 
   packages/fail:
+    devDependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.5(@types/node@26.6.6)(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2))
+
+  packages/gates:
+    dependencies:
+      '@todo/business':
+        specifier: workspace:*
+        version: link:../business
+      '@todo/fail':
+        specifier: workspace:*
+        version: link:../fail
     devDependencies:
       typescript:
         specifier: 'catalog:'

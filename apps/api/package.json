@@ -15,6 +15,7 @@
     "@todo/contract-api": "workspace:*",
     "@todo/data-d1": "workspace:*",
     "@todo/fail": "workspace:*",
+    "@todo/gates": "workspace:*",
     "@todo/operations": "workspace:*",
     "@todo/valid": "workspace:*",
     "hono": "4.13.14",
