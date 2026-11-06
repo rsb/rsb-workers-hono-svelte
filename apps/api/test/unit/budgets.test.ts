@@ -1,8 +1,7 @@
 import type { EndpointKey } from "@todo/contract-api";
 import { describe, expect, it } from "vitest";
-import { constructApi, constructOperations, constructRoutes } from "../../src/construct.ts";
-import { serve } from "../../src/http.ts";
 import { countingDbStore, fakeDbStore } from "./fake-db-store.ts";
+import { testApi } from "./test-api.ts";
 
 /** An endpoint's budget, and the one request that spends it. */
 type Budget = { storeCalls: number; path: string; init?: RequestInit };
@@ -30,9 +29,8 @@ describe("each endpoint spends its budget of DbStore calls", () => {
     const fake = fakeDbStore();
     await fake.addTodoUnlessFull({ id: "id-1", title: "buy milk", completed: true }, 500);
     const { store, calls } = countingDbStore(fake);
-    // The real route table: handler, validator and operation all run (Q3).
-    const operations = constructOperations({ dbStore: store, newId: () => "id-2" });
-    const api = serve(constructApi(constructRoutes(operations)));
+    // The real gates and route table: handler, validator and operation all run (Q3).
+    const api = testApi({ dbStore: store, newId: () => "id-2" });
 
     const response = await api.request(path, init);
 

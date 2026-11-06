@@ -1,5 +1,5 @@
 import type { Role } from "@todo/business/auth/actor.ts";
-import { SESSION_IDLE_MS, type SessionChannel } from "@todo/business/auth/session.ts";
+import { SESSION_IDLE_MS, type SessionChannel, type SessionRow } from "@todo/business/auth/session.ts";
 import { type Result, err, ok } from "@todo/business/result.ts";
 import type { AnyFail } from "@todo/fail/fail.ts";
 import { execute, queryAll } from "../driver.ts";
@@ -13,24 +13,6 @@ export type NewSession = {
   createdAt: number;
   idleUntil: number | null;
   expiresAt: number;
-};
-
-/**
- * A session and its user, as `sessions.find` reports them: ended or expired
- * included, since whether a session is live is the gate's to decide. It is
- * the shape the `authenticate` gate's `SessionRow` asks for; construct checks
- * that the two fit.
- */
-export type FoundSession = {
-  session: {
-    id: string;
-    userId: string;
-    channel: SessionChannel;
-    idleUntil: number | null;
-    expiresAt: number;
-    endedAt: number | null;
-  };
-  user: { role: Role; disabled: boolean; emailVerifiedAt: number | null; name: string; email: string };
 };
 
 /** The row `sessions JOIN users` returns. The table's CHECKs hold `channel`, `role` and `disabled` to these values. */
@@ -48,7 +30,8 @@ export type FoundRow = {
   email: string;
 };
 
-export const toFoundSession = (row: FoundRow): FoundSession => ({
+/** The row as the `authenticate` gate reads it (`SessionRow`, in business). */
+export const toSessionRow = (row: FoundRow): SessionRow => ({
   session: {
     id: row.id,
     userId: row.user_id,
@@ -136,7 +119,7 @@ const insertSessionRaw = (db: D1Database, session: NewSession) => {
  */
 export const sessionStore = (db: D1Database) => ({
   /** The session a token hash names, with its user, or `null` (`sessions.find`). */
-  findSession: async (tokenHash: string): Promise<Result<FoundSession | null, AnyFail>> => {
+  findSession: async (tokenHash: string): Promise<Result<SessionRow | null, AnyFail>> => {
     const rows = await selectSessionByTokenHashRaw(db, tokenHash);
     if (!rows.ok) {
       return err(rows.error);
@@ -147,7 +130,7 @@ export const sessionStore = (db: D1Database) => ({
     if (row === undefined) {
       return ok(null);
     }
-    return ok(toFoundSession(row));
+    return ok(toSessionRow(row));
   },
 
   /**

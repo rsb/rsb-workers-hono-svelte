@@ -1,24 +1,7 @@
-import { type Actor, type Profile, type Role, anonymous } from "@todo/business/auth/actor.ts";
-import { SESSION_IDLE_MS, type SessionChannel, TOKEN_PATTERN } from "@todo/business/auth/session.ts";
+import { type Actor, type Profile, anonymous } from "@todo/business/auth/actor.ts";
+import { SESSION_IDLE_MS, type SessionChannel, type SessionRow, TOKEN_PATTERN } from "@todo/business/auth/session.ts";
 import { type Result, err, ok } from "@todo/business/result.ts";
 import { type AnyFail, wrap } from "@todo/fail/fail.ts";
-
-/**
- * A session as the gate's statement reports it, ended or expired included:
- * whether it is live is decided here, not in the store. `idleUntil` is null
- * for a bearer session, which has no idle window (L40).
- */
-export type SessionRow = {
-  session: {
-    id: string;
-    userId: string;
-    channel: SessionChannel;
-    idleUntil: number | null;
-    expiresAt: number;
-    endedAt: number | null;
-  };
-  user: { role: Role; disabled: boolean; emailVerifiedAt: number | null; name: string; email: string };
-};
 
 /**
  * What the gate needs from the identity store: the session a token hash

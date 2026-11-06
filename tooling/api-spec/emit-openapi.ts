@@ -90,9 +90,9 @@ const shapeSchema = (shape: Shape): Json => {
 const failureSchema = (kind: Spec["kinds"][number]): Json => {
   const properties: Json = { kind: { type: "string", const: kind.name }, message: { type: "string" } };
   const required = ["kind", "message"];
-  if (kind.withField) {
-    properties.field = { type: "string" };
-    required.push("field");
+  if (kind.carries !== undefined) {
+    properties[kind.carries] = kind.carries === "reason" ? { type: "string", enum: kind.reasons } : { type: "string" };
+    required.push(kind.carries);
   }
   return {
     type: "object",

@@ -21,10 +21,20 @@ A body that is not JSON is refused as `validation`, with the field
 - Every object is closed: a field not listed is refused.
 - Any request whose body is over `BODY_LIMIT_BYTES` (8192) is refused
   before routing: `too_large`.
+- Any request that carries the session cookie and changes something is
+  refused unless it comes from the BFF's own page: `Sec-Fetch-Site` is
+  `same-origin` or `none`, or, without it, `Origin` is the BFF's. Its
+  body, if it has one, is `application/json`. Otherwise: `forbidden`,
+  reason `channel` (L38).
+- Any request whose bearer token names no live session, or that gives a
+  cookie and a bearer token together: `unauthenticated`. A cookie that
+  names no live session is not refused: the request is anonymous (L39).
+- Any request whose live session is a disabled user's: `forbidden`,
+  reason `account_disabled` (L39).
 - Any request can fail on the server: `internal`.
 - A method and path not listed here: `not_found`.
 
-Errors: `too_large`, `internal`
+Errors: `unauthenticated`, `forbidden`, `too_large`, `internal`
 
 The errors under each endpoint are the ones it adds to these.
 
@@ -38,6 +48,31 @@ Reply: 413
   "error": {
     "kind": "too_large",
     "message": "request body too large"
+  }
+}
+```
+
+Example: a bearer token that names no session
+Reply: 401
+```json
+{
+  "ok": false,
+  "error": {
+    "kind": "unauthenticated",
+    "message": "the bearer token names no live session"
+  }
+}
+```
+
+Example: a change from another site, with the session cookie
+Reply: 403
+```json
+{
+  "ok": false,
+  "error": {
+    "kind": "forbidden",
+    "message": "the request does not come from the BFF's page",
+    "reason": "channel"
   }
 }
 ```
@@ -57,6 +92,8 @@ Reply: 500
 ## Errors
 
 - `validation`: 422, with field
+- `unauthenticated`: 401
+- `forbidden`: 403, with reason: channel | account_disabled
 - `not_found`: 404
 - `limit`: 409
 - `too_large`: 413

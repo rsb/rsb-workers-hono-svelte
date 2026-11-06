@@ -38,7 +38,7 @@ export const endpoints = {
     params: [],
     status: 200,
     reply: HealthReply,
-    errors: ["too_large", "internal"],
+    errors: ["unauthenticated", "forbidden", "too_large", "internal"],
   },
   "GET /todos": {
     method: "GET",
@@ -47,7 +47,7 @@ export const endpoints = {
     query: GetTodosQuery,
     status: 200,
     reply: TodoListReply,
-    errors: ["validation", "too_large", "internal"],
+    errors: ["validation", "unauthenticated", "forbidden", "too_large", "internal"],
   },
   "GET /todos/counts": {
     method: "GET",
@@ -55,7 +55,7 @@ export const endpoints = {
     params: [],
     status: 200,
     reply: TodoCountsReply,
-    errors: ["too_large", "internal"],
+    errors: ["unauthenticated", "forbidden", "too_large", "internal"],
   },
   "POST /todos": {
     method: "POST",
@@ -64,7 +64,7 @@ export const endpoints = {
     body: AddTodoBody,
     status: 201,
     reply: TodoReply,
-    errors: ["validation", "limit", "too_large", "internal"],
+    errors: ["validation", "unauthenticated", "forbidden", "limit", "too_large", "internal"],
   },
   "PATCH /todos": {
     method: "PATCH",
@@ -73,7 +73,7 @@ export const endpoints = {
     body: PatchTodosBody,
     status: 200,
     reply: TodoListReply,
-    errors: ["validation", "too_large", "internal"],
+    errors: ["validation", "unauthenticated", "forbidden", "too_large", "internal"],
   },
   "PATCH /todos/{id}": {
     method: "PATCH",
@@ -82,7 +82,7 @@ export const endpoints = {
     body: PatchTodoBody,
     status: 200,
     reply: TodoReply,
-    errors: ["validation", "not_found", "too_large", "internal"],
+    errors: ["validation", "unauthenticated", "forbidden", "not_found", "too_large", "internal"],
   },
   "DELETE /todos": {
     method: "DELETE",
@@ -91,7 +91,7 @@ export const endpoints = {
     query: DeleteTodosQuery,
     status: 200,
     reply: TodoListReply,
-    errors: ["validation", "too_large", "internal"],
+    errors: ["validation", "unauthenticated", "forbidden", "too_large", "internal"],
   },
   "DELETE /todos/{id}": {
     method: "DELETE",
@@ -99,7 +99,7 @@ export const endpoints = {
     params: ["id"],
     status: 200,
     reply: DeletedReply,
-    errors: ["not_found", "too_large", "internal"],
+    errors: ["unauthenticated", "forbidden", "not_found", "too_large", "internal"],
   },
 } as const satisfies Record<string, Endpoint>;
 

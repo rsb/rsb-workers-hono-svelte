@@ -1,8 +1,8 @@
-import { SESSION_IDLE_MS } from "@todo/business/auth/session.ts";
+import { SESSION_IDLE_MS, type SessionRow } from "@todo/business/auth/session.ts";
 import { type Result, err, ok } from "@todo/business/result.ts";
 import { type AnyFail, unavailable } from "@todo/fail/fail.ts";
 import { describe, expect, test } from "vitest";
-import { type SessionLookup, type SessionRow, authenticate } from "../../src/authenticate.ts";
+import { type SessionLookup, authenticate } from "../../src/authenticate.ts";
 
 const NOW = Date.UTC(2026, 10, 5, 12);
 const HOUR = 60 * 60 * 1000;

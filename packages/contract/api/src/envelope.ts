@@ -1,12 +1,21 @@
 import * as v from "valibot";
-import { FieldKind, OtherKind } from "./kinds.ts";
+import { FieldKind, OtherKind, Reason, ReasonKind } from "./kinds.ts";
 
-/** `field` is present when the kind is `validation`, and only then. */
+/**
+ * `field` is present when the kind is `validation`, and only then; `reason`
+ * when the kind is `forbidden`, and only then, and is one of `Reason`
+ * (PRD, Envelope).
+ */
 export const ApiError = v.variant("kind", [
   v.strictObject({
     kind: FieldKind,
     message: v.string(),
     field: v.string(),
+  }),
+  v.strictObject({
+    kind: ReasonKind,
+    message: v.string(),
+    reason: Reason,
   }),
   v.strictObject({
     kind: OtherKind,

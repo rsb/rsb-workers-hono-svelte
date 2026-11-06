@@ -1,3 +1,5 @@
+import type { Role } from "./actor.ts";
+
 /**
  * The session timeouts (L40), in milliseconds. A cookie session slides: each
  * request a day after the last keeps it alive, up to the absolute limit. A
@@ -15,3 +17,22 @@ export type SessionChannel = "cookie" | "bearer";
  * characters. Anything else is not a token and names no session.
  */
 export const TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
+
+/**
+ * A session and its user, as one statement reads them (`data/identity.md ›
+ * sessions.find`): ended or expired included, since whether a session is
+ * live is the `authenticate` gate's to decide. `idleUntil` is null for a
+ * bearer session, which has no idle window (L40). Written once here, so the
+ * gate's port and the store's result are the same type.
+ */
+export type SessionRow = {
+  session: {
+    id: string;
+    userId: string;
+    channel: SessionChannel;
+    idleUntil: number | null;
+    expiresAt: number;
+    endedAt: number | null;
+  };
+  user: { role: Role; disabled: boolean; emailVerifiedAt: number | null; name: string; email: string };
+};

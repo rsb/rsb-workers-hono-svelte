@@ -1,7 +1,6 @@
 import type { RuleId } from "@todo/business/rules.ts";
-import { BODY_LIMIT_BYTES, type EndpointKey, endpoints } from "@todo/contract-api";
-import { type Context, type ErrorHandler, type Handler, Hono, type NotFoundHandler } from "hono";
-import { bodyLimit } from "hono/body-limit";
+import { type EndpointKey, endpoints } from "@todo/contract-api";
+import { type ErrorHandler, type Handler, Hono, type MiddlewareHandler, type NotFoundHandler } from "hono";
 
 /** A validator from `valid`: it carries the ids of the rules it applies, as data (L33). */
 export type Validator = ((candidate: never) => unknown) & { readonly rules: readonly RuleId[] };
@@ -28,11 +27,19 @@ export type Route = {
  */
 export type Routes = Record<EndpointKey, Route>;
 
+/** The gates, one per place, in the order they run (L38). */
+export type Gates = [
+  requestId: MiddlewareHandler,
+  bodyLimit: MiddlewareHandler,
+  channel: MiddlewareHandler,
+  authenticate: MiddlewareHandler,
+];
+
 /** Everything the HTTP layer serves, as construct builds it. */
 export type Api = {
+  gates: Gates;
   routes: Routes;
   notFound: NotFoundHandler;
-  tooLarge: (c: Context) => Response;
   onError: ErrorHandler;
 };
 
@@ -43,13 +50,15 @@ const honoPath = (specPath: string) => {
 };
 
 /**
- * Wires the api to Hono, once per isolate. On each request the body limit
- * runs first, before routing; then the route's entry point takes over.
+ * Wires the api to Hono, once per isolate. On each request the gates run
+ * first, in order, before routing; then the route's entry point takes over.
  * Routes are registered in the order construct lists them.
  */
 export const serve = (api: Api): Hono => {
   const app = new Hono();
-  app.use(bodyLimit({ maxSize: BODY_LIMIT_BYTES, onError: api.tooLarge }));
+  for (const gate of api.gates) {
+    app.use(gate);
+  }
   for (const [key, route] of Object.entries(api.routes)) {
     const endpoint = endpoints[key as EndpointKey];
     app.on(endpoint.method, honoPath(endpoint.path), route.handler);

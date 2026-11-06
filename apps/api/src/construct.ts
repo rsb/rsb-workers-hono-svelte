@@ -1,4 +1,6 @@
+import { type IdentityStore, createIdentityStore } from "@todo/data-d1/identity/store.ts";
 import { type DbStore, createDbStore } from "@todo/data-d1/store.ts";
+import { authenticate as authenticateUnit } from "@todo/gates/authenticate.ts";
 import { type AddTodo, addTodo } from "@todo/operations/todos/add-todo.ts";
 import { type CountTodos, countTodos } from "@todo/operations/todos/count-todos.ts";
 import { type DeleteCompleted, deleteCompleted } from "@todo/operations/todos/delete-completed.ts";
@@ -19,17 +21,32 @@ import { getTodos } from "./app/handlers/todos/get-todos.ts";
 import { patchTodo } from "./app/handlers/todos/patch-todo.ts";
 import { patchTodos } from "./app/handlers/todos/patch-todos.ts";
 import { postTodos } from "./app/handlers/todos/post-todos.ts";
-import type { Api, Routes } from "./http.ts";
+import type { Config } from "./config.ts";
+import { authenticate } from "./gates/authenticate.ts";
+import { bodyLimit } from "./gates/body-limit.ts";
+import { channel } from "./gates/channel.ts";
+import { sha256Hex } from "./gates/digest.ts";
+import { requestId } from "./gates/request-id.ts";
+import type { Api, Gates, Routes } from "./http.ts";
 import { routing } from "./route.ts";
 
 // The app's whole dependency graph, one builder per level (A10). Each level
 // takes the one below, so a caller can enter at any level and replace a piece.
 
 /** What the platform hands over already configured and built: not config. */
-export type Bindings = { appDb: D1Database };
+export type Bindings = { appDb: D1Database; identityDb: D1Database };
 
-/** The concrete world: the database store and the id source. */
-export type Infra = { dbStore: DbStore; newId: () => string };
+/**
+ * The concrete world: a store per database (L42), the id source, the clock
+ * and the hash a session token is kept under.
+ */
+export type Infra = {
+  dbStore: DbStore;
+  identityStore: IdentityStore;
+  newId: () => string;
+  now: () => number;
+  digest: (token: string) => Promise<string>;
+};
 
 /** Every operation, each built with the ports it declares. */
 export type Operations = {
@@ -48,8 +65,28 @@ export type Operations = {
  */
 export const constructInfra = (bindings: Bindings): Infra => ({
   dbStore: createDbStore(bindings.appDb),
+  identityStore: createIdentityStore(bindings.identityDb),
   newId: () => crypto.randomUUID(),
+  now: () => Date.now(),
+  digest: sha256Hex,
 });
+
+/**
+ * The gates, in the order they run on every request, before routing (L38):
+ * each is listed once, here. Only `authenticate` has a unit; it gets the
+ * identity store as its lookup, and the binding gets it to touch with.
+ */
+export const constructGates = (infra: Infra, config: Config): Gates => [
+  requestId,
+  bodyLimit(tooLarge),
+  channel({ bffOrigin: config.bffOrigin, sessionCookie: config.sessionCookie }),
+  authenticate({
+    unit: authenticateUnit({ sessions: infra.identityStore, digest: infra.digest }),
+    sessions: infra.identityStore,
+    now: infra.now,
+    sessionCookie: config.sessionCookie,
+  }),
+];
 
 /**
  * Every operation gets the whole `DbStore`; each port lets it see only the
@@ -93,18 +130,19 @@ export const constructRoutes = (operations: Operations): Routes => {
   };
 };
 
-/** The routes plus the failure handlers, typed by `http.ts`. */
-export const constructApi = (routes: Routes): Api => ({
+/** The gates, the routes and the failure handlers, typed by `http.ts`. */
+export const constructApi = (gates: Gates, routes: Routes): Api => ({
+  gates,
   routes,
   notFound,
-  tooLarge,
   onError,
 });
 
-/** Builds the whole app from the bindings, one A10 level at a time. `index.ts` calls this. */
-export const construct = (bindings: Bindings): Api => {
+/** Builds the whole app from the bindings and the config, one A10 level at a time. `index.ts` calls this. */
+export const construct = (bindings: Bindings, config: Config): Api => {
   const infra = constructInfra(bindings);
+  const gates = constructGates(infra, config);
   const operations = constructOperations(infra);
   const routes = constructRoutes(operations);
-  return constructApi(routes);
+  return constructApi(gates, routes);
 };

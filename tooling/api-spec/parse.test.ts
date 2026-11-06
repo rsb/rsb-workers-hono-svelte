@@ -99,7 +99,7 @@ describe("parse", () => {
     const parsed = parse(readFileSync("prd/todo/api.md", "utf8"));
     assert.ok(parsed.ok, JSON.stringify(!parsed.ok && parsed.problems));
     assert.equal(parsed.spec.endpoints.length, 8);
-    assert.deepEqual(parsed.spec.everyKinds, ["too_large", "internal"]);
+    assert.deepEqual(parsed.spec.everyKinds, ["unauthenticated", "forbidden", "too_large", "internal"]);
     const applies = Object.fromEntries(parsed.spec.endpoints.map((e) => [`${e.method} ${e.path}`, e.applies]));
     assert.deepEqual(applies["POST /todos"], ["title.length"]);
     assert.deepEqual(applies["PATCH /todos/{id}"], ["patch.nonempty", "title.length"]);
@@ -225,6 +225,78 @@ Reply: 404
   it("refuses a kind not in Errors", () => {
     const found = problems(spec(getA(works, "`limit`")));
     assert.deepEqual(found, ["GET /a has no example of limit", "kind limit is not in Errors"]);
+  });
+
+  it("reads what each kind carries beside its message", () => {
+    const withReason = spec(getA(works)).replace(
+      "- `not_found`: 404\n",
+      "- `not_found`: 404\n- `forbidden`: 403, with reason: channel | role\n",
+    );
+    const parsed = parse(withReason);
+    assert.ok(parsed.ok, JSON.stringify(!parsed.ok && parsed.problems));
+    assert.deepEqual(
+      parsed.spec.kinds.map((kind) => [kind.name, kind.carries, kind.reasons]),
+      [
+        ["validation", "field", []],
+        ["not_found", undefined, []],
+        ["forbidden", "reason", ["channel", "role"]],
+        ["internal", undefined, []],
+      ],
+    );
+  });
+
+  it("refuses a kind that carries anything else", () => {
+    const shape = 'an error is "- `kind`: status", "- `kind`: status, with field" or "- `kind`: status, with reason: a | b"';
+    const withPath = spec(getA(works)).replace("- `not_found`: 404\n", "- `not_found`: 404, with path\n");
+    assert.deepEqual(problems(withPath), [shape]);
+    const fieldList = spec(getA(works)).replace("- `validation`: 422, with field\n", "- `validation`: 422, with field: a | b\n");
+    assert.deepEqual(problems(fieldList), [shape]);
+  });
+
+  it("refuses a reason kind that does not list its reasons, or lists one twice", () => {
+    const bare = spec(getA(works)).replace("- `not_found`: 404\n", "- `not_found`: 404\n- `forbidden`: 403, with reason\n");
+    assert.deepEqual(problems(bare), ['kind forbidden carries a reason, so it lists them: "with reason: a | b"']);
+    const twice = spec(getA(works)).replace(
+      "- `not_found`: 404\n",
+      "- `not_found`: 404\n- `forbidden`: 403, with reason: role | role-x | role\n",
+    );
+    assert.deepEqual(problems(twice), [
+      `kind forbidden's reason "role-x" is not a name`,
+      "kind forbidden lists the reason role twice",
+    ]);
+  });
+
+  it("refuses a second kind that carries a reason", () => {
+    const two = spec(getA(works)).replace(
+      "- `not_found`: 404\n",
+      "- `not_found`: 404\n- `forbidden`: 403, with reason: role\n- `locked`: 423, with reason: held\n",
+    );
+    assert.deepEqual(problems(two), ["kind locked carries a reason, and so does forbidden; one kind carries a reason"]);
+  });
+
+  it("refuses an example whose reason the kind does not list", () => {
+    const refused = `
+Examples:
+
+Example: works
+Request: \`GET /a\`
+Reply: 200
+\`\`\`json
+{ "ok": true, "data": { "ok": true } }
+\`\`\`
+
+Example: refused
+Request: \`GET /a\`
+Reply: 403
+\`\`\`json
+{ "ok": false, "error": { "kind": "forbidden", "message": "no", "reason": "role" } }
+\`\`\`
+`;
+    const source = spec(getA(refused, "`forbidden`")).replace(
+      "- `not_found`: 404\n",
+      "- `not_found`: 404\n- `forbidden`: 403, with reason: channel\n",
+    );
+    assert.deepEqual(problems(source), ['example "refused" gives the reason role, which is not among channel']);
   });
 
   it("refuses an endpoint without Errors:", () => {

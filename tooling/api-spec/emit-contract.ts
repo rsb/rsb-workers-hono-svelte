@@ -143,8 +143,12 @@ const shapeDoc = (shape: Shape, endpoints: Endpoint[]) => {
 /** `kinds.ts`: the envelope's error kinds. */
 export const emitKinds = (spec: Spec, source: string, script: string) => {
   const all = spec.kinds.map((kind) => quote(kind.name));
-  const field = spec.kinds.filter((kind) => kind.withField).map((kind) => quote(kind.name));
-  const other = spec.kinds.filter((kind) => !kind.withField).map((kind) => quote(kind.name));
+  const carrying = (carries: "field" | "reason" | undefined) =>
+    spec.kinds.filter((kind) => kind.carries === carries).map((kind) => quote(kind.name));
+  const field = carrying("field");
+  const reason = carrying("reason");
+  const other = carrying(undefined);
+  const reasons = spec.kinds.flatMap((kind) => kind.reasons).map(quote);
   const every = spec.everyKinds.map(quote);
   const statuses = spec.kinds.map((kind) => `  ${kind.name}: ${kind.status},`);
   return `${header(source, script)}import * as v from "valibot";
@@ -157,7 +161,15 @@ export type ErrorKind = v.InferOutput<typeof ErrorKind>;
 export const FieldKind = v.picklist([${field.join(", ")}]);
 export type FieldKind = v.InferOutput<typeof FieldKind>;
 
-/** The kinds that carry no \`field\`. */
+/** The kinds that carry a \`reason\`. */
+export const ReasonKind = v.picklist([${reason.join(", ")}]);
+export type ReasonKind = v.InferOutput<typeof ReasonKind>;
+
+/** Every \`reason\` the kind that carries one can give. */
+export const Reason = v.picklist([${reasons.join(", ")}]);
+export type Reason = v.InferOutput<typeof Reason>;
+
+/** The kinds that carry neither. */
 export const OtherKind = v.picklist([${other.join(", ")}]);
 export type OtherKind = v.InferOutput<typeof OtherKind>;
 

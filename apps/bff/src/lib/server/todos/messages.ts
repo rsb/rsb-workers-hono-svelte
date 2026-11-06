@@ -46,6 +46,9 @@ export const problemMessage = (problem: Problem): string => {
  * The message for a failed add, from the kind the API answered with. The BFF
  * checked the title before sending it, so a `validation` answer is skew or a
  * bug, not something the person can fix: it gets the generic message.
+ * So do `unauthenticated` and `forbidden`, for now: the BFF sends no session
+ * yet, and the shell's error view (stage 23, commit 10) replaces this
+ * interim wording.
  */
 export const addFailedMessage = (kind: ErrorKind): string => {
   if (kind === "limit") {
