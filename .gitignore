@@ -4,6 +4,8 @@ node_modules/
 # wrangler
 .wrangler/
 .dev.vars*
+# the dev seed's raw session tokens (apps/api/scripts/seed-dev.ts)
+.dev.tokens
 
 # build output
 dist/

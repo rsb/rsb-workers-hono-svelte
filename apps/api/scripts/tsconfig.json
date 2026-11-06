@@ -1,0 +1,9 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    // The scripts run in node, beside the Worker: node's types, and the
+    // Worker's for the bindings `getPlatformProxy` hands over.
+    "types": ["node", "../worker-configuration.d.ts"]
+  },
+  "include": ["*.ts"]
+}
