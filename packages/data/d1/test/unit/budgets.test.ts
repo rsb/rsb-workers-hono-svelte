@@ -125,6 +125,11 @@ const identityBudgets: Record<keyof IdentityStore, Budget<IdentityStore>> = {
     answer: { changes: 1 },
     call: (store) => store.createUser({ id: "u1", email: "ada@example.com", name: "Ada", role: "member", createdAt: NOW }),
   },
+  markVerified: {
+    budget: { trips: 1, statements: 1 },
+    answer: { changes: 1 },
+    call: (store) => store.markVerified("u1", NOW),
+  },
   findUserByEmail: {
     budget: { trips: 1, statements: 1 },
     answer: { rows: [] },

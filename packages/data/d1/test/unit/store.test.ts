@@ -42,6 +42,7 @@ it("holds every identity table's methods, flat", () => {
     "findSession",
     "findUserByEmail",
     "listSessions",
+    "markVerified",
     "recordSignIn",
     "setCredential",
     "touchSession",

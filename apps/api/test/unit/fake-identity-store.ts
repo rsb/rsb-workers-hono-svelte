@@ -50,6 +50,14 @@ export const fakeIdentityStore = (sessions: Record<string, SessionRow> = {}, cre
       users.set(user.email, { ...user, disabled: false, emailVerifiedAt: null });
       return ok(true);
     },
+    markVerified: async (userId, now) => {
+      const user = [...users.values()].find((each) => each.id === userId);
+      if (user === undefined || user.emailVerifiedAt !== null) {
+        return ok(false);
+      }
+      user.emailVerifiedAt = now;
+      return ok(true);
+    },
     findUserByEmail: async (email) => ok(users.get(email) ?? null),
   };
   return { store, asked, touched, signIns, ended };

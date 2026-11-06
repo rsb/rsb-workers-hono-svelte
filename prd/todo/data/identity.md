@@ -199,6 +199,24 @@ Whether a user was created: they are not when the email is taken.
 - Cost: 1 round trip, 1 statement. Writes at most 1.
 - Rules: none
 
+## `users.mark_verified`
+Whether a user was marked verified: they are not when they already were.
+
+- Port: `UserStore.markVerified`
+- Used by: the dev seed, so slice C's `unverified` refusal changes
+  nothing for its users; the email link from slice C
+- Input: the user's id and `now`
+- Scope: none
+- Result: `marked | already` (`true` or `false`); `false` too when no
+  user has the id
+- Guarantee: one statement, `UPDATE … WHERE id = ? AND
+  email_verified_at IS NULL`, so the first verification's time is kept.
+- Retry safety: safe; a second call is `already`.
+- Failures: `unavailable`, `server`
+- Cost: 1 round trip, 1 statement. Finds the row by primary key; writes
+  at most 1.
+- Rules: none
+
 ## `users.find_by_email`
 The user with an email, or none.
 

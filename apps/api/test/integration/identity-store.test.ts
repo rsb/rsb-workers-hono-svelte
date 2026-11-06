@@ -90,6 +90,15 @@ describe("users", () => {
     });
   });
 
+  it("marks a user verified once, keeping the first time", async () => {
+    await createUser("u-verify", "verify@example.com");
+
+    expect(await store.markVerified("u-verify", NOW + 1)).toEqual({ ok: true, value: true });
+    expect(await store.markVerified("u-verify", NOW + 2)).toEqual({ ok: true, value: false });
+    expect(await store.markVerified("u-nobody", NOW + 3)).toEqual({ ok: true, value: false });
+    expect(await store.findUserByEmail("verify@example.com")).toMatchObject({ ok: true, value: { emailVerifiedAt: NOW + 1 } });
+  });
+
   it("finds no user for an unknown email", async () => {
     expect(await store.findUserByEmail("nobody@example.com")).toEqual({ ok: true, value: null });
   });
