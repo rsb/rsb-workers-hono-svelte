@@ -3,7 +3,8 @@
 	import NewTodo from "#lib/components/NewTodo.svelte";
 	import TodoFooter from "#lib/components/TodoFooter.svelte";
 	import TodoList from "#lib/components/TodoList.svelte";
-	import { SIGNED_OUT } from "#lib/shell/views.ts";
+	import { page } from "$app/state";
+	import { SIGNED_OUT, SIGNED_OUT_NOTICE } from "#lib/shell/views.ts";
 	import type { PageProps } from "./$types";
 
 	let { data, form }: PageProps = $props();
@@ -44,6 +45,9 @@
 	// empty while todos exist, and the footer and mark all must still show.
 	let hasTodos = $derived(data.state === "list" && data.active + data.completed > 0);
 	let allDone = $derived(hasTodos && data.state === "list" && data.active === 0);
+	// `accounts.shell.signed_out_notice`: where a sign-out lands (L50). Only
+	// over `signed_out`, so the address never tells a signed-in person so.
+	let signedOutNotice = $derived(data.state === "signed_out" && page.url.searchParams.has("signed-out"));
 </script>
 
 <svelte:head>
@@ -51,6 +55,13 @@
 </svelte:head>
 
 <main>
+	{#if signedOutNotice}
+		<div class="notice" role="status">
+			<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M8.5 12.5l2.5 2.5 4.5-5"></path></svg>
+			<p>{SIGNED_OUT_NOTICE}</p>
+		</div>
+	{/if}
+
 	<h1>Todos</h1>
 
 	<!-- accounts.shell.signed_out: "Create an account" comes in C, with its page. -->
@@ -90,6 +101,29 @@
 		font-size: 16px;
 		line-height: 1.55;
 		color: var(--fg2);
+	}
+
+	.notice {
+		display: flex;
+		gap: 12px;
+		align-items: center;
+		margin: 0 0 28px;
+		padding: 14px 16px;
+		border: 1px solid var(--line);
+		border-radius: 10px;
+		background: var(--fill);
+		color: var(--accent);
+	}
+
+	.notice p {
+		margin: 0;
+		color: var(--fg);
+		font-size: 16px;
+		line-height: 1.45;
+	}
+
+	.notice svg {
+		flex: none;
 	}
 
 	.actions {

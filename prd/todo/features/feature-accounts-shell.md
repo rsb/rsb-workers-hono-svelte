@@ -38,7 +38,7 @@ it.
 | `accounts.shell.member` | the top bar with "Todos" and the account button with the person's initials; the page inside | `authenticate › member`: an actor whose role is `member` | `shell.member` |
 | `accounts.shell.admin` | as `member`; the "Users" link is added in D, with its page | `authenticate › admin`: an actor whose role is `admin` | drawn only with the menu open (`shell.menu-open`, as admin) |
 | `accounts.shell.menu_open` | the account menu open over the page: name and email, "Admin" for an admin, then Todos; Sign out from B, Users (admin only) from D, and Profile when its page exists | `bff` (no chain runs) | `shell.menu-open` |
-| `accounts.shell.signed_out_notice` | `signed_out`, with the notice "You’re signed out on this device." | `open: B (after sign-out)` | `shell.signed-out-notice` |
+| `accounts.shell.signed_out_notice` | `signed_out`, with the notice "You’re signed out on this device." above it | `bff`: the sign-out action sends the browser to `/?signed-out`, and the list's page shows the notice over `signed_out` only, so the address never tells a signed-in person they are signed out | `shell.signed-out-notice` |
 
 There is no redirect: with no cookie the BFF renders `signed_out` with
 no list, and "Sign in" leads to `/sign-in` (B). The shell shows a link
@@ -80,8 +80,29 @@ None.
 | Action | Endpoint | Use case | Data cases | Leads to |
 | --- | --- | --- | --- | --- |
 | open or close the account menu | none | bff | none | `menu_open`, or back |
-| sign out | open until B | sign out (B): ends this device's session | open until B | `signed_out_notice` |
+| sign out | `DELETE /sessions/current` | `use-cases/auth/sign-out.md` | `data/identity.md › sessions.end` | `signed_out_notice`; `accounts.error.failed` |
 | try again | the page's own read | the page's | the page's | the page's state, or `accounts.error.failed` again |
+
+## Sign out
+Sign out is a POST from the account menu to `/sign-out`, never a GET
+(threats row 2), and a whole-page navigation, so what the page held in
+memory goes with the session. The BFF asks the api to end this
+device's session, then sends an expiring `Set-Cookie` for the session
+cookie and `Clear-Site-Data: "cache"` as a courtesy, and sends the
+browser to `/?signed-out` (L50). Not `"cookies"`: it reaches every
+cookie of the registrable domain, and on a shared parent domain that
+signs the person out of its other apps; the expiring cookie already
+deletes the one this app owns. The api writes no
+`Set-Cookie` (L40). `unauthenticated` from the api, a session another
+sign-out, a sign-out everywhere or a rotation ended first, is signed
+out too: the outcome the person asked for holds. Any other refusal is
+`accounts.error.failed`, with the cookie kept, since whether the
+session ended is not known and signing out again is safe. Opening
+`/sign-out` goes to the list and signs nobody out.
+
+Every page drawn for a signed-in person answers
+`Cache-Control: no-store`, so no cache keeps it and Back after sign-out
+asks again and shows no list.
 
 ## Budget
 The actor read is one api call per page load, `GET /sessions/current`,
@@ -91,6 +112,12 @@ most 2 rows read and none written on the steady path. The actor read
 adds no statement of its own. When the gate says `refreshDue`, 1 write
 follows the response (`sessions.touch`), at most once per session per
 half idle window. Asserted in `apps/api/test/unit/budgets.test.ts` and
+`packages/data/d1/test/unit/budgets.test.ts`.
+
+Sign out is one api call, `DELETE /sessions/current`, asserted in
+`apps/bff/test/unit/budgets.test.ts`; the list it sends the browser to
+is that page's load. On the api it costs the gate's lookup and 1 write
+(`sessions.end`), asserted in `apps/api/test/unit/budgets.test.ts` and
 `packages/data/d1/test/unit/budgets.test.ts`.
 
 ## Done
@@ -121,6 +148,15 @@ and D write theirs.
 1. *Given* no session cookie, *when* I open `/`, *then* "Sign in" in the
    top bar and on the page each lead to the sign-in page, whose top bar
    has no "Sign in". (`feature-accounts-sign-in.md`)
+2. *Given* the member signed in, *when* I sign out from the account
+   menu, *then* I see "You’re signed out on this device." and no list,
+   and Back shows no list. (L50) Opening `/sign-out` signs nobody out.
+3. *Given* a session signed out, *when* its cookie is presented again,
+   *then* it signs nobody in, and the cookie is deleted. (threats row
+   10)
+
+B's scenarios sign in through the page first, so a sign-out ends a
+session of its own, never the seeded one.
 
 Scenario A.7 is not an e2e scenario, for the reason scenario 1 of the
 root gives for health: `test:e2e` starts both Workers. It is the BFF's

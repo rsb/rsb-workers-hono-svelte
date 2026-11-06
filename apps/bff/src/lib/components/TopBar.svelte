@@ -76,7 +76,7 @@
 					<svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg>
 				</button>
 
-				<!-- Sign out is added in B, Users in D, Profile when its page exists. -->
+				<!-- Users is added in D, Profile when its page exists. -->
 				{#if open}
 					<div id="account-menu" class="menu">
 						<div class="menu-head">
@@ -94,6 +94,14 @@
 								</a>
 							</li>
 						</ul>
+						<!-- A plain POST, never a GET (threats row 2), and a whole-page
+						     navigation: what the page held in memory goes with the session. -->
+						<form method="POST" action="/sign-out">
+							<button type="submit" class="menu-item">
+								<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4"></path><path d="M9 8l-4 4 4 4M5 12h10"></path></svg>
+								Sign out
+							</button>
+						</form>
 					</div>
 				{/if}
 			</div>
@@ -301,6 +309,13 @@
 		text-decoration: none;
 		font-size: 15px;
 		font-weight: 500;
+	}
+
+	button.menu-item {
+		width: 100%;
+		border: 0;
+		background: none;
+		text-align: left;
 	}
 
 	.menu-item:hover,

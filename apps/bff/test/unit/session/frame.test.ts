@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEV_SESSION_COOKIE, SESSION_COOKIE, sessionCookie } from "../../../src/lib/server/session/cookie.ts";
-import { initials, loadFrame } from "../../../src/lib/server/session/frame.ts";
+import { frameHeaders, initials, loadFrame } from "../../../src/lib/server/session/frame.ts";
 
 const member = { id: "u1", role: "member", emailVerified: true, name: "Dev Member", email: "member@example.test" };
 const admin = { id: "u2", role: "admin", emailVerified: true, name: "Dev Admin", email: "admin@example.test" };
@@ -93,5 +93,21 @@ describe("sessionCookie", () => {
   it("is the api's name deployed, and the name without __Host- in dev, where the browser is on http", () => {
     expect(sessionCookie(false)).toBe(SESSION_COOKIE);
     expect(sessionCookie(true)).toBe(DEV_SESSION_COOKIE);
+  });
+});
+
+describe("frameHeaders", () => {
+  const person = { name: "Dev Member", email: "member@example.test", initials: "DM", admin: false };
+
+  it("stores no page drawn for a signed-in person, so Back after sign-out asks again", () => {
+    expect(frameHeaders({ probe: false, account: { state: "signed_in", person } })).toEqual({ "cache-control": "no-store" });
+  });
+
+  it.each([
+    ["anonymous", { probe: false, account: { state: "anonymous" } }],
+    ["failed", { probe: false, account: { state: "failed" } }],
+    ["the probe", { probe: true }],
+  ] as const)("adds nothing for %s", (_, frame) => {
+    expect(frameHeaders(frame)).toEqual({});
   });
 });

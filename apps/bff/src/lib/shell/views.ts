@@ -8,6 +8,9 @@ import type { CaughtError } from "@sveltejs/kit/hooks";
 /** `accounts.shell.signed_out`, in place of the list. */
 export const SIGNED_OUT = "Sign in to see your list. Your to-dos are kept with your account.";
 
+/** `accounts.shell.signed_out_notice`, above `signed_out`, after a sign-out. */
+export const SIGNED_OUT_NOTICE = "You’re signed out on this device.";
+
 /** Back to the list, from any error. */
 export const HOME = "Go to your to-dos";
 
