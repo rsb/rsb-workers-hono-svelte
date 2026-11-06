@@ -21,7 +21,11 @@ on OpenAPI, L24 on entry chains, L25 on use cases, L26 on the api
 spec, L27 on `valid`. L29–L35 were agreed in the specs session of
 2026-11-04: L29 on rule kinds, L30 on the use case's form, L31 on a
 rule's sources, L32 on the use case as the root, L33 on citing rules
-by id, L34 on the rules spec, L35 on what makes a spec. L44–L46 were
+by id, L34 on the rules spec, L35 on what makes a spec. L37–L43 were
+agreed in the authentication design session of 2026-11-05 (handoff
+23) and built in stage 23: L37 on gates, L38 on the api's gates, L39
+on authentication and authorization, L40 on sessions, L41 on the
+`users` and `auth` areas, L42 on two databases, L43 on scope. L44–L46 were
 agreed in the PRD tree session of 2026-11-05: L44 on the PRD as a
 tree, L45 on feature, view, state and board, L46 on data cases. They
 are recorded in [the api story](the-api-story.md).
@@ -39,17 +43,17 @@ Status:
 ### Entry chain
 
 The path every request takes:
-startup → entry point → [process →] operation (using business) → port
-← data. Construct does the wiring. Each link has one role, and a
-request cannot skip a link. A process is there only when the use case
-needs one.
+startup → [gates](#gate) → entry point → [process →] operation (using
+business) → port ← data. Construct does the wiring. Each link has one
+role, and a request cannot skip a link. A process is there only when
+the use case needs one.
 
 - **DDD:** layered architecture, with the domain at the centre.
 - **We differ:** the boundary is kept by the architecture (checked
   imports and tests), not by encapsulation. Each link can be tested on
   its own, with or without a mock, and in every test category.
-- **Status:** locked (L2, L18). Called *chain* until L24; in file and
-  identifier names it is `entry-chains`.
+- **Status:** locked (L2, L18, L37). Called *chain* until L24; in file and
+  identifier names it is `entry-chains`. The gates joined it in L37.
 
 It is rooted at the [use case](#use-case) (L32): an entry point is
 where one delivery attaches to a use case, so a use case may have
@@ -185,7 +189,9 @@ A process:
 - receives built operations from construct, so its tests mock
   operations only.
 
-Processes do not call processes.
+Processes do not call processes. A process may compose operations
+across [areas](#area): anything that writes to both `users` and `auth`
+is one (L41), such as `signUp` or `disableUser`.
 
 Lives in `packages/processes`, in the folder of the area whose use
 case triggers it. It imports operations' types only (`import type`),
@@ -202,6 +208,20 @@ and `packages/operations` never imports it.
   an operation is: sign-up, disable a user and delete an account are
   the accounts features' processes. "The process from idea to code" is
   not this word: that is the [PRD](#prd)'s layers (story, chapter 14).
+  Amended in stage 23: it may cross areas (L41). None exists yet.
+
+### Step record
+
+What a process keeps of each step it ran: its name, its attempt, when
+it started and finished, and its result,
+`Step<T> = { name, attempt, started, finished, result: Result<T, AnyFail> }`.
+A process's result lists its steps. Immediate and durable processes
+share it, so moving a process to Cloudflare Workflows changes the
+runner and nothing in the process.
+
+- **DDD:** none; a saga's log is the nearest.
+- **Status:** target (backlog G, handoff 12). It is written with the
+  first process, sign-up (slice C).
 
 ### Operation
 
@@ -317,8 +337,10 @@ facts. It makes no ids and decides no rules.
 
 A part of the business inside one system, such as `todos` or `users`.
 It is a folder in each layer, `business`, `operations` and
-`processes`, not a package of its own. Areas share one language and
-one store.
+`processes`, not a package of its own. Areas share one language. Since
+L42 they do not all share one database: `users` and `auth` keep their
+tables in the [identity database](#identity-database), and the rest
+in the [app database](#app-database).
 
 - Siblings never import each other within a layer: no business area
   imports another, and no operation imports another. Areas meet in an
@@ -327,12 +349,13 @@ one store.
 - An area becomes its own package only by recorded exception: a
   second app needs only some areas, a team owns it, or the package's
   check or test time hurts.
-- Data is split by engine or external system, never by area.
+- Data is split by engine or external system, never by area. The
+  two D1 databases are two folders of one package, `packages/data/d1`.
 
 - **DDD:** a module. It is not a bounded context: a bounded context is
   a whole system with its own language. If two areas start to mean
   different things by the same word, they have become two systems.
-- **Status:** locked (L22).
+- **Status:** locked (L22, L41, L42).
 
 ## Effects
 
@@ -946,6 +969,127 @@ file names, and the feature carries a board map.
 - **Status:** locked (L45). The two existing exports are mapped, not
   renamed.
 
+## Gates and identity
+
+The terms of stage 23 (L37–L43): what runs before an entry point,
+who a request acts for, and which rows it may touch. The story's
+chapter 15 tells them in order.
+
+### Gate
+
+A stage of the [entry chain](#entry-chain) that runs once per
+request, before routing, on every path. It does exactly two things:
+it attaches a fact to the request, or it refuses in the error
+envelope. It never reads business data for a business purpose and
+never decides what a request means.
+
+A gate has a [binding](#binding-of-a-gate) and, when it makes a
+decision over a port, a [unit](#unit-of-a-gate). Construct lists the
+bindings in order (`constructGates`), and that list is the gates'
+address. The api's gates are `requestId`, `bodyLimit`, `channel` and
+`authenticate` (L38). The BFF runs none.
+
+- **DDD:** none. It is the web's middleware, given one job and an
+  address.
+- **We differ:** no `Gate` interface and no registry; two plain
+  functions per gate are a convention, held by tests. `gates` imports
+  `business` and `fail` only, and `operations` and `data` never import
+  it.
+- **Not called:** middleware, which names Hono's mechanism, not the
+  stage; guard.
+- **Status:** locked (L37, L38).
+
+### Binding (of a gate)
+
+The part of a [gate](#gate) that lives in the delivery: Hono
+middleware in `apps/api/src/gates/`, or a token reader in a provider
+CLI. It reads the request, runs the unit if there is one, and
+attaches what it found or answers the refusal in the envelope.
+
+Not the platform's binding (`APP_DB`, the BFF's `API`), which is a
+capability the platform hands over (story, chapter 3). The context
+tells the two apart; where it does not, say "the gate's binding".
+
+- **Status:** locked (L37).
+
+### Unit (of a gate)
+
+The part of a [gate](#gate) that decides, over a port, in
+`packages/gates`: a plain function over plain inputs, so its test
+needs no request. Only `authenticate` has one.
+
+Not the [unit](#use-case) a handler runs, an operation or a process
+(L19). A gate's unit is never a use case's.
+
+- **Status:** locked (L37).
+
+### Credential
+
+What a request offers as proof of who it acts for: the session
+cookie, by its configured name, or the token of `Authorization:
+Bearer`. A request gives one or neither: both together are refused
+as `unauthenticated`. In slice B a password is a credential too, and
+its table is `credentials`; it proves a sign-in, never a request.
+
+- **Status:** locked (L39, L40).
+
+### Channel
+
+How a request came: by `cookie` (a browser, through the BFF),
+`bearer` (a CLI or another client) or `none`. The `channel` gate
+attaches it, and refuses an unsafe cookie-bearing request that is not
+the BFF's own page. A session row keeps the channel it was started
+for, and its token is accepted on that channel only.
+
+- **Status:** locked (L38, L40).
+
+### Actor
+
+Who a request acts for: `anonymous`, or a user with `userId`, `role`
+and `emailVerified`. The `authenticate` gate attaches it; the
+[runner](#scope) checks it against the operation's row in
+`access.md`. It holds what authorization needs and nothing else. The
+name and email the frame shows are the profile, beside it.
+
+- **DDD:** none; the security principal.
+- **Not called:** user, which is the `users` area's row; principal.
+- **Status:** locked (L39).
+
+### Scope
+
+Which rows a store call may read or write: `{ ownerId }` for the
+actor's own (`own`), `{ any: true }` for every row (`any`, an admin's).
+The runner works it out from the actor and the operation's row and
+hands it to the operation's body; the body hands it to the store. The
+store has no default, and reads and writes are scoped alike, in one
+statement. No row in scope is a [fact](#fact), and the operation names
+it `not_found`.
+
+The runner is `run`, in `packages/operations/src/run.ts`: every
+operation's builder wraps its body in it, so authorization is applied
+once, before the body, and never by a gate.
+
+- **DDD:** none.
+- **Status:** locked (L39, L43). No operation uses `any` until slice D.
+
+### Identity database
+
+The D1 database `todo-identity`, bound as `IDENTITY_DB`. It holds the
+`users` and `auth` areas' tables: `users` and `sessions` since stage
+23, `credentials` and `verifications` with slices B and C. One per
+product. Its data cases are `prd/todo/data/identity.md`.
+
+- **Status:** locked (L42).
+
+### App database
+
+The D1 database `todo`, bound as `APP_DB`. It holds the business
+rows, the todos, each with a `user_id` it treats as an opaque value:
+the only key between the two databases, never enforced by either. No
+query joins across them. Its data cases are `prd/todo/data/app.md`.
+
+- **Status:** locked (L42).
+
 ## The BFF
 
 ### BFF operation
@@ -986,8 +1130,5 @@ To be settled in later sessions:
   - the contract and the OpenAPI document (`tooling/api-spec/`);
   - the extractor that reads construct, and the entry chain index
     (`tooling/entry-chains/`, stage 13);
-- authentication and authorization, as subsystems rather than rule
-  kinds, modelled in their own session; the operation descriptor will
-  carry `kind` and `resource`;
 - branded input types as proof that validation happened (only `valid`
   mints a `NewTodo`): offered, not decided.

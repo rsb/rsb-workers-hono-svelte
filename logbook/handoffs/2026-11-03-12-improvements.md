@@ -45,6 +45,7 @@ suggested order is Claude's; the owner's order replaces it.
 | L | `tooling/` is type-checked: a factory that trusts its checkers should compile them (added at stage 17, Q4) | S | "nothing type-checks `tooling/`" (stage 15 and 16 tours); today it runs only under Node's type stripping | nothing | done, stage 18 (`194d666`) |
 | M | `@types/node` in the catalog: `apps/bff` and `tooling/` pin `26.6.6` each, by hand (added at stage 18, Q2) | S | two exact pins that can drift apart | nothing | done, stage 19 (`6879b7a`) |
 | N | The join's unit report is checked for staleness against `packages/operations/src` too, not only the test files (carried since stage 16) | S | a report older than the code it tested passes `check:join` | nothing | done, stage 19 (`28162d1`) |
+| O | Budgets as a data file the tests read, so the pillars view prints the numbers (added at stage 23, commit 12) | S | the performance signal reads only pass or fail (logbook/pillars.md); the numbers' movement from stage to stage | nothing | not stage 23 |
 
 Two things stay exactly as they are and are not on the list: the store
 reports facts and the operation decides what they mean; generation
