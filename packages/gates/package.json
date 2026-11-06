@@ -1,0 +1,21 @@
+{
+  "name": "@todo/gates",
+  "private": true,
+  "description": "The gates' units: decisions a gate makes over a port (L37). Imports business and fail only.",
+  "type": "module",
+  "exports": {
+    "./*": "./src/*"
+  },
+  "scripts": {
+    "check": "tsc -p tsconfig.json",
+    "test:unit": "vitest run -c vitest.unit.config.ts"
+  },
+  "dependencies": {
+    "@todo/business": "workspace:*",
+    "@todo/fail": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

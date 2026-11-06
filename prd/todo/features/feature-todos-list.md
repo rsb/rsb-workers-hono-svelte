@@ -16,9 +16,11 @@ or the completed ones. It is not shared, not ordered by hand, and not
 larger than 500 items.
 
 ## Who
-`member`, scope `own`: a person sees and changes only their list.
-(Before slice A every request was the one implicit user; this line is
-what slice A makes true.)
+`member`, scope `own`: a person sees and changes only their list
+(`access.md`; deviation 21). An `anonymous` actor is refused before
+any todo is read, and the page renders the shell's `signed_out`
+(`feature-accounts-shell.md`). Before slice A every request was the
+one implicit user.
 
 ## Views
 
@@ -212,6 +214,17 @@ cites the upstream sentence, or the deviation, it comes from.
 7. *Given* I am on `/active`, *then* the counter and "Clear completed"
    reflect all todos, not only those listed. (Counter, Clear completed;
    5: they come from `GET /todos/counts`)
+
+### A Ownership without login
+Numbered after the shell's A.1 to A.7, so each slice A scenario has
+one number across the features.
+
+8. *Given* the member's session and the member's todo "buy milk",
+   *when* the admin opens `/`, *then* "buy milk" is not listed, and
+   the counter counts only the admin's todos. (21)
+
+That the cap is per user (deviation 9) is held by the app store's
+tests, not by e2e: no scenario fills a list.
 
 ## Board map
 The first design was exported before the naming convention. Every
