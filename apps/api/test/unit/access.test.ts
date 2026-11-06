@@ -1,13 +1,13 @@
 import { type AccessRow, access } from "@todo/business/access.ts";
 import type { Actor } from "@todo/business/auth/actor.ts";
 import { err } from "@todo/business/result.ts";
+import type { IdentityStore } from "@todo/data-d1/identity/store.ts";
 import type { DbStore } from "@todo/data-d1/store.ts";
 import { serverFault } from "@todo/fail/fail.ts";
 import { operationOf } from "@todo/operations/run.ts";
 import { describe, expect, it } from "vitest";
 import { type Infra, constructOperations } from "../../src/construct.ts";
 import { fakeHasher } from "./fake-hasher.ts";
-import { fakeIdentityStore } from "./fake-identity-store.ts";
 import { NOW, digest } from "./test-api.ts";
 
 // The dynamic access check (L43): every operation as construct builds it,
@@ -18,8 +18,8 @@ import { NOW, digest } from "./test-api.ts";
 
 const actors: Record<string, Actor> = {
   anonymous: { kind: "anonymous" },
-  member: { kind: "user", userId: "u1", role: "member", emailVerified: false },
-  admin: { kind: "user", userId: "u-admin", role: "admin", emailVerified: true },
+  member: { kind: "user", userId: "u1", role: "member", emailVerified: false, sessionId: "s1" },
+  admin: { kind: "user", userId: "u-admin", role: "admin", emailVerified: true, sessionId: "s-admin" },
 };
 
 type Verdict = "runs" | "unauthenticated" | "forbidden";
@@ -37,23 +37,28 @@ const expected = (row: AccessRow, actor: string): Verdict => {
 /** Construct's operations on infra that records every use: a body that ran used some, or gave a result. */
 const built = () => {
   const used: string[] = [];
-  const dbStore = new Proxy(
-    {},
-    {
-      get: (_, method) => async () => {
-        used.push(`dbStore.${String(method)}`);
-        return err(serverFault("the store is not under test"));
+  const recording = (name: string) =>
+    new Proxy(
+      {},
+      {
+        get: (_, method) => async () => {
+          used.push(`${name}.${String(method)}`);
+          return err(serverFault("the store is not under test"));
+        },
       },
-    },
-  ) as DbStore;
+    );
   const infra: Infra = {
-    dbStore,
-    identityStore: fakeIdentityStore().store,
+    dbStore: recording("dbStore") as DbStore,
+    identityStore: recording("identityStore") as IdentityStore,
     newId: () => {
       used.push("newId");
       return "id-1";
     },
     now: () => NOW,
+    newToken: () => {
+      used.push("newToken");
+      return "t".repeat(43);
+    },
     digest,
     hasher: fakeHasher().hasher,
   };

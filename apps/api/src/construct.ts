@@ -3,6 +3,10 @@ import { type IdentityStore, createIdentityStore } from "@todo/data-d1/identity/
 import { type DbStore, createDbStore } from "@todo/data-d1/store.ts";
 import { authenticate as authenticateUnit } from "@todo/gates/authenticate.ts";
 import { type CurrentSession, currentSession } from "@todo/operations/auth/current-session.ts";
+import { type ListSessions, listSessions } from "@todo/operations/auth/list-sessions.ts";
+import { type Hasher, type SignInOperation, signIn } from "@todo/operations/auth/sign-in.ts";
+import { type SignOutEverywhere, signOutEverywhere } from "@todo/operations/auth/sign-out-everywhere.ts";
+import { type SignOut, signOut } from "@todo/operations/auth/sign-out.ts";
 import { type AddTodo, addTodo } from "@todo/operations/todos/add-todo.ts";
 import { type CountTodos, countTodos } from "@todo/operations/todos/count-todos.ts";
 import { type DeleteCompleted, deleteCompleted } from "@todo/operations/todos/delete-completed.ts";
@@ -14,7 +18,6 @@ import { toCompleted } from "@todo/valid/todos/completed.ts";
 import { toNewTodo } from "@todo/valid/todos/new-todo.ts";
 import { toTodoFilter } from "@todo/valid/todos/todo-filter.ts";
 import { toTodoPatch } from "@todo/valid/todos/todo-patch.ts";
-import type { Hasher } from "@todo/operations/auth/sign-in.ts";
 import { notFound, onError, tooLarge } from "./app/handlers/errors/errors.ts";
 import { getHealth } from "./app/handlers/health/health.ts";
 import { getCurrentSession } from "./app/handlers/sessions/get-current-session.ts";
@@ -26,6 +29,7 @@ import { patchTodo } from "./app/handlers/todos/patch-todo.ts";
 import { patchTodos } from "./app/handlers/todos/patch-todos.ts";
 import { postTodos } from "./app/handlers/todos/post-todos.ts";
 import { argon2FromWasm, createHasher } from "./auth/hasher.ts";
+import { newToken } from "./auth/token.ts";
 import type { Config } from "./config.ts";
 import { authenticate } from "./gates/authenticate.ts";
 import { bodyLimit } from "./gates/body-limit.ts";
@@ -47,14 +51,15 @@ export type Bindings = { appDb: D1Database; identityDb: D1Database; argon2Wasm: 
 
 /**
  * The concrete world: a store per database (L42), the id source, the clock,
- * the hash a session token is kept under, and the hasher a password is
- * checked with (L48).
+ * a new session token and the hash it is kept under (L40), and the hasher
+ * a password is checked with (L48).
  */
 export type Infra = {
   dbStore: DbStore;
   identityStore: IdentityStore;
   newId: () => string;
   now: () => number;
+  newToken: () => string;
   digest: (token: string) => Promise<string>;
   hasher: Hasher;
 };
@@ -72,6 +77,10 @@ export type Operations = {
   deleteTodo: DeleteTodo;
   deleteCompleted: DeleteCompleted;
   currentSession: CurrentSession;
+  signIn: SignInOperation;
+  signOut: SignOut;
+  signOutEverywhere: SignOutEverywhere;
+  listSessions: ListSessions;
 };
 
 /**
@@ -85,6 +94,7 @@ export const constructInfra = (bindings: Bindings, config: Config): Infra => ({
   identityStore: createIdentityStore(bindings.identityDb),
   newId: () => crypto.randomUUID(),
   now: () => Date.now(),
+  newToken,
   digest: sha256Hex,
   hasher: createHasher({
     argon2: argon2FromWasm(bindings.argon2Wasm),
@@ -110,7 +120,8 @@ export const constructGates = (infra: Infra, config: Config): Gates => [
 ];
 
 /**
- * Every operation gets the whole `DbStore`; each port lets it see only the
+ * Every todo operation gets the whole `DbStore`, and every session
+ * operation the whole `IdentityStore`; each port lets it see only the
  * methods it declares. The same store goes to all, so an add is seen by the
  * next list (D15).
  */
@@ -123,6 +134,10 @@ export const constructOperations = (infra: Infra): Operations => ({
   deleteTodo: deleteTodo({ dbStore: infra.dbStore }),
   deleteCompleted: deleteCompleted({ dbStore: infra.dbStore }),
   currentSession: currentSession(),
+  signIn: signIn({ identityStore: infra.identityStore, hasher: infra.hasher, digest: infra.digest, newId: infra.newId, newToken: infra.newToken, now: infra.now }),
+  signOut: signOut({ identityStore: infra.identityStore, now: infra.now }),
+  signOutEverywhere: signOutEverywhere({ identityStore: infra.identityStore, now: infra.now }),
+  listSessions: listSessions({ identityStore: infra.identityStore, now: infra.now }),
 });
 
 /** The route helpers, bound to these operations and their rows in `access.md`. */

@@ -73,8 +73,9 @@ const forbiddenMessage = (reason: Reason): string => {
  * person can fix none of them by changing what they typed: the BFF checked
  * it first, so `validation` is skew or a bug. `unauthenticated` is a
  * session that ended since the page loaded; the reload after the action
- * renders the shell's `signed_out`. Every kind must have words, so a new
- * one does not compile until it is given some.
+ * renders the shell's `signed_out`. `invalid_credentials` is sign-in's
+ * alone, and no todo action is a sign-in. Every kind must have words, so
+ * a new one does not compile until it is given some.
  */
 export const failedMessage = (failed: ApiError): string => {
   switch (failed.kind) {
@@ -82,6 +83,7 @@ export const failedMessage = (failed: ApiError): string => {
       return forbiddenMessage(failed.reason);
     case "validation":
     case "unauthenticated":
+    case "invalid_credentials":
     case "not_found":
     case "limit":
     case "too_large":

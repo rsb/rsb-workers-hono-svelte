@@ -16,7 +16,7 @@ const row = (requires: AccessRow["requires"], scope: AccessRow["scope"]): Access
   scope,
 });
 
-const verified: Actor = { kind: "user", userId: "u1", role: "member", emailVerified: true };
+const verified: Actor = { kind: "user", userId: "u1", role: "member", emailVerified: true, sessionId: "s1" };
 
 describe("verdict", () => {
   it("refuses an anonymous actor below the row as unauthenticated", () => {

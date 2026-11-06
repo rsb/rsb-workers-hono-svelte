@@ -6,6 +6,7 @@ export const status = (kind: ErrorKind): number => {
     case "validation":
       return 422;
     case "unauthenticated":
+    case "invalid_credentials":
       return 401;
     case "forbidden":
       return 403;

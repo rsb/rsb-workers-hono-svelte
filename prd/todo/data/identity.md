@@ -129,7 +129,7 @@ session ended, and a due rehash. It writes `sessions` and
 Whether one of the actor's sessions was ended: it is not when it had
 already ended.
 
-- Port: `SessionEnd.endSession`
+- Port: `SignOutStore.endSession`
 - Used by: sign-out
 - Input: the session's id, the `ended_reason` (`signed_out`), and `now`
 - Scope: `{ ownerId }`
@@ -147,7 +147,7 @@ already ended.
 ## `sessions.end_all`
 How many of the actor's live sessions were ended.
 
-- Port: `SessionEnd.endAllSessions`
+- Port: `SignOutEverywhereStore.endAllSessions`
 - Used by: sign-out-everywhere
 - Input: the `ended_reason` (`signed_out_everywhere`), and `now`
 - Scope: `{ ownerId }`
@@ -165,7 +165,7 @@ How many of the actor's live sessions were ended.
 ## `sessions.list`
 The actor's live sessions, most recently touched first, up to a bound.
 
-- Port: `SessionList.listSessions`
+- Port: `ListSessionsStore.listSessions`
 - Used by: list-sessions
 - Input: `now`
 - Scope: `{ ownerId }`
@@ -219,7 +219,7 @@ The user with an email, or none.
 ## `credentials.find_for_sign_in`
 A user and their password credential, by email, or none.
 
-- Port: `CredentialLookup.findForSignIn`
+- Port: `SignInStore.findForSignIn`
 - Used by: sign-in (L49)
 - Input: an email, lower-cased
 - Scope: none

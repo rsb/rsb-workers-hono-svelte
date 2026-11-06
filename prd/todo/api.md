@@ -7,7 +7,7 @@ this file. Since stage 22 it is also the home of what the PRD root's
 API section held (L44).
 
 What a use case refuses reaches the wire as the kind of the same name:
-`limit` and `not_found`. Its `unavailable` and `server` reach the wire
+`limit`, `not_found` and `invalid_credentials`. Its `unavailable` and `server` reach the wire
 as `internal`. Use cases and features cite the use case's kinds; this
 paragraph is the one place they are mapped to the envelope's.
 
@@ -101,6 +101,7 @@ Reply: 500
 
 - `validation`: 422, with field
 - `unauthenticated`: 401
+- `invalid_credentials`: 401
 - `forbidden`: 403, with reason: channel | account_disabled | role
 - `not_found`: 404
 - `limit`: 409

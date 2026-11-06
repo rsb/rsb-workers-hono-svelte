@@ -108,6 +108,7 @@ export const authenticate =
       userId: session.userId,
       role: user.role,
       emailVerified: user.emailVerifiedAt !== null,
+      sessionId: session.id,
     };
     // A cookie session is touched once less than half its idle window is
     // left, never past its absolute expiry; a bearer session has no window.

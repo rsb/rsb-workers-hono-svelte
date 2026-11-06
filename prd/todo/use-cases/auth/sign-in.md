@@ -48,6 +48,12 @@ none
   - when the credential's parameters or pepper are not the current
     ones, the password is hashed again and written back,
     compare-and-set on the old PHC string.
+- When the hasher cannot make that rehash, the sign-in still succeeds,
+  with the session started and no rehash in the batch. The password was
+  proved against a hash that still holds; the rehash is hygiene, and
+  deferring it loses nothing. The failure goes to the log as a fault,
+  with the request id and its kind, never a secret, and the next
+  sign-in tries again, since the stored hash still needs it.
 - No external effects. Email verification is not checked in B (C
   refuses `unverified`).
 
@@ -65,6 +71,15 @@ The BFF stores the token as its session cookie and the api never writes
 - The store fails: `unavailable` or `server`. The batch is one
   transaction, so either no session was started or the caller simply
   holds no token for the one that was.
+  shows: `accounts.error.failed`
+- The store reports the new token's hash already taken (`started` is
+  false): `server`. With 256 random bits it does not happen, so it is
+  our fault, never the caller's. It is not retried with another token,
+  and it is never answered as a success: no row holds that token.
+  shows: `accounts.error.failed`
+- The hasher cannot check the password (a pepper id with no secret, a
+  PHC string it cannot read): `server`, never `invalid_credentials`.
+  Nothing is stored.
   shows: `accounts.error.failed`
 
 The input rules refuse before this runs, as `invalid`.

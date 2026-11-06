@@ -1303,6 +1303,37 @@
         ],
         "additionalProperties": false
       },
+      "InvalidCredentialsFailure": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": false
+          },
+          "error": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "invalid_credentials"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "message"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "ok",
+          "error"
+        ],
+        "additionalProperties": false
+      },
       "ForbiddenFailure": {
         "type": "object",
         "properties": {

@@ -8,6 +8,7 @@ import { ARGON2_PARAMS, CURRENT_PEPPER_ID, type PasswordHash } from "@todo/busin
 import { type Result, err, ok } from "@todo/business/result.ts";
 import { type AnyFail, serverFault } from "@todo/fail/fail.ts";
 import type { Hasher } from "@todo/operations/auth/sign-in.ts";
+import { base64url } from "./base64url.ts";
 
 /** The pepper secrets by id, as `readConfig` reads them: `PEPPER_1` is id 1. */
 export type Peppers = Readonly<Record<number, string>>;
@@ -98,6 +99,3 @@ export const createHasher = (deps: { argon2: () => Argon2; peppers: Peppers }): 
     needsRehash: (stored: PasswordHash) => stored.pepperId !== CURRENT_PEPPER_ID || !stored.secret.startsWith(CURRENT_HEAD),
   };
 };
-
-/** Bytes as base64url without padding. */
-const base64url = (bytes: Uint8Array): string => btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");

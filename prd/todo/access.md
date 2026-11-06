@@ -39,7 +39,16 @@ A probe, such as `GET /health`, runs no operation and has no row.
 | `deleteTodo` | `use-cases/todos/remove-a-todo.md` | `member` | `own` |
 | `deleteCompleted` | `use-cases/todos/clear-completed.md` | `member` | `own` |
 | `currentSession` | `use-cases/auth/current-session.md` | `anonymous` | `n/a` |
+| `signIn` | `use-cases/auth/sign-in.md` | `anonymous` | `n/a` |
+| `signOut` | `use-cases/auth/sign-out.md` | `member` | `own` |
+| `signOutEverywhere` | `use-cases/auth/sign-out-everywhere.md` | `member` | `own` |
+| `listSessions` | `use-cases/auth/list-sessions.md` | `member` | `own` |
 
 Every todo operation is `own` in slice A, the admin's included: the
 seeded admin sees only their own list. `any` is in the type and the
 store from A, and no operation uses it until D (handoff 23, Q5).
+
+`signIn` is `anonymous` and `n/a`: there is no actor to scope by until
+it succeeds, and it runs for a signed-in one too, whose session it
+ends (L49). The three session operations are `own`: an actor ends and
+lists only their own sessions (L50, L51).

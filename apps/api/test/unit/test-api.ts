@@ -16,6 +16,9 @@ export const config: Config = { bffOrigin: "https://todo.test", sessionCookie: "
 /** A digest that is plainly not SHA-256, so a test can name a session's hash. */
 export const digest = async (token: string) => `hash:${token}`;
 
+/** The token every sign-in in a unit test mints: 43 characters, as `TOKEN_PATTERN` takes. */
+export const TEST_TOKEN = "n".repeat(43);
+
 /**
  * The whole api, gates and route table, on fake stores, entered below
  * `constructInfra` (A10): no workerd, no database, a fixed clock and, by
@@ -29,6 +32,7 @@ export const testApi = (
     identityStore: parts.identityStore ?? fakeIdentityStore().store,
     newId: parts.newId ?? (() => "id-1"),
     now: parts.now ?? (() => NOW),
+    newToken: () => TEST_TOKEN,
     digest,
     hasher: fakeHasher().hasher,
   };
