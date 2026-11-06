@@ -6,6 +6,7 @@ import { serverFault } from "@todo/fail/fail.ts";
 import { operationOf } from "@todo/operations/run.ts";
 import { describe, expect, it } from "vitest";
 import { type Infra, constructOperations } from "../../src/construct.ts";
+import { fakeHasher } from "./fake-hasher.ts";
 import { fakeIdentityStore } from "./fake-identity-store.ts";
 import { NOW, digest } from "./test-api.ts";
 
@@ -54,6 +55,7 @@ const built = () => {
     },
     now: () => NOW,
     digest,
+    hasher: fakeHasher().hasher,
   };
   return { operations: constructOperations(infra), used };
 };

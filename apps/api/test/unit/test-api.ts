@@ -4,13 +4,14 @@ import type { Config } from "../../src/config.ts";
 import { type Infra, constructApi, constructGates, constructOperations, constructRoutes } from "../../src/construct.ts";
 import { serve } from "../../src/http.ts";
 import { fakeDbStore } from "./fake-db-store.ts";
+import { fakeHasher } from "./fake-hasher.ts";
 import { fakeIdentityStore } from "./fake-identity-store.ts";
 
 /** The fixed clock every unit test of the whole api runs at. */
 export const NOW = Date.UTC(2026, 10, 5, 12);
 
-/** The config the tests run with: the BFF's origin, and the cookie as local dev names it. */
-export const config: Config = { bffOrigin: "https://todo.test", sessionCookie: "sid" };
+/** The config the tests run with: the BFF's origin, the cookie as local dev names it, and a pepper no hasher here reads. */
+export const config: Config = { bffOrigin: "https://todo.test", sessionCookie: "sid", peppers: { 1: "unit-test-pepper-not-a-secret-00000001" } };
 
 /** A digest that is plainly not SHA-256, so a test can name a session's hash. */
 export const digest = async (token: string) => `hash:${token}`;
@@ -29,6 +30,7 @@ export const testApi = (
     newId: parts.newId ?? (() => "id-1"),
     now: parts.now ?? (() => NOW),
     digest,
+    hasher: fakeHasher().hasher,
   };
   const gates = constructGates(infra, config);
   const routes = constructRoutes(constructOperations(infra));

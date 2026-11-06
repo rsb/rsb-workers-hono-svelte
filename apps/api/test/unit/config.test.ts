@@ -5,8 +5,10 @@ import { describeProblems, readConfig } from "../../src/config.ts";
 import { misconfigured } from "../../src/misconfigured.ts";
 import { config } from "./test-api.ts";
 
-const DEPLOYED = { BFF_ORIGIN: "https://todo.example", SESSION_COOKIE: "__Host-sid" };
-const LOCAL = { BFF_ORIGIN: "http://localhost:5173", SESSION_COOKIE: "sid" };
+/** A pepper of the length the dev seed writes. Not a secret: it keys nothing. */
+const PEPPER = "p".repeat(43);
+const DEPLOYED = { BFF_ORIGIN: "https://todo.example", SESSION_COOKIE: "__Host-sid", PEPPER_1: PEPPER };
+const LOCAL = { BFF_ORIGIN: "http://localhost:5173", SESSION_COOKIE: "sid", PEPPER_1: PEPPER };
 
 /** The problems `readConfig` gives, as `[name, problem]` pairs. */
 const problems = (vars: Record<string, unknown>) => {
@@ -16,24 +18,33 @@ const problems = (vars: Record<string, unknown>) => {
 
 describe("readConfig", () => {
   it("reads a deployed config", () => {
-    expect(readConfig(DEPLOYED)).toEqual({ ok: true, value: { bffOrigin: "https://todo.example", sessionCookie: "__Host-sid" } });
+    expect(readConfig(DEPLOYED)).toEqual({ ok: true, value: { bffOrigin: "https://todo.example", sessionCookie: "__Host-sid", peppers: { 1: PEPPER } } });
   });
 
   it("reads local dev's config: http on localhost, and a plain cookie name", () => {
-    expect(readConfig(LOCAL)).toEqual({ ok: true, value: { bffOrigin: "http://localhost:5173", sessionCookie: "sid" } });
+    expect(readConfig(LOCAL)).toEqual({ ok: true, value: { bffOrigin: "http://localhost:5173", sessionCookie: "sid", peppers: { 1: PEPPER } } });
     expect(readConfig({ ...LOCAL, BFF_ORIGIN: "http://127.0.0.1:5173" }).ok).toBe(true);
   });
 
   it("reads the unit tests' config: a plain name over https is allowed", () => {
-    expect(readConfig({ BFF_ORIGIN: config.bffOrigin, SESSION_COOKIE: config.sessionCookie })).toEqual({ ok: true, value: config });
+    const vars = { BFF_ORIGIN: config.bffOrigin, SESSION_COOKIE: config.sessionCookie, PEPPER_1: config.peppers[1] };
+    expect(readConfig(vars)).toEqual({ ok: true, value: config });
   });
 
   it("names every variable that is missing, or not a string", () => {
     expect(problems({})).toEqual([
       ["BFF_ORIGIN", "is not set"],
       ["SESSION_COOKIE", "is not set"],
+      ["PEPPER_1", "is not set"],
     ]);
-    expect(problems({ BFF_ORIGIN: 5173, SESSION_COOKIE: "sid" })).toEqual([["BFF_ORIGIN", "is not a string"]]);
+    expect(problems({ ...LOCAL, BFF_ORIGIN: 5173 })).toEqual([["BFF_ORIGIN", "is not a string"]]);
+  });
+
+  it("refuses a PEPPER_1 shorter than 32 characters, and never repeats it", () => {
+    const short = "a-pepper-of-31-characters-xxxxx";
+    expect(short).toHaveLength(31);
+    expect(problems({ ...LOCAL, PEPPER_1: short })).toEqual([["PEPPER_1", "is 31 characters, and a pepper is at least 32"]]);
+    expect(readConfig({ ...LOCAL, PEPPER_1: "x".repeat(32) }).ok).toBe(true);
   });
 
   it("refuses a BFF_ORIGIN that is not an origin exactly as a browser sends it", () => {
@@ -66,7 +77,7 @@ describe("readConfig", () => {
   });
 
   it("names every problem at once, one line each", () => {
-    const read = readConfig({ BFF_ORIGIN: "http://todo.example", SESSION_COOKIE: "s id" });
+    const read = readConfig({ BFF_ORIGIN: "http://todo.example", SESSION_COOKIE: "s id", PEPPER_1: PEPPER });
     expect(read.ok).toBe(false);
     if (!read.ok) {
       expect(describeProblems(read.error)).toBe(
@@ -105,6 +116,7 @@ describe("the api, when its config does not read", () => {
       problems: [
         { name: "BFF_ORIGIN", problem: 'is "http://todo.example": an origin is https, or http only on localhost or 127.0.0.1' },
         { name: "SESSION_COOKIE", problem: "is not set" },
+        { name: "PEPPER_1", problem: "is not set" },
       ],
     });
   });

@@ -10,8 +10,11 @@
 // the fresh database e2e makes each run. They are not in `.dev.vars`:
 // wrangler loads every `.dev.vars` key into the Worker's env and into
 // `wrangler types`, so a token there would sit in the api's env and make
-// `pnpm check` depend on whether the file exists. `.dev.vars` holds only
-// `SESSION_COOKIE=sid`, also written once when missing.
+// `pnpm check` depend on whether the file exists. `.dev.vars` holds local
+// dev's config: `SESSION_COOKIE=sid`, and `PEPPER_1`, the secret password
+// hashes are keyed with (L48), 32 random bytes. Each is written once when
+// missing. A secret belongs there: wrangler.jsonc names it in
+// `secrets.required`, so `wrangler types` reads that list, not the file.
 //
 // Usage, from apps/api, after the identity migrations:
 //   node scripts/seed-dev.ts                 the database `pnpm dev` uses
@@ -76,6 +79,8 @@ const newToken = () => randomBytes(32).toString("base64url");
 
 const persistTo = process.argv[2];
 const cookieName = ensureEntry(devVarsPath, "SESSION_COOKIE", () => DEV_COOKIE);
+// Never rewritten: a new pepper would leave every stored hash unreadable.
+ensureEntry(devVarsPath, "PEPPER_1", () => randomBytes(32).toString("base64url"));
 
 const proxy = await getPlatformProxy<{ IDENTITY_DB: D1Database }>({
   configPath: join(apiDir, "wrangler.jsonc"),

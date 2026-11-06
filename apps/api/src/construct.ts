@@ -14,6 +14,7 @@ import { toCompleted } from "@todo/valid/todos/completed.ts";
 import { toNewTodo } from "@todo/valid/todos/new-todo.ts";
 import { toTodoFilter } from "@todo/valid/todos/todo-filter.ts";
 import { toTodoPatch } from "@todo/valid/todos/todo-patch.ts";
+import type { Hasher } from "@todo/operations/auth/sign-in.ts";
 import { notFound, onError, tooLarge } from "./app/handlers/errors/errors.ts";
 import { getHealth } from "./app/handlers/health/health.ts";
 import { getCurrentSession } from "./app/handlers/sessions/get-current-session.ts";
@@ -24,6 +25,7 @@ import { getTodos } from "./app/handlers/todos/get-todos.ts";
 import { patchTodo } from "./app/handlers/todos/patch-todo.ts";
 import { patchTodos } from "./app/handlers/todos/patch-todos.ts";
 import { postTodos } from "./app/handlers/todos/post-todos.ts";
+import { argon2FromWasm, createHasher } from "./auth/hasher.ts";
 import type { Config } from "./config.ts";
 import { authenticate } from "./gates/authenticate.ts";
 import { bodyLimit } from "./gates/body-limit.ts";
@@ -36,12 +38,17 @@ import { routing } from "./route.ts";
 // The app's whole dependency graph, one builder per level (A10). Each level
 // takes the one below, so a caller can enter at any level and replace a piece.
 
-/** What the platform hands over already configured and built: not config. */
-export type Bindings = { appDb: D1Database; identityDb: D1Database };
+/**
+ * What the platform hands over already configured and built: not config.
+ * `argon2Wasm` is Argon2's `.wasm`, which the Worker imports as a module and
+ * the platform compiles (L48).
+ */
+export type Bindings = { appDb: D1Database; identityDb: D1Database; argon2Wasm: WebAssembly.Module };
 
 /**
- * The concrete world: a store per database (L42), the id source, the clock
- * and the hash a session token is kept under.
+ * The concrete world: a store per database (L42), the id source, the clock,
+ * the hash a session token is kept under, and the hasher a password is
+ * checked with (L48).
  */
 export type Infra = {
   dbStore: DbStore;
@@ -49,6 +56,7 @@ export type Infra = {
   newId: () => string;
   now: () => number;
   digest: (token: string) => Promise<string>;
+  hasher: Hasher;
 };
 
 /**
@@ -68,14 +76,20 @@ export type Operations = {
 
 /**
  * The only builder that sees the bindings: it passes each to what uses it.
- * The running Worker always stores todos in D1 (DB4).
+ * The running Worker always stores todos in D1 (DB4). It takes the config
+ * for the peppers, which the hasher keys a password with. Argon2 is
+ * instantiated on the first sign-in, not at startup.
  */
-export const constructInfra = (bindings: Bindings): Infra => ({
+export const constructInfra = (bindings: Bindings, config: Config): Infra => ({
   dbStore: createDbStore(bindings.appDb),
   identityStore: createIdentityStore(bindings.identityDb),
   newId: () => crypto.randomUUID(),
   now: () => Date.now(),
   digest: sha256Hex,
+  hasher: createHasher({
+    argon2: argon2FromWasm(bindings.argon2Wasm),
+    peppers: config.peppers,
+  }),
 });
 
 /**
@@ -149,7 +163,7 @@ export const constructApi = (gates: Gates, routes: Routes): Api => ({
 
 /** Builds the whole app from the bindings and the config, one A10 level at a time. `index.ts` calls this. */
 export const construct = (bindings: Bindings, config: Config): Api => {
-  const infra = constructInfra(bindings);
+  const infra = constructInfra(bindings, config);
   const gates = constructGates(infra, config);
   const operations = constructOperations(infra);
   const routes = constructRoutes(operations);

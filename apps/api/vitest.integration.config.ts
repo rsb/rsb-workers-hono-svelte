@@ -20,6 +20,10 @@ export default defineConfig(async () => {
             // so CI has none, and the committed vars alone do not read: a
             // __Host- cookie under an http BFF (src/config.ts).
             SESSION_COOKIE: "sid",
+            // The tests' own pepper, so the api's config reads without
+            // .dev.vars (P68). Not a secret: it keys only the hashes these
+            // tests make, in databases that last one test file.
+            PEPPER_1: "integration-test-pepper-not-a-secret-0001",
           },
         },
       }),

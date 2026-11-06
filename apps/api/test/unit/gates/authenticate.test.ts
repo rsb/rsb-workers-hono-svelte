@@ -7,6 +7,7 @@ import * as v from "valibot";
 import { describe, expect, it, vi } from "vitest";
 import { type Infra, constructGates } from "../../../src/construct.ts";
 import { fakeDbStore } from "../fake-db-store.ts";
+import { fakeHasher } from "../fake-hasher.ts";
 import { fakeIdentityStore } from "../fake-identity-store.ts";
 import { NOW, config, digest, testApi } from "../test-api.ts";
 import { BEARER_TOKEN, DISABLED_TOKEN, MEMBER_TOKEN, STALE_TOKEN, UNKNOWN_TOKEN, sessionRows } from "./session-rows.ts";
@@ -34,7 +35,7 @@ const executionContext = () => {
  * in for it.
  */
 const whoami = (identity = fakeIdentityStore(sessionRows)) => {
-  const infra: Infra = { dbStore: fakeDbStore(), identityStore: identity.store, newId: () => "id-1", now: () => NOW, digest };
+  const infra: Infra = { dbStore: fakeDbStore(), identityStore: identity.store, newId: () => "id-1", now: () => NOW, digest, hasher: fakeHasher().hasher };
   const app = new Hono();
   for (const gate of constructGates(infra, config)) {
     app.use(gate);
