@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { execute, queryAll, writeThenQueryAll } from "../../src/driver.ts";
+import { execute, executeBatch, queryAll, writeThenQueryAll } from "../../src/driver.ts";
 import { fakeD1 } from "./fake-d1.ts";
 
 describe("queryAll", () => {
@@ -98,6 +98,41 @@ describe("writeThenQueryAll", () => {
     );
 
     expect(read).toMatchObject({ ok: false, error: { kind: "server" } });
+    expect(batches).toEqual([]);
+  });
+});
+
+describe("executeBatch", () => {
+  it("runs the writes as one batch, and returns each one's changes in order", async () => {
+    const { db, batches } = fakeD1({ changes: 1 });
+
+    const written = await executeBatch(
+      db,
+      () => [db.prepare("UPDATE sessions SET ended_at = 1"), db.prepare("UPDATE credentials SET secret = 'x'")],
+      "sign in",
+    );
+
+    expect(written).toEqual({ ok: true, value: [1, 1] });
+    expect(batches).toEqual([2]);
+  });
+
+  it("classifies a D1 error, named by the context", async () => {
+    const { db } = fakeD1({ throws: new Error("D1_ERROR: Network connection lost.") });
+
+    const written = await executeBatch(db, () => [db.prepare("UPDATE sessions SET ended_at = 1")], "sign in");
+
+    expect(written).toMatchObject({
+      ok: false,
+      error: { kind: "unavailable", message: "sign in: D1_ERROR: Network connection lost." },
+    });
+  });
+
+  it("classifies an error thrown while binding, as it builds the statements inside the try", async () => {
+    const { db, batches } = fakeD1({ throwsOnBind: new Error("D1_TYPE_ERROR: Type 'undefined' not supported") });
+
+    const written = await executeBatch(db, () => [db.prepare("UPDATE sessions SET ended_at = ?1").bind(undefined)], "sign in");
+
+    expect(written).toMatchObject({ ok: false, error: { kind: "server" } });
     expect(batches).toEqual([]);
   });
 });

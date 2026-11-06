@@ -1,7 +1,7 @@
 // The dev seed (handoff 23, Q1): one member and one admin, each with a live
 // cookie session, written through the identity store's own methods
 // (`data/identity.md`: `users.create`, `users.find_by_email`,
-// `sessions.start`), so the seed breaks when the store does. It reaches the
+// `identity.sign_in`), so the seed breaks when the store does. It reaches the
 // local IDENTITY_DB through wrangler's `getPlatformProxy`; there is no
 // dev-only route, and nothing in the api knows the seed exists.
 //
@@ -109,21 +109,27 @@ try {
     }
 
     const token = ensureEntry(tokensPath, person.key, newToken);
-    const started = await store.startSession({
-      id: crypto.randomUUID(),
-      tokenHash: await sha256Hex(token),
-      userId: found.value.id,
-      channel: "cookie",
-      createdAt: now,
-      idleUntil: now + SESSION_IDLE_MS,
-      expiresAt: now + SESSION_ABSOLUTE_MS,
+    // Sign-in's own write, with no presented session and no rehash: the
+    // new session alone.
+    const started = await store.recordSignIn({
+      session: {
+        id: crypto.randomUUID(),
+        tokenHash: await sha256Hex(token),
+        userId: found.value.id,
+        channel: "cookie",
+        createdAt: now,
+        idleUntil: now + SESSION_IDLE_MS,
+        expiresAt: now + SESSION_ABSOLUTE_MS,
+        label: null,
+        city: null,
+      },
     });
     if (!started.ok) {
-      throw new Error(`sessions.start failed for ${person.email}: ${started.error.message}`);
+      throw new Error(`identity.sign_in failed for ${person.email}: ${started.error.message}`);
     }
 
     const user = created.value ? "created" : "already there";
-    const session = started.value ? "session started" : "session already there";
+    const session = started.value.started ? "session started" : "session already there";
     console.log(`${person.role} ${person.email}: ${user}, ${session}`);
     // For manual `pnpm dev`: paste into the console at http://localhost:5173.
     console.log(`  document.cookie = "${cookieName}=${token}; path=/; SameSite=Lax"`);

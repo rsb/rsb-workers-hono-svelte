@@ -63,6 +63,20 @@ const appBudgets: Record<keyof DbStore, Budget<DbStore>> = {
 
 const NOW = Date.UTC(2026, 10, 5, 12);
 
+const session = {
+  id: "s1",
+  tokenHash: "hash-1",
+  userId: "u1",
+  channel: "cookie" as const,
+  createdAt: NOW,
+  idleUntil: NOW,
+  expiresAt: NOW,
+  label: null,
+  city: null,
+};
+
+const rehash = { userId: "u1", secret: "$argon2id$new", pepperId: 1, previousSecret: "$argon2id$old" };
+
 /** The same for every `IdentityStore` method (`data/identity.md`). */
 const identityBudgets: Record<keyof IdentityStore, Budget<IdentityStore>> = {
   findSession: {
@@ -75,19 +89,36 @@ const identityBudgets: Record<keyof IdentityStore, Budget<IdentityStore>> = {
     answer: { changes: 1 },
     call: (store) => store.touchSession({ id: "s1", idleUntil: NOW, now: NOW }),
   },
-  startSession: {
+  endSession: {
     budget: { trips: 1, statements: 1 },
     answer: { changes: 1 },
-    call: (store) =>
-      store.startSession({
-        id: "s1",
-        tokenHash: "hash-1",
-        userId: "u1",
-        channel: "cookie",
-        createdAt: NOW,
-        idleUntil: NOW,
-        expiresAt: NOW,
-      }),
+    call: (store) => store.endSession(own, { id: "s1", reason: "signed_out", now: NOW }),
+  },
+  endAllSessions: {
+    budget: { trips: 1, statements: 1 },
+    answer: { changes: 2 },
+    call: (store) => store.endAllSessions(own, { reason: "signed_out_everywhere", now: NOW }),
+  },
+  listSessions: {
+    budget: { trips: 1, statements: 1 },
+    answer: { rows: [] },
+    call: (store) => store.listSessions(own, { now: NOW }),
+  },
+  // Its first case; the other three are in `signInBudgets`, below.
+  recordSignIn: {
+    budget: { trips: 1, statements: 1 },
+    answer: { changes: 1 },
+    call: (store) => store.recordSignIn({ session }),
+  },
+  findForSignIn: {
+    budget: { trips: 1, statements: 1 },
+    answer: { rows: [] },
+    call: (store) => store.findForSignIn("ada@example.com"),
+  },
+  setCredential: {
+    budget: { trips: 1, statements: 1 },
+    answer: { changes: 1 },
+    call: (store) => store.setCredential({ userId: "u1", kind: "password", secret: "$argon2id$x", pepperId: 1, now: NOW }),
   },
   createUser: {
     budget: { trips: 1, statements: 1 },
@@ -98,6 +129,28 @@ const identityBudgets: Record<keyof IdentityStore, Budget<IdentityStore>> = {
     budget: { trips: 1, statements: 1 },
     answer: { rows: [] },
     call: (store) => store.findUserByEmail("ada@example.com"),
+  },
+};
+
+/**
+ * `identity.sign_in`'s Cost line has four cases, one batch each; the first
+ * is `recordSignIn`'s entry above.
+ */
+const signInBudgets: Record<string, Budget<IdentityStore>> = {
+  "with a presented session": {
+    budget: { trips: 1, statements: 2 },
+    answer: { changes: 1 },
+    call: (store) => store.recordSignIn({ session, rotate: "s0" }),
+  },
+  "with a due rehash": {
+    budget: { trips: 1, statements: 2 },
+    answer: { changes: 1 },
+    call: (store) => store.recordSignIn({ session, rehash }),
+  },
+  "with both": {
+    budget: { trips: 1, statements: 3 },
+    answer: { changes: 1 },
+    call: (store) => store.recordSignIn({ session, rotate: "s0", rehash }),
   },
 };
 
@@ -120,4 +173,8 @@ describe("each DbStore method spends its budget of round trips to D1", () => {
 
 describe("each IdentityStore method spends its budget of round trips to D1", () => {
   it.each(Object.entries(identityBudgets))("%s", (method, entry) => spends(createIdentityStore, method, entry));
+});
+
+describe("recordSignIn spends its budget in each of its cases", () => {
+  it.each(Object.entries(signInBudgets))("%s", (method, entry) => spends(createIdentityStore, method, entry));
 });

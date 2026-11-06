@@ -1,6 +1,7 @@
 import { SESSION_IDLE_MS } from "@todo/business/auth/session.ts";
+import { SESSIONS_LIST_MAX } from "@todo/business/rules.ts";
 import { describe, expect, it } from "vitest";
-import { type FoundRow, type NewSession, sessionStore } from "../../../src/identity/sessions.ts";
+import { type FoundRow, sessionStore } from "../../../src/identity/sessions.ts";
 import { fakeD1 } from "../fake-d1.ts";
 
 const NOW = Date.UTC(2026, 10, 5, 12);
@@ -66,12 +67,12 @@ describe("findSession", () => {
 });
 
 describe("touchSession", () => {
-  it("binds the id, the new window, and now plus half the idle window", async () => {
+  it("binds the id, the new window, now plus half the idle window, and now as the last touch", async () => {
     const { db, prepared } = fakeD1({ changes: 1 });
 
     await sessionStore(db).touchSession({ id: "s1", idleUntil: NOW + SESSION_IDLE_MS, now: NOW });
 
-    expect(prepared[0]?.bound).toEqual(["s1", NOW + SESSION_IDLE_MS, NOW + SESSION_IDLE_MS / 2]);
+    expect(prepared[0]?.bound).toEqual(["s1", NOW + SESSION_IDLE_MS, NOW + SESSION_IDLE_MS / 2, NOW]);
   });
 
   it.each([
@@ -87,31 +88,79 @@ describe("touchSession", () => {
   });
 });
 
-describe("startSession", () => {
-  const session: NewSession = {
-    id: "s1",
-    tokenHash: "hash-1",
-    userId: "u1",
-    channel: "bearer",
-    createdAt: NOW,
-    idleUntil: null,
-    expiresAt: NOW + 2000,
-  };
-
-  it("binds the session in column order", async () => {
+describe("endSession", () => {
+  it("binds the id, the reason, now and the owner", async () => {
     const { db, prepared } = fakeD1({ changes: 1 });
 
-    await sessionStore(db).startSession(session);
+    await sessionStore(db).endSession({ ownerId: "u1" }, { id: "s1", reason: "signed_out", now: NOW });
 
-    expect(prepared[0]?.bound).toEqual(["s1", "hash-1", "u1", "bearer", NOW, null, NOW + 2000]);
+    expect(prepared[0]?.bound).toEqual(["s1", "signed_out", NOW, "u1"]);
   });
 
   it.each([
     [1, true],
     [0, false],
-  ])("reports %i changed rows as started: %s", async (changes, started) => {
+  ])("reports %i changed rows as ended: %s", async (changes, ended) => {
     const { db } = fakeD1({ changes });
 
-    expect(await sessionStore(db).startSession(session)).toEqual({ ok: true, value: started });
+    expect(await sessionStore(db).endSession({ ownerId: "u1" }, { id: "s1", reason: "signed_out", now: NOW })).toEqual({
+      ok: true,
+      value: ended,
+    });
+  });
+});
+
+describe("endAllSessions", () => {
+  it("binds the owner, now and the reason, and reports how many ended", async () => {
+    const { db, prepared } = fakeD1({ changes: 3 });
+
+    const result = await sessionStore(db).endAllSessions({ ownerId: "u1" }, { reason: "signed_out_everywhere", now: NOW });
+
+    expect(prepared[0]?.bound).toEqual(["u1", NOW, "signed_out_everywhere"]);
+    expect(result).toEqual({ ok: true, value: 3 });
+  });
+});
+
+describe("listSessions", () => {
+  const row = (id: string) => ({ id, label: "Firefox on Linux", city: null, created_at: NOW - 10, touched_at: NOW - 5 });
+
+  it("binds the owner, now and one more than the bound", async () => {
+    const { db, prepared } = fakeD1({ rows: [] });
+
+    await sessionStore(db).listSessions({ ownerId: "u1" }, { now: NOW });
+
+    expect(prepared[0]?.bound).toEqual(["u1", NOW, SESSIONS_LIST_MAX + 1]);
+  });
+
+  it("reads each row back as a listed session, with nothing more", async () => {
+    const { db } = fakeD1({ rows: [row("s1")] });
+
+    expect(await sessionStore(db).listSessions({ ownerId: "u1" }, { now: NOW })).toEqual({
+      ok: true,
+      value: {
+        sessions: [{ id: "s1", label: "Firefox on Linux", city: null, createdAt: NOW - 10, touchedAt: NOW - 5 }],
+        more: false,
+      },
+    });
+  });
+
+  it("returns the bound and says more when the extra row came back", async () => {
+    const rows = Array.from({ length: SESSIONS_LIST_MAX + 1 }, (_, i) => row(`s${i}`));
+    const { db } = fakeD1({ rows });
+
+    const result = await sessionStore(db).listSessions({ ownerId: "u1" }, { now: NOW });
+
+    expect(result.ok && result.value.sessions).toHaveLength(SESSIONS_LIST_MAX);
+    expect(result.ok && result.value.more).toBe(true);
+  });
+
+  it("says no more at exactly the bound", async () => {
+    const rows = Array.from({ length: SESSIONS_LIST_MAX }, (_, i) => row(`s${i}`));
+    const { db } = fakeD1({ rows });
+
+    const result = await sessionStore(db).listSessions({ ownerId: "u1" }, { now: NOW });
+
+    expect(result.ok && result.value.sessions).toHaveLength(SESSIONS_LIST_MAX);
+    expect(result.ok && result.value.more).toBe(false);
   });
 });

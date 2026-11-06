@@ -6,7 +6,9 @@ import type { User } from "@todo/data-d1/identity/users.ts";
 /**
  * A fake identity store that keeps session rows by token hash, and records
  * each hash it is asked for and each touch it makes. Only the gates read it
- * today; the user methods keep users by email.
+ * today; the user methods keep users by email, and the slice B methods
+ * answer as if nothing were stored until the operations that call them
+ * arrive.
  */
 export const fakeIdentityStore = (sessions: Record<string, SessionRow> = {}) => {
   const asked: string[] = [];
@@ -22,7 +24,12 @@ export const fakeIdentityStore = (sessions: Record<string, SessionRow> = {}) => 
       touched.push(input);
       return ok(true);
     },
-    startSession: async () => ok(true),
+    endSession: async () => ok(true),
+    endAllSessions: async () => ok(0),
+    listSessions: async () => ok({ sessions: [], more: false }),
+    recordSignIn: async () => ok({ started: true }),
+    findForSignIn: async () => ok(null),
+    setCredential: async () => ok(undefined),
     createUser: async (user) => {
       if (users.has(user.email)) {
         return ok(false);

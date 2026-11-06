@@ -14,16 +14,22 @@ const now = Date.now();
 for (const actor of [MEMBER, ADMIN]) {
   const user = { id: actor.userId, email: `${actor.userId}@example.com`, name: actor.userId, role: actor.role, createdAt: now };
   const created = await store.createUser(user);
-  const started = await store.startSession({
-    id: `s-${actor.userId}`,
-    tokenHash: await sha256Hex(actor.token),
-    userId: actor.userId,
-    channel: "bearer",
-    createdAt: now,
-    idleUntil: null,
-    expiresAt: now + SESSION_ABSOLUTE_MS,
+  // With no presented session and no rehash, a sign-in's write is the
+  // insert alone, and it takes the session's channel as given.
+  const started = await store.recordSignIn({
+    session: {
+      id: `s-${actor.userId}`,
+      tokenHash: await sha256Hex(actor.token),
+      userId: actor.userId,
+      channel: "bearer",
+      createdAt: now,
+      idleUntil: null,
+      expiresAt: now + SESSION_ABSOLUTE_MS,
+      label: null,
+      city: null,
+    },
   });
-  if (!created.ok || !created.value || !started.ok || !started.value) {
+  if (!created.ok || !created.value || !started.ok || !started.value.started) {
     throw new Error(`the session seed failed for ${actor.userId}`);
   }
 }

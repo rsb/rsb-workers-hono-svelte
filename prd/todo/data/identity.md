@@ -80,48 +80,32 @@ Whether a live session's idle window was moved on.
   at most 1. At most once per session per half idle window.
 - Rules: none
 
-## `sessions.start`
-A new session row, for a user and a token hash.
-
-- Port: `SessionStart.startSession`
-- Used by: the dev seed (`apps/api/scripts/seed-dev.ts`). Sign-in
-  starts its session inside its batch instead (`identity.sign_in`).
-- Input: the session (`id`, `tokenHash`, `userId`, `channel`,
-  `createdAt`, `idleUntil`, `expiresAt`, and `label` and `city`, either
-  of which may be null)
-- Scope: none
-- Result: `started | token_taken` (`true` or `false`): taken when a row
-  already has that token hash
-- Guarantee: one statement. `touched_at` starts at `createdAt`. The raw
-  token is never stored, only its hash (L40).
-- Retry safety: safe; a second call with the same hash is
-  `token_taken` and stores nothing.
-- Failures: `unavailable`, `server`
-- Cost: 1 round trip, 1 statement. Writes 1.
-- Rules: none
-
 ## `identity.sign_in`
 A sign-in's writes, as one batch: the new session, the presented
 session ended, and a due rehash. It writes `sessions` and
 `credentials`, so its id names the database, not a table.
 
 - Port: `SignInStore.recordSignIn`
-- Used by: sign-in (L49)
-- Input: the new session, as `sessions.start` takes it, and two
-  options:
+- Used by: sign-in (L49); the dev seed (`apps/api/scripts/seed-dev.ts`)
+  and the integration seed (`apps/api/test/integration/seed-sessions.ts`),
+  with neither option, so the seeds write through sign-in's own store
+- Input: the new session (`id`, `tokenHash`, `userId`, `channel`,
+  `createdAt`, `idleUntil`, `expiresAt`, and `label` and `city`, either
+  of which may be null), and two options:
   - `rotate`: the id of the session the request presented, ended with
     `ended_reason` `rotated` if it is still open;
   - `rehash`: the user, the new PHC string, its pepper id, and the PHC
     string the credential held when it was read.
 - Scope: none
 - Result: `{ started, rehashed }`. `started` is `started | token_taken`
-  (`true` or `false`), as for `sessions.start`. `rehashed` is `true`
-  when the credential still held the old PHC string and was rewritten,
-  `false` when another write got there first, and absent without
-  `rehash`.
-- Guarantee: one D1 batch, so one transaction: the insert, as
-  `sessions.start` writes it; then the rotation's `UPDATE … WHERE id = ?
-  AND ended_at IS NULL`; then the rehash, compare-and-set:
+  (`true` or `false`): taken when a row already has that token hash.
+  `rehashed` is `true` when the credential still held the old PHC string
+  and was rewritten, `false` when another write got there first, and
+  absent without `rehash`.
+- Guarantee: one D1 batch, so one transaction: the insert, with
+  `touched_at` at `createdAt` and only the token's hash stored, never the
+  raw token (L40); then the rotation's `UPDATE … WHERE id = ? AND
+  ended_at IS NULL`, at `createdAt`; then the rehash, compare-and-set:
   `UPDATE credentials SET secret = ?, pepper_id = ?, updated_at = ?
   WHERE user_id = ? AND kind = 'password' AND secret = ?`, its change
   count the result (L48, L43's style). The rehash has no entry of its
@@ -134,7 +118,7 @@ session ended, and a due rehash. It writes `sessions` and
   string no longer matches.
 - Failures: `unavailable`, `server`
 - Cost: 1 round trip in every case. Without a presented session or a
-  due rehash: 1 statement, writes 1. With a presented session and no
+  due rehash: 1 statement, writes at most 1. With a presented session and no
   due rehash: 2 statements, writes at most 2. With a due rehash and no
   presented session: 2 statements, writes at most 2. With both: 3
   statements, writes at most 3. The rotated session and the credential

@@ -34,7 +34,18 @@ it("holds every identity table's methods, flat", () => {
 
   const names = Object.keys(createIdentityStore(db)).sort();
 
-  expect(names).toEqual(["createUser", "findSession", "findUserByEmail", "startSession", "touchSession"]);
+  expect(names).toEqual([
+    "createUser",
+    "endAllSessions",
+    "endSession",
+    "findForSignIn",
+    "findSession",
+    "findUserByEmail",
+    "listSessions",
+    "recordSignIn",
+    "setCredential",
+    "touchSession",
+  ]);
 });
 
 it("prepares nothing when the identity store is built", () => {
