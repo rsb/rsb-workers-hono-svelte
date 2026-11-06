@@ -1,6 +1,8 @@
+import { access } from "@todo/business/access.ts";
 import { type IdentityStore, createIdentityStore } from "@todo/data-d1/identity/store.ts";
 import { type DbStore, createDbStore } from "@todo/data-d1/store.ts";
 import { authenticate as authenticateUnit } from "@todo/gates/authenticate.ts";
+import { type CurrentSession, currentSession } from "@todo/operations/auth/current-session.ts";
 import { type AddTodo, addTodo } from "@todo/operations/todos/add-todo.ts";
 import { type CountTodos, countTodos } from "@todo/operations/todos/count-todos.ts";
 import { type DeleteCompleted, deleteCompleted } from "@todo/operations/todos/delete-completed.ts";
@@ -14,6 +16,7 @@ import { toTodoFilter } from "@todo/valid/todos/todo-filter.ts";
 import { toTodoPatch } from "@todo/valid/todos/todo-patch.ts";
 import { notFound, onError, tooLarge } from "./app/handlers/errors/errors.ts";
 import { getHealth } from "./app/handlers/health/health.ts";
+import { getCurrentSession } from "./app/handlers/sessions/get-current-session.ts";
 import { deleteTodo as deleteTodoHandler } from "./app/handlers/todos/delete-todo.ts";
 import { deleteTodos } from "./app/handlers/todos/delete-todos.ts";
 import { getTodoCounts } from "./app/handlers/todos/get-todo-counts.ts";
@@ -48,7 +51,10 @@ export type Infra = {
   digest: (token: string) => Promise<string>;
 };
 
-/** Every operation, each built with the ports it declares. */
+/**
+ * Every operation, each built with the ports it declares. Each has one row
+ * in `prd/todo/access.md`, which its builder applies (`check:access`).
+ */
 export type Operations = {
   addTodo: AddTodo;
   listTodos: ListTodos;
@@ -57,6 +63,7 @@ export type Operations = {
   setAllCompleted: SetAllCompleted;
   deleteTodo: DeleteTodo;
   deleteCompleted: DeleteCompleted;
+  currentSession: CurrentSession;
 };
 
 /**
@@ -101,25 +108,27 @@ export const constructOperations = (infra: Infra): Operations => ({
   setAllCompleted: setAllCompleted({ dbStore: infra.dbStore }),
   deleteTodo: deleteTodo({ dbStore: infra.dbStore }),
   deleteCompleted: deleteCompleted({ dbStore: infra.dbStore }),
+  currentSession: currentSession(),
 });
 
-/** The route helpers, bound to these operations. */
-const { route, probe } = routing<Operations>();
+/** The route helpers, bound to these operations and their rows in `access.md`. */
+const { route, probe } = routing<Operations>(access);
 
 /**
  * Each handler with the unit it runs and the validator it is given, keyed
  * by its endpoint as the spec writes it. Every endpoint has exactly one
  * route, or this does not compile. Routes are registered in this order, so
  * a fixed path comes before `/todos/{id}` and `counts` is never read as an
- * id.
+ * id. Each handler runs behind its unit's row (`route.ts`).
  */
 export const constructRoutes = (operations: Operations): Routes => {
   // The built operations, named as the units they are. Inside this function
   // they hide the builders of the same name imported above.
-  const { addTodo, listTodos, countTodos, updateTodo, setAllCompleted, deleteTodo, deleteCompleted } = operations;
+  const { addTodo, listTodos, countTodos, updateTodo, setAllCompleted, deleteTodo, deleteCompleted, currentSession } = operations;
 
   return {
     "GET /health": probe({ getHealth }),
+    "GET /sessions/current": route({ getCurrentSession }, { currentSession }),
     "GET /todos": route({ getTodos }, { listTodos }, { toTodoFilter }),
     "GET /todos/counts": route({ getTodoCounts }, { countTodos }),
     "POST /todos": route({ postTodos }, { addTodo }, { toNewTodo }),

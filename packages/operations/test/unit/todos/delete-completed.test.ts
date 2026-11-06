@@ -1,22 +1,24 @@
 import { describe, expect, it } from "vitest";
+import type { Own } from "@todo/business/auth/scope.ts";
 import { err, ok } from "@todo/business/result.ts";
 import { unavailable } from "@todo/fail/fail.ts";
 import { deleteCompleted } from "../../../src/todos/delete-completed.ts";
+import { member, own } from "../actors.ts";
 
 describe("deleteCompleted", () => {
-  it("asks the store once and returns the todos it says are left", async () => {
-    let asked = 0;
+  it("asks the store once, in the actor's scope, and returns the todos it says are left", async () => {
+    const asked: Own[] = [];
     const todos = [{ id: "id-2", title: "walk dog", completed: false }];
     const dbStore = {
-      deleteCompleted: async () => {
-        asked += 1;
+      deleteCompleted: async (scope: Own) => {
+        asked.push(scope);
         return ok(todos);
       },
     };
 
-    const deleted = await deleteCompleted({ dbStore })();
+    const deleted = await deleteCompleted({ dbStore })(member);
 
-    expect(asked).toBe(1);
+    expect(asked).toEqual([own]);
     expect(deleted).toEqual({ ok: true, value: todos });
   });
 
@@ -24,7 +26,7 @@ describe("deleteCompleted", () => {
     const todos = [{ id: "id-1", title: "buy milk", completed: false }];
     const dbStore = { deleteCompleted: async () => ok(todos) };
 
-    const deleted = await deleteCompleted({ dbStore })();
+    const deleted = await deleteCompleted({ dbStore })(member);
 
     expect(deleted).toEqual({ ok: true, value: todos });
   });
@@ -33,7 +35,7 @@ describe("deleteCompleted", () => {
     const down = unavailable("delete completed: D1_ERROR: Network connection lost.");
     const dbStore = { deleteCompleted: async () => err(down) };
 
-    const deleted = await deleteCompleted({ dbStore })();
+    const deleted = await deleteCompleted({ dbStore })(member);
 
     if (deleted.ok) {
       throw new Error("expected a failure");

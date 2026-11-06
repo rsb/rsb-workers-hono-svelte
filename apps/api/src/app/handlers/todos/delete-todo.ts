@@ -8,8 +8,9 @@ export const deleteTodo = (deleteTodo: DeleteTodo) => async (c: Context<Env, "/t
   // Any id is asked for as it is; one no todo has is not found.
   const id = c.req.param("id");
 
-  // Deleting can fail for the user (no such todo) or for us (the store).
-  const deleted = await deleteTodo(id);
+  // It runs as the actor the gate attached. Deleting can fail for the user
+  // (no session, or no such todo of theirs) or for us (the store).
+  const deleted = await deleteTodo(c.get("actor"), id);
   if (!deleted.ok) {
     return mapFailure(c, deleted.error);
   }

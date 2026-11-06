@@ -3,10 +3,11 @@ import type { Context } from "hono";
 import type { CountTodos } from "@todo/operations/todos/count-todos.ts";
 import { mapFailure, success } from "../present.ts";
 
-/** `GET /todos/counts`: nothing to validate; count every todo, then present. */
+/** `GET /todos/counts`: nothing to validate; count the actor's todos, then present. */
 export const getTodoCounts = (countTodos: CountTodos) => async (c: Context) => {
-  // No business rule refuses a count, but the store can fail.
-  const counted = await countTodos();
+  // It runs as the actor the gate attached, so it counts their todos. The
+  // runner refuses an anonymous one; the store can fail.
+  const counted = await countTodos(c.get("actor"));
   if (!counted.ok) {
     return mapFailure(c, counted.error);
   }

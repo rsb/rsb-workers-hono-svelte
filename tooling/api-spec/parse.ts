@@ -3,6 +3,8 @@
 // heading, a labelled line, a list item, prose or blank. A line the
 // vocabulary does not allow is a problem, reported with its line number.
 
+import { REQUIRES, type Requires } from "../access/parse.ts";
+
 export type Type =
   | { kind: "text" }
   | { kind: "boolean" }
@@ -68,6 +70,12 @@ export type Endpoint = {
    * each id is a rule, and that the validator applies them, is the join's.
    */
   applies: string[] | undefined;
+  /**
+   * Who may call it, as `Security:` writes it, in `access.md`'s words: the
+   * least actor its unit's row requires, or `anonymous` for a probe. That it
+   * is the row's is the generator's to check, against the construct.
+   */
+  security: Requires;
   params: Field[];
   /** The query shape's name, inline or shared. */
   query: string | undefined;
@@ -106,7 +114,7 @@ const SECTIONS = ["Every endpoint", "Errors", "Shapes", "Endpoints"] as const;
 type Section = (typeof SECTIONS)[number];
 
 const METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"];
-const PARTS = ["Serves", "Applies", "Path", "Query", "Body", "Reply", "Errors", "Examples"] as const;
+const PARTS = ["Serves", "Applies", "Security", "Path", "Query", "Body", "Reply", "Errors", "Examples"] as const;
 type Part = (typeof PARTS)[number];
 
 const NAME = "[A-Za-z_][A-Za-z0-9_]*";
@@ -706,6 +714,7 @@ export const parse = (source: string): Parsed => {
       path,
       serves: "",
       applies: undefined,
+      security: "anonymous",
       params: [],
       query: undefined,
       body: undefined,
@@ -801,6 +810,15 @@ export const parse = (source: string): Parsed => {
         endpoint.applies = ids;
         continue;
       }
+      if (label === "Security") {
+        const level = /^`([a-z_]+)`\.?$/.exec(text)?.[1];
+        if (level === undefined || !(REQUIRES as readonly string[]).includes(level)) {
+          problem(entry.line, `Security: is one of ${REQUIRES.map((each) => `\`${each}\``).join(", ")}`);
+          continue;
+        }
+        endpoint.security = level as Requires;
+        continue;
+      }
       if (label === "Path") {
         if (text !== "") {
           problem(entry.line, "Path: has its parameters as fields under it");
@@ -853,6 +871,9 @@ export const parse = (source: string): Parsed => {
 
     if (endpoint.serves === "") {
       problem(block.line, `${key} has no Serves:`);
+    }
+    if (!seenParts.has("Security")) {
+      problem(block.line, `${key} has no Security:; write "Security: \`anonymous\`" when anyone may call it`);
     }
     if (endpoint.reply === "") {
       problem(block.line, `${key} has no Reply:`);

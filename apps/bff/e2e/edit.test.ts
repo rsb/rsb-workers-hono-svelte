@@ -1,4 +1,5 @@
-import { type Page, expect, test } from "@playwright/test";
+import { type Page, expect } from "@playwright/test";
+import { test } from "./signed-in.ts";
 
 // PRD scenarios 4.1–4.9. The API's store is shared by the whole run (D19),
 // so each test adds its own todo with a unique title and finds it by that.

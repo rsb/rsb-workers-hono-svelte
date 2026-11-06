@@ -1,16 +1,16 @@
 import { TodoListReply, envelope } from "@todo/contract-api";
-import { exports } from "cloudflare:workers";
 import * as v from "valibot";
 import { expect, it } from "vitest";
+import { asMember } from "./signed-in.ts";
 
 const list = async () => {
-  const response = await exports.default.fetch("https://todo-api/todos");
+  const response = await asMember("https://todo-api/todos");
   expect(response.status).toBe(200);
   return v.parse(envelope(TodoListReply), await response.json());
 };
 
 const add = (title: string) =>
-  exports.default.fetch("https://todo-api/todos", {
+  asMember("https://todo-api/todos", {
     method: "POST",
     body: JSON.stringify({ title }),
   });

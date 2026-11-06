@@ -24,8 +24,9 @@ export const getTodos = (listTodos: ListTodos, toTodoFilter: ToTodoFilter) => as
     return userFailure(c, invalidOf(filter.error));
   }
 
-  // No business rule refuses a list, but the store can fail.
-  const listed = await listTodos(filter.value);
+  // It runs as the actor the gate attached, so it lists their todos. The
+  // runner refuses an anonymous one; the store can fail.
+  const listed = await listTodos(c.get("actor"), filter.value);
   if (!listed.ok) {
     return mapFailure(c, listed.error);
   }

@@ -10,7 +10,7 @@ import { presentTodo } from "./present.ts";
 /** The validator construct gives this handler (L33). */
 type ToCompleted = typeof toCompleted;
 
-/** `PATCH /todos`: validate the body, read `completed`, set it on every todo, then present the list. */
+/** `PATCH /todos`: validate the body, read `completed`, set it on every todo of the actor's, then present the list. */
 export const patchTodos = (setAllCompleted: SetAllCompleted, toCompleted: ToCompleted) => async (c: Context) => {
   // The body must be JSON, shaped as the contract says.
   const body = await validateBody(c, PatchTodosBody);
@@ -24,8 +24,9 @@ export const patchTodos = (setAllCompleted: SetAllCompleted, toCompleted: ToComp
     return userFailure(c, invalidOf(completed.error));
   }
 
-  // No business rule refuses it, but the store can fail.
-  const set = await setAllCompleted(completed.value);
+  // It runs as the actor the gate attached, so it sets their todos. The
+  // runner refuses an anonymous one; the store can fail.
+  const set = await setAllCompleted(c.get("actor"), completed.value);
   if (!set.ok) {
     return mapFailure(c, set.error);
   }

@@ -1,9 +1,9 @@
 import { TodoCountsReply, TodoListReply, envelope } from "@todo/contract-api";
-import { exports } from "cloudflare:workers";
 import * as v from "valibot";
 import { expect, it } from "vitest";
+import { asMember } from "./signed-in.ts";
 
-const fetchApi = (path: string, init?: RequestInit) => exports.default.fetch(`https://todo-api${path}`, init);
+const fetchApi = (path: string, init?: RequestInit) => asMember(`https://todo-api${path}`, init);
 
 const titles = async (query: string) => {
   const response = await fetchApi(`/todos${query}`);

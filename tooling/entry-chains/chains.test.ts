@@ -28,6 +28,24 @@ describe("the entry chains of apps/api", () => {
     );
   });
 
+  it("lists the gates in the order construct runs them, then the runner, before the rest", () => {
+    assert.deepEqual(
+      index.shared.slice(0, 5).map((row) => [row.label, row.symbols.join(", ")]),
+      [
+        ["gates", "requestId"],
+        ["gates", "bodyLimit"],
+        ["gates", "channel"],
+        ["gates", "authenticate"],
+        ["runner", "run, verdict"],
+      ],
+    );
+  });
+
+  it("ends GET /sessions/current at its unit, which declares no port", () => {
+    const chain = index.chains.find((found) => found.key === "GET /sessions/current");
+    assert.equal(chain?.line, "GET /sessions/current → getCurrentSession → currentSession");
+  });
+
   it("lists the driver once, as a shared link, and in no chain", () => {
     const driver = index.shared.filter((row) => row.label === "driver");
     assert.deepEqual(driver, [

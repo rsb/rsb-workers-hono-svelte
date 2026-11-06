@@ -1,14 +1,18 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
+import { parse as parseAccess } from "../access/parse.ts";
 import { readRoutes } from "../entry-chains/routes.ts";
-import { emitOpenApi } from "./emit-openapi.ts";
-import { parse } from "./parse.ts";
+import { SESSION_COOKIE, emitOpenApi } from "./emit-openapi.ts";
+import { type Endpoint, parse } from "./parse.ts";
 
 const parsed = parse(readFileSync("prd/todo/api.md", "utf8"));
 assert.ok(parsed.ok);
+const accessed = parseAccess(readFileSync("prd/todo/access.md", "utf8"));
+assert.ok(accessed.ok);
+const access = accessed.rows;
 const routes = await readRoutes("apps/api/src/construct.ts");
-const doc = JSON.parse(emitOpenApi(parsed.spec, routes, "prd/todo/api.md", "test"));
+const doc = JSON.parse(emitOpenApi(parsed.spec, routes, access, "prd/todo/api.md", "test"));
 
 type Node = Record<string, unknown>;
 
@@ -95,6 +99,23 @@ describe("the OpenAPI document", () => {
     assert.equal(new Set(ids).size, ids.length);
   });
 
+  it("says who may call each operation, by either credential, and lets an anonymous one call with neither", () => {
+    assert.deepEqual(Object.keys(doc.components.securitySchemes).sort(), ["bearer", "session"]);
+    for (const { key, op } of operations) {
+      const endpoint: Endpoint | undefined = parsed.spec.endpoints.find((found) => `${found.method} ${found.path}` === key);
+      assert.equal(op["x-requires"], endpoint?.security, key);
+      const credentials = [{ session: [] }, { bearer: [] }];
+      assert.deepEqual(op.security, endpoint?.security === "anonymous" ? [{}, ...credentials] : credentials, key);
+    }
+  });
+
+  it("names the session cookie the api is configured with", () => {
+    // wrangler.jsonc is JSON with comments; the one line that names the cookie is enough.
+    const configured = /"SESSION_COOKIE": "([^"]+)"/.exec(readFileSync("apps/api/wrangler.jsonc", "utf8"))?.[1];
+    assert.equal(SESSION_COOKIE, configured);
+    assert.equal(doc.components.securitySchemes.session.name, configured);
+  });
+
   it("has no x-unit on the probe", () => {
     const health = operations.find((operation) => operation.key === "GET /health");
     assert.equal(health?.op.operationId, "getHealth");
@@ -105,12 +126,12 @@ describe("the OpenAPI document", () => {
 describe("routes against the spec", () => {
   it("refuses an endpoint with no route", () => {
     const fewer = routes.filter((route) => route.key !== "POST /todos");
-    assert.throws(() => emitOpenApi(parsed.spec, fewer, "s", "t"), /the spec has POST \/todos, and construct has no route/);
+    assert.throws(() => emitOpenApi(parsed.spec, fewer, access, "s", "t"), /the spec has POST \/todos, and construct has no route/);
   });
 
   it("refuses a route the spec does not list", () => {
     const more = [...routes, { key: "PUT /todos", name: "putTodos", unit: null, validator: null }];
-    assert.throws(() => emitOpenApi(parsed.spec, more, "s", "t"), /construct has a route for PUT \/todos/);
+    assert.throws(() => emitOpenApi(parsed.spec, more, access, "s", "t"), /construct has a route for PUT \/todos/);
   });
 
   it("refuses two routes with one operationId", () => {
@@ -120,6 +141,35 @@ describe("routes against the spec", () => {
       }
       return route;
     });
-    assert.throws(() => emitOpenApi(parsed.spec, twice, "s", "t"), /GET \/todos and GET \/todos\/counts have the same operationId, getTodos/);
+    assert.throws(() => emitOpenApi(parsed.spec, twice, access, "s", "t"), /GET \/todos and GET \/todos\/counts have the same operationId, getTodos/);
+  });
+});
+
+describe("Security: against access.md", () => {
+  /** The spec with one endpoint's Security: changed. */
+  const securing = (key: string, security: "anonymous" | "member" | "admin") => ({
+    ...parsed.spec,
+    endpoints: parsed.spec.endpoints.map((endpoint) =>
+      `${endpoint.method} ${endpoint.path}` === key ? { ...endpoint, security } : endpoint,
+    ),
+  });
+
+  it("refuses an endpoint whose Security: is not its unit's row", () => {
+    assert.throws(
+      () => emitOpenApi(securing("GET /todos", "anonymous"), routes, access, "s", "t"),
+      /GET \/todos says Security: anonymous, but listTodos's row in access\.md requires member/,
+    );
+  });
+
+  it("refuses a probe that says anything but anonymous", () => {
+    assert.throws(
+      () => emitOpenApi(securing("GET /health", "member"), routes, access, "s", "t"),
+      /GET \/health says Security: member, but it is a probe, which runs no unit: anonymous/,
+    );
+  });
+
+  it("refuses a route whose unit has no row", () => {
+    const rowless = access.filter((row) => row.operation !== "countTodos");
+    assert.throws(() => emitOpenApi(parsed.spec, routes, rowless, "s", "t"), /GET \/todos\/counts runs countTodos, which has no row in access\.md/);
   });
 });

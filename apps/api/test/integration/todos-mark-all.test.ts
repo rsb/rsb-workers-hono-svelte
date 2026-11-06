@@ -1,10 +1,10 @@
 import { Failure, TodoListReply, TodoReply, envelope } from "@todo/contract-api";
-import { exports } from "cloudflare:workers";
 import * as v from "valibot";
 import { expect, it } from "vitest";
+import { asMember } from "./signed-in.ts";
 
 const add = async (title: string) => {
-  const response = await exports.default.fetch("https://todo-api/todos", {
+  const response = await asMember("https://todo-api/todos", {
     method: "POST",
     body: JSON.stringify({ title }),
   });
@@ -15,10 +15,10 @@ const add = async (title: string) => {
   return reply.data;
 };
 
-const markAll = (body: string) => exports.default.fetch("https://todo-api/todos", { method: "PATCH", body });
+const markAll = (body: string) => asMember("https://todo-api/todos", { method: "PATCH", body });
 
 const list = async () => {
-  const response = await exports.default.fetch("https://todo-api/todos");
+  const response = await asMember("https://todo-api/todos");
   return v.parse(envelope(TodoListReply), await response.json());
 };
 

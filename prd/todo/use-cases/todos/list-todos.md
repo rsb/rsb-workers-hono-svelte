@@ -12,6 +12,9 @@ Read the todos: all of them, or only the active or the completed ones.
 ## Input
 - A `TodoFilter`: optionally, whether the todos wanted are completed.
   Without it, every todo.
+- The actor's own scope, `{ ownerId }`, which the runner hands it as
+  the operation's access row says (L43). Every todo below is one of the
+  actor's.
 
 ## Given
 none
@@ -29,6 +32,7 @@ one; possibly none.
 
 ## Guarantees
 - `todos.order`
+- `todos.scoped`
 
 ## Atomic
 One read: the list is a snapshot of one moment, never a mix of the

@@ -13,11 +13,28 @@ export type TodoReply = v.InferOutput<typeof TodoReply>;
 export const TodoListReply = v.array(TodoReply);
 export type TodoListReply = v.InferOutput<typeof TodoListReply>;
 
+/** The signed-in user a request acts for, with what the frame shows. */
+export const SessionUser = v.strictObject({
+  id: v.string(),
+  role: v.picklist(["member", "admin"]),
+  emailVerified: v.boolean(),
+  name: v.string(),
+  email: v.string(),
+});
+export type SessionUser = v.InferOutput<typeof SessionUser>;
+
 /** The data of `GET /health`. */
 export const HealthReply = v.strictObject({
   ok: v.literal(true),
 });
 export type HealthReply = v.InferOutput<typeof HealthReply>;
+
+/** The data of `GET /sessions/current`. */
+export const SessionReply = v.strictObject({
+  user: v.exactOptional(SessionUser),
+  clearCookie: v.boolean(),
+});
+export type SessionReply = v.InferOutput<typeof SessionReply>;
 
 /** The query of `GET /todos`. */
 export const GetTodosQuery = v.strictObject({

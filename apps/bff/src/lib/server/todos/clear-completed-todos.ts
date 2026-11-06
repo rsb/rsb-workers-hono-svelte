@@ -1,6 +1,6 @@
 import { fail } from "@sveltejs/kit";
 import { deleteTodos } from "../api/todos.ts";
-import { SOMETHING_WENT_WRONG } from "./messages.ts";
+import { failedMessage } from "./messages.ts";
 import { status } from "./status.ts";
 
 /**
@@ -15,7 +15,7 @@ export async function clearCompletedTodos(api: Pick<Fetcher, "fetch">) {
   const reply = await deleteTodos(api, { completed: "true" });
   if (!reply.ok) {
     const kind = reply.error.kind;
-    return fail(status(kind), { clearCompleted: { message: SOMETHING_WENT_WRONG } });
+    return fail(status(kind), { clearCompleted: { message: failedMessage(reply.error) } });
   }
 
   return { cleared: true };

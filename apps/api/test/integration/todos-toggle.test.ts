@@ -1,10 +1,10 @@
 import { Failure, TodoListReply, TodoReply, envelope } from "@todo/contract-api";
-import { exports } from "cloudflare:workers";
 import * as v from "valibot";
 import { expect, it } from "vitest";
+import { asMember } from "./signed-in.ts";
 
 const add = async (title: string) => {
-  const response = await exports.default.fetch("https://todo-api/todos", {
+  const response = await asMember("https://todo-api/todos", {
     method: "POST",
     body: JSON.stringify({ title }),
   });
@@ -16,7 +16,7 @@ const add = async (title: string) => {
 };
 
 const toggle = (id: string, body: string) =>
-  exports.default.fetch(`https://todo-api/todos/${id}`, { method: "PATCH", body });
+  asMember(`https://todo-api/todos/${id}`, { method: "PATCH", body });
 
 it("PATCH /todos/:id completes a todo, and the next list shows it", async () => {
   const todo = await add("buy milk");
@@ -28,7 +28,7 @@ it("PATCH /todos/:id completes a todo, and the next list shows it", async () => 
     ok: true,
     data: { id: todo.id, title: "buy milk", completed: true },
   });
-  const listed = await exports.default.fetch("https://todo-api/todos");
+  const listed = await asMember("https://todo-api/todos");
   const reply = v.parse(envelope(TodoListReply), await listed.json());
   expect(reply.ok && reply.data.find((each) => each.id === todo.id)?.completed).toBe(true);
 });

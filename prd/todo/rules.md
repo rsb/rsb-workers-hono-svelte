@@ -88,7 +88,7 @@ such as `BODY_LIMIT_BYTES`, a closed object or a query given once, are
 ## Constants
 
 - `TITLE_MAX`: 256. The longest title, after trim.
-- `TODO_LIMIT`: 500. The most todos the list holds.
+- `TODO_LIMIT`: 500. The most todos one owner's list holds.
 
 ## Inputs
 
@@ -158,19 +158,27 @@ Violations:
 Source: PRD › API, `PATCH /todos/:id` ("at least one").
 
 ### `todos.cap`
-The list holds fewer than `limit` todos when one is added.
+The owner's list holds fewer than `limit` todos when one is added.
 Kind: state
 
 Parameters:
 - `limit`: `TODO_LIMIT`
 
-Source: PRD deviation 9.
+Source: PRD deviation 9; per owner from deviation 21.
 
 ### `todo.exists`
 A todo has the id.
 Kind: state
 
 Source: PRD › API, `PATCH /todos/:id` and `DELETE /todos/:id` (404).
+
+### `todo.owned`
+The todo with the id is in the actor's scope. Another's todo is
+`not_found`, the same as a missing one, so a caller cannot tell
+whether another's id exists.
+Kind: state
+
+Source: PRD deviation 21; L43.
 
 ### `todos.order`
 Every list the store returns is in the order todos were added.
@@ -185,3 +193,10 @@ Kind: guarantee
 
 Source: story chapter 8, the guarantees (L29). The id is a UUID from
 the id source (D13).
+
+### `todos.scoped`
+Every todo a store call reads or writes is in the scope it is given.
+Kind: guarantee
+
+Source: L43: the store has no default scope, and reads and writes are
+scoped alike.

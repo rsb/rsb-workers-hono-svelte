@@ -3,6 +3,7 @@
 	import NewTodo from "#lib/components/NewTodo.svelte";
 	import TodoFooter from "#lib/components/TodoFooter.svelte";
 	import TodoList from "#lib/components/TodoList.svelte";
+	import { SIGNED_OUT } from "#lib/shell/views.ts";
 	import type { PageProps } from "./$types";
 
 	let { data, form }: PageProps = $props();
@@ -41,8 +42,8 @@
 	});
 	// From the counts, which cover every todo: on a filter the list can be
 	// empty while todos exist, and the footer and mark all must still show.
-	let hasTodos = $derived(data.active + data.completed > 0);
-	let allDone = $derived(hasTodos && data.active === 0);
+	let hasTodos = $derived(data.state === "list" && data.active + data.completed > 0);
+	let allDone = $derived(hasTodos && data.state === "list" && data.active === 0);
 </script>
 
 <svelte:head>
@@ -52,13 +53,18 @@
 <main>
 	<h1>Todos</h1>
 
-	<NewTodo {failed} {hasTodos} {allDone} {markAllFailed} />
-
-	{#if hasTodos}
-		<TodoList todos={data.todos} {toggleFailed} {removeFailed} />
-		<TodoFooter filter={data.filter} active={data.active} completed={data.completed} {clearFailed} />
+	<!-- accounts.shell.signed_out: "Sign in" and "Create an account" come in B and C. -->
+	{#if data.state === "signed_out"}
+		<p class="lede">{SIGNED_OUT}</p>
 	{:else}
-		<EmptyState error={data.error} />
+		<NewTodo {failed} {hasTodos} {allDone} {markAllFailed} />
+
+		{#if hasTodos}
+			<TodoList todos={data.todos} {toggleFailed} {removeFailed} />
+			<TodoFooter filter={data.filter} active={data.active} completed={data.completed} {clearFailed} />
+		{:else}
+			<EmptyState />
+		{/if}
 	{/if}
 </main>
 
@@ -76,6 +82,13 @@
 		font-weight: 600;
 		letter-spacing: -0.02em;
 		line-height: 1.1;
+	}
+
+	.lede {
+		margin: 0;
+		font-size: 16px;
+		line-height: 1.55;
+		color: var(--fg2);
 	}
 
 	@media (max-width: 480px) {

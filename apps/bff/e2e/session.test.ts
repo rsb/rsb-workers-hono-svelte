@@ -1,33 +1,13 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { type Page, expect, test } from "@playwright/test";
+import { BASE, signIn } from "./signed-in.ts";
 import { add, open, rowOf } from "./todos.ts";
 
-// Stage 23, commit 7: the BFF forwards the browser's session to the api.
-// `dev:e2e` seeds a member session whose raw token is in apps/api/.dev.tokens
-// (apps/api/scripts/seed-dev.ts); the browser carries it as the `sid` cookie,
-// local dev's name for `__Host-sid`. No dev-only route and nothing in the BFF
-// knows the seed: the cookie goes in through Playwright, as a browser holds it.
-// The todos are not yet the actor's own (commit 8), so each test removes
-// what it added and the files after it see the store as it was.
+// Stage 23: the BFF forwards the browser's session to the api (commit 7),
+// and every todo operation requires a member (commit 8). This file signs
+// in per test, with Playwright's own `test`, so its control can go without
+// a cookie. Each test removes what it added.
 
-const BASE = "http://localhost:5173";
-
-/** The member's raw session token, as the seed wrote it. */
-const memberToken = () => {
-  const path = join(import.meta.dirname, "..", "..", "api", ".dev.tokens");
-  const line = readFileSync(path, "utf8")
-    .split("\n")
-    .find((entry) => entry.startsWith("MEMBER_TOKEN="));
-  if (line === undefined) {
-    throw new Error(`no MEMBER_TOKEN in ${path}: dev:e2e seeds it`);
-  }
-  return line.slice("MEMBER_TOKEN=".length).trim();
-};
-
-const signInAsMember = async (page: Page) => {
-  await page.context().addCookies([{ name: "sid", value: memberToken(), url: BASE, httpOnly: true, sameSite: "Lax" }]);
-};
+const signInAsMember = (page: Page) => signIn(page.context(), "MEMBER_TOKEN");
 
 /** Removes the todo with this title through the page. */
 const remove = async (page: Page, title: string) => {
@@ -79,13 +59,14 @@ test("given the member's session cookie, a cross-site form post is refused and a
 
 test("without a session cookie, the same cross-site post is not the channel gate's to refuse", async ({ page }) => {
   // The control for the refusal above: what the gate refused was the cookie
-  // arriving from elsewhere, so it was forwarded. Without one there is no
-  // session to ride on, and the post goes on (L38).
+  // arriving from elsewhere. Without one there is no session to ride on,
+  // so the gate lets the post go on (L38), and it is anonymous: adding
+  // requires a member, and the runner refuses it, 401 and not the gate's
+  // 403 (`access.md`).
   const response = await crossSitePost(page, "no cookie, from elsewhere");
 
-  expect(response.status()).toBe(200);
+  expect(response.status()).toBe(401);
+  await signInAsMember(page);
   await open(page);
-  await expect(rowOf(page, "no cookie, from elsewhere")).toBeVisible();
-
-  await remove(page, "no cookie, from elsewhere");
+  await expect(rowOf(page, "no cookie, from elsewhere")).toHaveCount(0);
 });

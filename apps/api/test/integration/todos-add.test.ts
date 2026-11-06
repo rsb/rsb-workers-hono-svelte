@@ -1,10 +1,10 @@
 import { TodoReply, envelope } from "@todo/contract-api";
-import { exports } from "cloudflare:workers";
 import * as v from "valibot";
 import { expect, it } from "vitest";
+import { asMember } from "./signed-in.ts";
 
 it("POST /todos adds an active todo with a trimmed title and a uuid", async () => {
-  const response = await exports.default.fetch("https://todo-api/todos", {
+  const response = await asMember("https://todo-api/todos", {
     method: "POST",
     body: JSON.stringify({ title: "  buy milk  " }),
   });

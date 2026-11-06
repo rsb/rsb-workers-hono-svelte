@@ -15,6 +15,9 @@ type Budget<Store> = { budget: Cost; answer: Answer; call: (store: Store) => Pro
 
 const todo = { id: "id-1", title: "buy milk", completed: false };
 
+/** One owner's scope: every todo call takes one (L43), and it costs nothing more. */
+const own = { ownerId: "u1" };
+
 /**
  * Every `DbStore` method's budget: the current cost written down, not a
  * limit to stay under. A method without one does not compile. A change to a
@@ -24,37 +27,37 @@ const appBudgets: Record<keyof DbStore, Budget<DbStore>> = {
   addTodoUnlessFull: {
     budget: { trips: 1, statements: 1 },
     answer: { changes: 1 },
-    call: (store) => store.addTodoUnlessFull(todo, 500),
+    call: (store) => store.addTodoUnlessFull(own, todo, 500),
   },
   listTodos: {
     budget: { trips: 1, statements: 1 },
     answer: { rows: [] },
-    call: (store) => store.listTodos({ completed: true }),
+    call: (store) => store.listTodos(own, { completed: true }),
   },
   countTodos: {
     budget: { trips: 1, statements: 1 },
     answer: { rows: [{ active: 1, completed: 1 }] },
-    call: (store) => store.countTodos(),
+    call: (store) => store.countTodos(own),
   },
   updateTodo: {
     budget: { trips: 1, statements: 1 },
     answer: { rows: [{ id: "id-1", title: "buy milk", completed: 1 }] },
-    call: (store) => store.updateTodo("id-1", { completed: true }),
+    call: (store) => store.updateTodo(own, "id-1", { completed: true }),
   },
   setAllCompleted: {
     budget: { trips: 1, statements: 2 },
     answer: { rows: [] },
-    call: (store) => store.setAllCompleted(true),
+    call: (store) => store.setAllCompleted(own, true),
   },
   deleteTodo: {
     budget: { trips: 1, statements: 1 },
     answer: { changes: 1 },
-    call: (store) => store.deleteTodo("id-1"),
+    call: (store) => store.deleteTodo(own, "id-1"),
   },
   deleteCompleted: {
     budget: { trips: 1, statements: 2 },
     answer: { rows: [] },
-    call: (store) => store.deleteCompleted(),
+    call: (store) => store.deleteCompleted(own),
   },
 };
 

@@ -34,6 +34,8 @@ const endpoint = (method: string, path: string, serves: string, applies: string[
   path,
   serves,
   applies,
+  // Not the join's: generate checks it against access.md.
+  security: "anonymous",
   params: [],
   query: undefined,
   body: undefined,

@@ -11,14 +11,24 @@ export default defineConfig(async () => {
     plugins: [
       cloudflareTest({
         wrangler: { configPath: "./wrangler.jsonc" },
-        miniflare: { bindings: { TEST_APP_MIGRATIONS: appMigrations, TEST_IDENTITY_MIGRATIONS: identityMigrations } },
+        miniflare: {
+          bindings: {
+            TEST_APP_MIGRATIONS: appMigrations,
+            TEST_IDENTITY_MIGRATIONS: identityMigrations,
+            // Local dev's config: wrangler.jsonc's vars with the cookie the
+            // dev seed writes to .dev.vars over them. .dev.vars is gitignored,
+            // so CI has none, and the committed vars alone do not read: a
+            // __Host- cookie under an http BFF (src/config.ts).
+            SESSION_COOKIE: "sid",
+          },
+        },
       }),
     ],
     test: {
       include: ["test/integration/**/*.test.ts"],
       // Storage is isolated per test file, so each file starts on an empty,
-      // migrated database (DB9).
-      setupFiles: ["./test/integration/apply-migrations.ts"],
+      // migrated database (DB9), holding a member's and an admin's session.
+      setupFiles: ["./test/integration/apply-migrations.ts", "./test/integration/seed-sessions.ts"],
     },
   };
 });

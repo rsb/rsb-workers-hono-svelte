@@ -1,4 +1,5 @@
-import { type Page, expect, test } from "@playwright/test";
+import { type Page, expect } from "@playwright/test";
+import { test } from "./signed-in.ts";
 import { add, items, open, removeAll, rowOf } from "./todos.ts";
 
 // PRD scenarios 6.1–6.4, and mark all shown only when there are todos

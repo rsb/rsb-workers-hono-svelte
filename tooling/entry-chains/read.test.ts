@@ -218,6 +218,11 @@ describe("operationLinesOf", () => {
     assert.deepEqual(operationLinesOf(text, "c.ts"), [{ name: "listTodos", builder: "listTodos" }]);
   });
 
+  it("reads an operation built with no port", () => {
+    const text = construct(["  currentSession: currentSession(),"]);
+    assert.deepEqual(operationLinesOf(text, "c.ts"), [{ name: "currentSession", builder: "currentSession" }]);
+  });
+
   it("fails on an operation it cannot read", () => {
     const text = construct(["  listTodos: build(listTodos, infra),"]);
     assert.throws(() => operationLinesOf(text, "c.ts"), /an operation is written/);

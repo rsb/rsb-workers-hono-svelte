@@ -27,8 +27,9 @@ export const patchTodo = (updateTodo: UpdateTodo, toTodoPatch: ToTodoPatch) => a
     return userFailure(c, invalidOf(patch.error));
   }
 
-  // Updating can fail for the user (no such todo) or for us (the store).
-  const updated = await updateTodo(id, patch.value);
+  // It runs as the actor the gate attached. Updating can fail for the user
+  // (no session, or no such todo of theirs) or for us (the store).
+  const updated = await updateTodo(c.get("actor"), id, patch.value);
   if (!updated.ok) {
     return mapFailure(c, updated.error);
   }

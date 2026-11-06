@@ -7,10 +7,11 @@ import { unavailable, wrap } from "@todo/fail/fail.ts";
 import { patchTodos } from "../../../../../src/app/handlers/todos/patch-todos.ts";
 import type { SetAllCompleted } from "@todo/operations/todos/set-all-completed.ts";
 import { toCompleted } from "@todo/valid/todos/completed.ts";
+import { asMember, member } from "../actor.ts";
 
 /** Sends a PATCH through the route, as it would be served. */
 const patch = (setAllCompleted: SetAllCompleted, body: string) => {
-  const app = new Hono().patch("/todos", patchTodos(setAllCompleted, toCompleted));
+  const app = new Hono().use(asMember).patch("/todos", patchTodos(setAllCompleted, toCompleted));
   return app.request("/todos", { method: "PATCH", body });
 };
 
@@ -57,19 +58,19 @@ describe("patchTodos", () => {
   });
 
   it("sets the value sent and presents the list the operation returns", async () => {
-    const asked: boolean[] = [];
+    const asked: unknown[] = [];
     const todos = [
       { id: "id-1", title: "buy milk", completed: true },
       { id: "id-2", title: "walk dog", completed: true },
     ];
-    const setAllCompleted: SetAllCompleted = async (completed) => {
-      asked.push(completed);
+    const setAllCompleted: SetAllCompleted = async (actor, completed) => {
+      asked.push(actor, completed);
       return ok(todos);
     };
 
     const response = await patch(setAllCompleted, '{"completed":true}');
 
-    expect(asked).toEqual([true]);
+    expect(asked).toEqual([member, true]);
     expect(response.status).toBe(200);
     expect(v.parse(envelope(TodoListReply), await response.json())).toEqual({ ok: true, data: todos });
   });

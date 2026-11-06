@@ -57,7 +57,7 @@ describe("rules generate --check", () => {
     writeFileSync(join(useCases, "add-a-todo.md"), add.replace("## Given\n- `todos.cap`", "## Given\n- `todos.order`"));
     const result = run(["prd/todo/rules.md", useCases, business, valid, "--check"]);
     assert.equal(result.status, 1);
-    assert.match(result.stderr, /add-a-todo\.md:17: todos\.order is a guarantee rule, but Given cites state rules/);
+    assert.match(result.stderr, /add-a-todo\.md:20: todos\.order is a guarantee rule, but Given cites state rules/);
   });
 });
 

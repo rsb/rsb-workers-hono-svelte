@@ -8,23 +8,26 @@ import { describe, expect, it, vi } from "vitest";
 import type { ListTodos } from "@todo/operations/todos/list-todos.ts";
 import { getTodos } from "../../../../../src/app/handlers/todos/get-todos.ts";
 import { toTodoFilter } from "@todo/valid/todos/todo-filter.ts";
+import { asMember, member } from "../actor.ts";
 
 const get = () => new Context(new Request("https://todo-api/todos"));
 
 /** Sends a GET through the route, with the query given, as it would be served. */
 const list = (listTodos: ListTodos, query: string) => {
-  const app = new Hono().get("/todos", getTodos(listTodos, toTodoFilter));
+  const app = new Hono().use(asMember).get("/todos", getTodos(listTodos, toTodoFilter));
   return app.request(`/todos${query}`);
 };
 
 /** A fake operation that records the filter it was asked for. */
 const recording = () => {
   const asked: TodoFilter[] = [];
-  const listTodos: ListTodos = async (filter) => {
+  const actors: unknown[] = [];
+  const listTodos: ListTodos = async (actor, filter) => {
+    actors.push(actor);
     asked.push(filter);
     return ok([]);
   };
-  return { asked, listTodos };
+  return { asked, actors, listTodos };
 };
 
 /** A fake operation for the cases that must not reach it. */
@@ -39,12 +42,13 @@ const failed = async (response: Response) => ({
 });
 
 describe("getTodos, the query", () => {
-  it("asks for every todo when there is no query", async () => {
-    const { asked, listTodos } = recording();
+  it("asks for every todo when there is no query, as the attached actor", async () => {
+    const { asked, actors, listTodos } = recording();
 
     await list(listTodos, "");
 
     expect(asked).toEqual([{}]);
+    expect(actors).toEqual([member]);
   });
 
   // `?` with nothing after it has no keys, so it is no query.

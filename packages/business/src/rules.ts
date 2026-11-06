@@ -3,7 +3,7 @@
 /** The longest title, after trim. */
 export const TITLE_MAX = 256;
 
-/** The most todos the list holds. */
+/** The most todos one owner's list holds. */
 export const TODO_LIMIT = 500;
 
 /**
@@ -19,8 +19,10 @@ export type RuleId =
   | "patch.nonempty"
   | "todos.cap"
   | "todo.exists"
+  | "todo.owned"
   | "todos.order"
-  | "todos.unique_id";
+  | "todos.unique_id"
+  | "todos.scoped";
 
 /**
  * A rule as prd/todo/rules.md defines it: its kind, its statement, its
@@ -53,10 +55,10 @@ export const RULES: Readonly<Record<RuleId, Rule>> = {
   },
   "todos.cap": {
     kind: "state",
-    statement: "The list holds fewer than `limit` todos when one is added.",
+    statement: "The owner's list holds fewer than `limit` todos when one is added.",
     parameters: { limit: TODO_LIMIT },
     violations: [],
-    source: "PRD deviation 9.",
+    source: "PRD deviation 9; per owner from deviation 21.",
   },
   "todo.exists": {
     kind: "state",
@@ -64,6 +66,13 @@ export const RULES: Readonly<Record<RuleId, Rule>> = {
     parameters: {},
     violations: [],
     source: "PRD › API, `PATCH /todos/:id` and `DELETE /todos/:id` (404).",
+  },
+  "todo.owned": {
+    kind: "state",
+    statement: "The todo with the id is in the actor's scope. Another's todo is `not_found`, the same as a missing one, so a caller cannot tell whether another's id exists.",
+    parameters: {},
+    violations: [],
+    source: "PRD deviation 21; L43.",
   },
   "todos.order": {
     kind: "guarantee",
@@ -78,5 +87,12 @@ export const RULES: Readonly<Record<RuleId, Rule>> = {
     parameters: {},
     violations: [],
     source: "story chapter 8, the guarantees (L29). The id is a UUID from the id source (D13).",
+  },
+  "todos.scoped": {
+    kind: "guarantee",
+    statement: "Every todo a store call reads or writes is in the scope it is given.",
+    parameters: {},
+    violations: [],
+    source: "L43: the store has no default scope, and reads and writes are scoped alike.",
   },
 };

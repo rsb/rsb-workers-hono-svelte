@@ -89,9 +89,12 @@ wanted it gone, and it is. Changing one that is gone is not: the
 change did not happen, so the row says so.
 
 ## Budget
-One page load: 1 api call on `/`, 2 on `/active` and `/completed`.
+One page load: 2 api calls on `/`, 3 on `/active` and `/completed`:
+the frame's actor read, 1 (`feature-accounts-shell.md`, Budget), and
+the page's reads, 1 on `/` and 2 on the filters.
 One action: 1 api call, then the page reloads its reads; the reload
-counts against the load. Each api call is 1 store call; each store
+counts against the load. Each todo api call is 1 store call, and the
+actor read none (the identity round trip is the gate's); each store
 call is 1 round trip to D1, of 1 statement, except mark all and clear
 completed, which are 2 (`data/app.md`). Asserted in
 `apps/bff/test/unit/budgets.test.ts`, `apps/api/test/unit/budgets.test.ts`

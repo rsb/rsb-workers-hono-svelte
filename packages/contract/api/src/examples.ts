@@ -88,6 +88,63 @@ export const examples: Record<EndpointKey, Example[]> = {
       }
     }
   ],
+  "GET /sessions/current": [
+    {
+      "name": "no one is signed in",
+      "request": {
+        "method": "GET",
+        "path": "/sessions/current",
+        "params": {},
+        "query": []
+      },
+      "status": 200,
+      "reply": {
+        "ok": true,
+        "data": {
+          "clearCookie": false
+        }
+      }
+    },
+    {
+      "name": "a member is signed in",
+      "request": {
+        "method": "GET",
+        "path": "/sessions/current",
+        "params": {},
+        "query": []
+      },
+      "status": 200,
+      "reply": {
+        "ok": true,
+        "data": {
+          "user": {
+            "id": "u-member",
+            "role": "member",
+            "emailVerified": true,
+            "name": "Ada Lovelace",
+            "email": "ada@example.com"
+          },
+          "clearCookie": false
+        }
+      }
+    },
+    {
+      "name": "the session cookie names no live session",
+      "request": {
+        "method": "GET",
+        "path": "/sessions/current",
+        "params": {},
+        "query": []
+      },
+      "status": 200,
+      "reply": {
+        "ok": true,
+        "data": {
+          "clearCookie": true
+        }
+      }
+    }
+  ],
   "GET /todos": [
     {
       "name": "lists every todo",

@@ -1,7 +1,7 @@
 import type { EndpointKey } from "@todo/contract-api";
 import { describe, expect, it } from "vitest";
 import { countingDbStore, fakeDbStore } from "./fake-db-store.ts";
-import { testApi } from "./test-api.ts";
+import { MEMBER, signedIn } from "./signed-in.ts";
 
 /** An endpoint's budget, and the one request that spends it. */
 type Budget = { storeCalls: number; path: string; init?: RequestInit };
@@ -14,6 +14,8 @@ type Budget = { storeCalls: number; path: string; init?: RequestInit };
  */
 const budgets: Record<EndpointKey, Budget> = {
   "GET /health": { storeCalls: 0, path: "/health" },
+  // What the gate attached is the reply: the identity round trip is the gate's.
+  "GET /sessions/current": { storeCalls: 0, path: "/sessions/current" },
   "GET /todos": { storeCalls: 1, path: "/todos?completed=true" },
   "GET /todos/counts": { storeCalls: 1, path: "/todos/counts" },
   "POST /todos": { storeCalls: 1, path: "/todos", init: { method: "POST", body: '{"title":"walk dog"}' } },
@@ -25,12 +27,13 @@ const budgets: Record<EndpointKey, Budget> = {
 
 describe("each endpoint spends its budget of DbStore calls", () => {
   it.each(Object.entries(budgets))("%s", async (endpoint, { storeCalls, path, init }) => {
-    // One completed todo, seeded past the counter, so every request succeeds.
+    // One completed todo of the member's, seeded past the counter, so every
+    // request, sent as the member, succeeds.
     const fake = fakeDbStore();
-    await fake.addTodoUnlessFull({ id: "id-1", title: "buy milk", completed: true }, 500);
+    await fake.addTodoUnlessFull({ ownerId: "u1" }, { id: "id-1", title: "buy milk", completed: true }, 500);
     const { store, calls } = countingDbStore(fake);
     // The real gates and route table: handler, validator and operation all run (Q3).
-    const api = testApi({ dbStore: store, newId: () => "id-2" });
+    const api = signedIn(MEMBER, { dbStore: store, newId: () => "id-2" });
 
     const response = await api.request(path, init);
 

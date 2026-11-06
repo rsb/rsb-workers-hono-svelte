@@ -26,7 +26,7 @@ export async function addTodo(api: Pick<Fetcher, "fetch">, form: FormData) {
   const reply = await postTodo(api, newTodo.value);
   if (!reply.ok) {
     const kind = reply.error.kind;
-    return fail(status(kind), { title, message: addFailedMessage(kind) });
+    return fail(status(kind), { title, message: addFailedMessage(reply.error) });
   }
 
   return { added: reply.data.title };
