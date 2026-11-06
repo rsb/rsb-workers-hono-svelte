@@ -7,9 +7,9 @@ Cost line is the number `packages/data/d1/test/unit/budgets.test.ts`
 asserts; a change to one changes the other in the same commit (L36).
 Use cases and features cite an entry as `data/app.md › <id>`.
 
-Database: `DB` (the D1 database `todo`; it becomes `APP_DB` in slice A,
-beside `IDENTITY_DB`)
-Tables: `todos` (`packages/data/d1/migrations/0001_todos.sql`)
+Database: `APP_DB` (the D1 database `todo`), beside `IDENTITY_DB`
+(`data/identity.md`, L42)
+Tables: `todos` (`packages/data/d1/migrations/app/0001_todos.sql`)
 
 Every entry:
 - Failures: `unavailable` when D1 names a transient or quota error,
