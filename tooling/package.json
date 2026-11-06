@@ -1,7 +1,7 @@
 {
   "name": "@todo/tooling",
   "private": true,
-  "description": "The generators and checkers: api-spec, access, entry-chains, rules, join and the package dependency rule. Run from the root as node tooling/....ts; compiled here so pnpm check covers them.",
+  "description": "The generators and checkers: api-spec, access, entry-chains, rules, join, config-check, the package dependency rule, and the pillars view. Run from the root as node tooling/....ts; compiled here so pnpm check covers them.",
   "type": "module",
   "scripts": {
     "check": "tsc -p tsconfig.json"

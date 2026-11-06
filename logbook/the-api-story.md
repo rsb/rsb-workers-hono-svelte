@@ -239,8 +239,71 @@ The decisions behind this story are:
   is a deliberate edit, in the same commit as the code that changed
   the cost, with its reason in the commit message. Built in stage 21
   (chapter 8).
-- L37–L43 are the authentication decisions of handoff 23, recorded
-  when stage 23 builds them.
+- L37, agreed with the owner in the authentication design session
+  (handoff 23, 2026-11-05): gates are a stage. The chain is startup →
+  gates → entry point → [process] → operation → port ← data. A gate
+  runs once per entry, before routing, for every request, and does
+  exactly two things: it attaches a fact to the request, or refuses in
+  the error envelope. It never reads business data for a business
+  purpose and never decides what a request means. A gate has a
+  binding in the delivery and, when it makes a decision over a port, a
+  unit in `packages/gates`. Construct lists the bindings in order, and
+  that list is the gates' address. There is no `Gate` interface and no
+  registry. `gates` imports `business` and `fail` only; `operations`
+  and `data` never import `gates`. This amends L2. Built in stage 23
+  (chapter 15).
+- L38, agreed in the same session: the api's gates, in order, are
+  `requestId`, `bodyLimit`, `channel` and `authenticate`. Only
+  `authenticate` has a unit. The BFF runs no gate: it forwards the
+  browser's request over the service binding and decides nothing. A
+  consumer CLI sends `Authorization: Bearer`; a provider CLI runs the
+  same unit. Built in stage 23 (chapter 15).
+- L39, agreed in the same session: authentication is a gate, and
+  authorization never is. The `authenticate` unit returns the actor or
+  refuses, and never writes. No credential is `anonymous`. A cookie
+  that names no live session is `anonymous`, with a hint to clear it.
+  A bearer token that names no live session is refused as
+  `unauthenticated`, and so is a request that carries both a cookie
+  and a bearer token: a request proves itself one way. A live session
+  of a disabled user is refused, `account_disabled`. Authorization is
+  declared once in `prd/todo/access.md`, generated once into a
+  property of each operation, and applied once by a shared runner in
+  the operations layer, before the body. A delivery may at most mirror
+  it, for ordering or for OpenAPI's `security`. Built in stage 23
+  (chapter 15).
+- L40, agreed in the same session: sessions are rows in D1. A session
+  row keeps the SHA-256 of a 256-bit random token, never the token. Its
+  idle window is 24 hours, sliding, and its absolute lifetime is 30
+  days. A bearer session has no idle window and a longer lifetime. The
+  api returns a new token in the envelope; each delivery stores it its
+  own way, and the api never writes `Set-Cookie`. A token is accepted
+  only on the channel it was started for. The gate's lookup is one
+  statement, `sessions JOIN users`, on the primary. A due idle refresh
+  runs after the response, through `waitUntil`. Every sign-in makes a
+  new row and ends the old one. Built in stage 23, except sign-in and
+  sign-out, which are slice B's (chapter 15).
+- L41, agreed in the same session: `users` and `auth` are areas, and
+  processes cross them. `users` owns the person; `auth` owns proof and
+  continuity (credentials, sessions, verifications). Areas never
+  import each other. Anything that writes to both is a process. The
+  gate's join on `users.disabled` is the control for a disabled user;
+  ending that user's sessions is hygiene. Target: no process exists
+  yet (chapter 15).
+- L42, agreed in the same session: two D1 databases. The identity
+  database holds the `users` and `auth` tables; the app database holds
+  business rows that carry a `user_id` as an opaque value. The user id
+  is the only key between them, minted once, never the email, never
+  enforced by a database. No query joins across them; a read that
+  needs both is composed by id in code. Referential integrity across
+  the two is a process's concern. Built in stage 23 (chapters 8 and
+  15).
+- L43, agreed in the same session: ownership is a scope the operation
+  passes. The store has no default scope, and reads and writes are
+  scoped alike, in one statement, never read then write. No row in
+  scope is a fact, and the operation names it `not_found`. `access.md`
+  has two columns per operation, `Requires` and `Scope`, and a missing
+  row fails generation. Built in stage 23; `any` waits for slice D
+  (chapter 15).
 - L44, agreed with the owner in the PRD tree session (2026-11-05): the
   PRD is a tree. `prd/<product>/` holds documents of known kinds: a
   short root (`<product>.md`: purpose, areas, product-wide limits, the
@@ -301,6 +364,8 @@ ask for. Three refactors get the code there:
 
 Chapter 0 and chapters 11–13 are new. They are numbered so that
 references to chapters 1–10 elsewhere in the logbook stay correct.
+Chapter 15, the gates, sits between startup and the entry points in a
+request's order, and is numbered last for the same reason.
 
 Paths are under `apps/api/src/`. Business, operations and data are
 packages under `packages/` (chapter 0).
@@ -311,8 +376,10 @@ apps/api/src/
 ├─ construct.ts        builds everything, once per isolate
 ├─ route.ts            the helpers construct writes its route table with
 ├─ http.ts             our HTTP module: drives Hono
+├─ gates/              the gates' bindings (L37)
 └─ app/handlers/       entry points
 packages/
+├─ gates/              the gates' units (L37)
 ├─ operations/         the work
 ├─ processes/          compositions of operations (L22, target)
 ├─ business/           types, rules, Result
@@ -444,11 +511,11 @@ builds what the first half could have.
 In the code:
 - The first half is the module body of `index.ts`: `construct()`,
   then `serve(…)`. Both run once, when the isolate loads the module.
-- The second half is whatever `serve` registers with `app.use`. Today
-  that is only the body limit, which runs before routing so that an
-  oversized body is a 413 on any path (D16). `too-large.test.ts`
-  proves it on a path with no route, which the spec's 413 example,
-  replayed on `POST /todos`, cannot.
+- The second half is the gates (chapter 15), which `serve` registers
+  with `app.use` in construct's order. The body limit is one of them.
+  It runs before routing, so an oversized body is a 413 on any path
+  (D16). `too-large.test.ts` proves it on a path with no route, which
+  the spec's 413 example, replayed on `POST /todos`, cannot.
 
 Whatever the first half builds lives as long as the isolate. Since
 stage 06 that is only objects, never state: the `DbStore` holds the D1
@@ -462,10 +529,8 @@ nothing needs it: building the store only keeps the binding, and
 prepares no statement. A store whose creation needs I/O (a Postgres
 pool, a D1 session per request) reopens this (review item 30).
 
-**Open.**
-- What the per-request half contains beyond the body limit.
-- Where middleware lives once there is middleware of our own. The
-  owner suggested "middle", and Claude suggested `middleware`.
+Stage 23 settled what the per-request half holds, and where: it is the
+gates, and their bindings live in `apps/api/src/gates/` (L37).
 
 ## 2. `index.ts`
 
@@ -486,27 +551,33 @@ Hono's configuration behind it:
 `http.ts` also exports the types `Api`, `Route` and `Routes`, which
 describe what construct must hand it (chapter 4).
 
-Today the story has two steps, because there is no config. The
-bindings come from `cloudflare:workers`, and construct takes them as
-they are:
+Since stage 23 the story has three steps. The bindings come from
+`cloudflare:workers`, and construct takes them as they are, beside
+the config:
 
 ```ts
-const api = construct({ db: env.DB });
-export default serve(api);
+const config = readConfig(env);
+
+export default config.ok
+  ? serve(construct({ appDb: env.APP_DB, identityDb: env.IDENTITY_DB }, config.value))
+  : misconfigured(config.error);
 ```
 
-`index.ts` does not check that the `DB` binding exists. The toolchain
+`index.ts` does not check that the bindings exist. The toolchain
 already does: `wrangler types --check` fails `pnpm check` when the
-binding and the generated types disagree.
+bindings and the generated types disagree.
+
+A config that does not read builds nothing, and nothing throws at
+module scope. `misconfigured(problems)` is a fetch that answers every
+request 500 `internal` in the envelope, with the message `internal
+error`, as every `internal` has: the cause is logged, never sent. It
+logs the problems once, on the first request, since Workers attach
+logs to requests and a line written at module scope may never
+surface. When backlog E's PRD deviation lands, `unavailable` (503)
+replaces `internal` here.
 
 `http.ts` sits in the composition zone. Handlers do not import it.
 They take Hono's own types (`Context`) from `hono` (D3).
-
-**Open.**
-- Config failure at module load: the Worker fails to start, callers
-  get Cloudflare's error rather than our envelope, and deploy rejects
-  the script. The story should say how `index.ts` handles this once
-  config exists.
 
 ## 3. Config
 
@@ -542,9 +613,51 @@ construct's `Bindings` (chapter 4). The only check of the database our
 code will make is a readiness probe, one cheap query per call (review
 item 35, L20, not built yet).
 
-The api reads no environment value yet, so `config.ts` holds only a
-comment saying this. Config arrives with the first environment value
-(D9).
+### One schema, two readers
+
+Config arrived in stage 23 with its first two values, which the gates
+need: `BFF_ORIGIN`, which the `channel` gate compares `Origin` with,
+and `SESSION_COOKIE`, the session cookie's name (D9). Each is a
+`vars` entry in `wrangler.jsonc`, and local dev overrides them in
+`.dev.vars`.
+
+`readConfig` is the schema, and it is read in two places: by the api
+at startup, and by `tooling/config-check`, which checks a deploy's
+variables before they run (`pnpm check:config`). So it is written by
+hand, not with valibot, and imports only `Result`, which a plain node
+script can run. It returns every problem it finds, each named under
+its variable. Two rules worth knowing:
+- `BFF_ORIGIN` is an origin exactly as a browser sends it, https
+  unless the host is local, because the gate compares it as a string.
+- A `__Host-` or `__Secure-` cookie name needs an https BFF, since a
+  browser refuses such a cookie over http. The rule runs one way only:
+  a plain name over https passes.
+
+The checker hands `readConfig` what wrangler hands the Worker: a JSON
+var as its value, not as a string, so a var that is not a string is
+refused as the api would refuse it.
+
+**What the check reads is what runs.** The committed vars alone fail
+the check: a local `BFF_ORIGIN` beside the deployed `__Host-sid`. So
+`check:config` reads the committed vars with `.dev.vars` over them,
+which is local dev's config. A tooling test does the same with the
+seed's `SESSION_COOKIE=sid` as a fixture, so CI covers local dev's
+config through `test:tooling`. The same test pins that the vars alone
+are refused.
+
+CI found that pair running where it was thought to run nowhere: in
+the integration suite. The stage 23 review tour tells it
+([reports/2026-11-05-23-slice-a-review-tour.md](reports/2026-11-05-23-slice-a-review-tour.md),
+section 6).
+
+**Open.**
+- Checking a deployed config, which waits for the deploy workflow and
+  its secrets (Turnstile, slice B). When it comes, `wrangler.jsonc`'s
+  base vars become local dev's (`http://localhost:5173`, `sid`) and
+  the deployed values move to an `env.production` block beside the
+  deploy workflow, which the check then reads. That reverses stage
+  23's arrangement, and the two tests that read the deployed cookie
+  name from the base vars change with it.
 
 ## 4. Construct
 
@@ -1590,8 +1703,8 @@ port method and the use cases that use it, its input and result in
 business types, what it keeps atomic, the order it returns, its
 failures and its cost. Nothing is generated from it. SQL stays
 hand-written, because the engine-specific choices in it are made for
-performance (DB1, DB6). One file per database: `app.md` now, and
-`identity.md` when slice A adds the identity database. **Target.**
+performance (DB1, DB6). One file per database: `app.md` and, since
+stage 23, `identity.md` (L42). **Target.**
 Each store function's doc comment cites its entry, the budgets tests
 read the Cost lines instead of repeating them, and a conformance suite
 holds one test per guarantee, run against D1 now and any later store.
@@ -1604,9 +1717,13 @@ entry would cite them by the same ids.
 
 ### The D1 package
 
-`packages/data/d1` is the api's database. It holds the migrations
-(`migrations/0001_todos.sql`) beside the code that depends on them,
-and `apps/api/wrangler.jsonc` points `migrations_dir` at them (DB8).
+`packages/data/d1` holds the api's two databases (L42): the app
+database, `APP_DB`, with the todos, and the identity database,
+`IDENTITY_DB`, with `users` and `sessions` (chapter 15). Each has its
+own migrations folder (`migrations/app/`, `migrations/identity/`)
+beside the code that depends on it, and `apps/api/wrangler.jsonc`
+points each binding's `migrations_dir` at its folder (DB8). The
+identity store's code is under `src/identity/`.
 
 The table:
 - **Order:** SQL has no insertion order, so the table has a `seq`
@@ -2540,6 +2657,8 @@ and not part of the contract, because its kinds are not the wire's
 | Kind | Meaning | Made by |
 |---|---|---|
 | `invalid` | input breaks a rule; `field` names it | `invalid(field, message)` |
+| `unauthenticated` | the credential proves no one (L39) | `unauthenticated` |
+| `forbidden` | the actor may not, and `reason` says why: `channel`, `account_disabled` or `role` | `forbidden(reason, message)` |
 | `not_found` | the thing asked for does not exist | `notFound` |
 | `limit` | a business limit refused the request | `limitReached` |
 | `too_large` | the request is bigger than we accept | `tooLarge` |
@@ -2806,3 +2925,223 @@ budgets test asserts.
 - Nothing yet compares a design's `state` enum with its feature's
   state list. The two accounts maps were checked by a script once, in
   stage 22; the check is not kept.
+
+## 15. Gates
+
+Before stage 23 every request reached an entry point as it came. Now
+every request first passes the gates, and an operation runs for an
+actor. The chain is startup → gates → entry point → [process] →
+operation → port ← data (L37). This chapter tells the gates, the
+actor they attach, and the two checks the operations layer makes on
+that actor: who may run what, and over which rows.
+
+### A gate is a stage (L37)
+
+A gate runs once per request, before routing, on every path, and does
+exactly two things: it attaches a fact to the request, or it refuses
+in the error envelope. It never reads business data for a business
+purpose and never decides what a request means. Whether a todo may be
+changed is not a gate's question.
+
+A gate has up to two parts:
+- a **binding**, in the delivery: Hono middleware in
+  `apps/api/src/gates/`. It reads the request, calls the unit if
+  there is one, and attaches or refuses. A provider CLI would have its
+  own binding, a token reader;
+- a **unit**, in `packages/gates`, only when the gate makes a decision
+  over a port. It is a plain function over plain inputs, so its test
+  needs no request: `authenticate`'s test runs every branch of L39
+  with a fixed `now` and a fake `sessions` reader.
+
+`constructGates` lists the bindings in order, and that list is the
+gates' address, as the route table is the routes' (chapter 4). There
+is no `Gate` interface and no registry: two plain functions per gate
+are a convention, held by tests.
+
+The import rule: `gates` imports `business` and `fail` only, and never
+`operations`, `valid` or `data`; `operations` and `data` never import
+`gates`. `tooling/deps/matrix.test.ts` holds it, beside the other
+packages' rules.
+
+### The api's gates, in order (L38)
+
+| Gate | Parts | Attaches | Refuses |
+| --- | --- | --- | --- |
+| `requestId` | binding | the request's id, and the log bound to it | never |
+| `bodyLimit` | binding | nothing | an oversized body, `too_large` (413), before it is parsed |
+| `channel` | binding | how the request came: `cookie`, `bearer` or `none` | an unsafe request carrying the session cookie that is not the BFF's own, `forbidden`, reason `channel` |
+| `authenticate` | binding and unit | the actor, the profile, and whether to clear the cookie | see below |
+
+**`channel`** is the api's answer to CSRF, and it is ours: Hono's
+`csrf()` checks form content types only and has had bypasses. For an
+unsafe method with the session cookie, `Sec-Fetch-Site` must be
+`same-origin` or `none`. Without it, `Origin` must equal the BFF's
+origin, and a request with neither is refused, since nothing then
+says where it came from. A body must be `application/json`: a form or
+`text/plain` body is what another site can send without a preflight.
+A request without the cookie is not checked here, since a browser
+does not send a bearer token on its own.
+
+The gate's first catch was our own BFF: it sent its writes as
+`text/plain`, and the gate refused them until they declared JSON.
+
+The BFF runs no gate. It forwards the browser's request over the
+service binding, with its `Cookie`, `Origin`, `Sec-Fetch-Site` and
+`Sec-Fetch-Mode`, and decides nothing.
+
+### Authentication is a gate (L39)
+
+The unit is `authenticate({ credentials, now })`, built over the
+`sessions` lookup and a `digest` the delivery supplies (SHA-256, so the
+package needs no platform crypto). It reads and never writes:
+
+| The request carries | The unit answers |
+| --- | --- |
+| no credential | `anonymous` |
+| a cookie that names no live session: unparseable, unknown, ended, expired, or a bearer session's token | `anonymous`, and `clearCookie` |
+| a bearer token that names no live session | refused, `unauthenticated` (401) |
+| a cookie and a bearer token together | refused, `unauthenticated`: a request proves itself one way |
+| a live session of a disabled user | refused, `forbidden`, reason `account_disabled` |
+| a live session | the actor, and the profile |
+
+A dead cookie is not an error. Two tabs racing a sign-out end at the
+signed-out page. The api never writes `Set-Cookie` (L40), so it says
+`clearCookie`, and the BFF deletes the cookie.
+
+The **actor** holds what authorization needs and nothing else:
+`anonymous`, or a user with `userId`, `role` and `emailVerified`. The
+name and email the frame shows are the **profile**, beside it, read by
+the same statement.
+
+`GET /sessions/current` returns what the gate attached: `{ user?,
+clearCookie }`, where no `user` means anonymous, since the contract has
+no unions. Its unit, `currentSession`, takes the actor and declares no
+port. Its budget is 0 `DbStore` calls: the identity round trip is the
+gate's.
+
+### Authorization is the runner's (L39)
+
+Authorization is never a gate. It is declared once, applied once, and
+at most mirrored:
+- **Declared** in `prd/todo/access.md`: one row per operation, with
+  `Requires` (`anonymous`, `member`, `verified_member`, `admin`) and
+  `Scope` (`own`, `any`, `n/a`).
+- **Generated** by `tooling/access/` into `packages/business/src/access.ts`.
+  A missing row, or a row whose operation construct does not build,
+  fails generation (`check:access`).
+- **Applied** by `run`, in `packages/operations/src/run.ts`. Every
+  operation's builder returns its body wrapped in `run(name, body)`,
+  so a built operation carries its own check. The built function takes
+  the actor; the body is handed the scope, never the actor, and its
+  type comes from the row (`ScopeOf<N>`). An `n/a` row hands the body
+  the actor, since there is no owned row to scope by. An actor below
+  the row is refused before the body: anonymous as `unauthenticated`,
+  a signed-in actor as `forbidden`, reason `role`.
+- **Mirrored** by the route. `routing(access)` binds the route helpers
+  to the generated table, and each handler runs behind its unit's row:
+  `route.ts` answers the runner's own `verdict` before the handler
+  reads the request. So an anonymous request with a bad body is a 401,
+  not a 422. This is a presentation choice: the runner still checks
+  inside the operation and stays the authority.
+
+Each endpoint in `api.md` says `Security:` in access.md's words, and
+`check:api` refuses one that is not its unit's row. OpenAPI gets a
+`session` scheme (the cookie) and a `bearer` one, and says the role as
+`x-requires`, since OpenAPI cannot.
+
+Two tests hold the runner. `apps/api/test/unit/access.test.ts` calls
+every operation construct builds as anonymous, member and admin, works
+out the verdict itself, apart from the runner, and checks each built
+function is `run`'s under its own name. `apps/api/test/unit/route.test.ts`
+shows the route's 403 `role` mirror on a made-up admin row, since every
+real row is `member` or `anonymous`. That row is the proof until slice
+D's `listUsers` retires it.
+
+### Sessions are rows (L40)
+
+The identity database's `sessions` table keeps `token_hash`, the
+SHA-256 of a 256-bit random token, never the token. `user_id`,
+`channel`, `created_at`, `idle_until`, `expires_at`, `ended_at` and
+`ended_reason` complete the row. The timeouts are business constants:
+idle 24 hours, sliding, and absolute 30 days for a cookie session; a
+bearer session has no idle window and lives 90 days.
+
+The gate's lookup is one statement, `sessions JOIN users`, on the
+primary (`data/identity.md › sessions.find`). A token is accepted only
+on the channel its session was started for. When less than half the
+idle window is left, the unit says `refreshDue`, and the binding moves
+the window after the response, through `waitUntil`; a touch that
+fails is logged, never answered.
+
+No raw token is in the repo (rl-0012), nor in the Worker's env. The
+dev seed (`pnpm seed:dev`) creates one member and one admin through
+the stores, `users.create` and `sessions.start`, and writes their raw
+tokens to the gitignored `apps/api/.dev.tokens`. The api sees only
+digests.
+
+### Areas and processes (L41)
+
+`users` owns the person: `id`, `email`, `name`, `role`, `disabled`,
+`email_verified_at`. `auth` owns proof and continuity: credentials,
+sessions and verifications. Areas never import each other. `auth`
+builds the actor from a `users` row through the gate's join. Anything
+that writes to both is a process: `signUp`, `disableUser`,
+`verifyEmail`, `changePassword`. None exists yet. The gate's join on
+`users.disabled` is the control for a disabled user; ending that
+user's sessions is hygiene.
+
+### Two databases (L42)
+
+The identity database, `IDENTITY_DB`, holds the `users` and `auth`
+tables. The app database, `APP_DB`, holds the todos, each with a
+`user_id` it treats as an opaque value. The user id is the only key
+between them, minted once by the id source in `users.create`, never
+the email, never enforced by a database. No query joins across them;
+a read that needs both sides is composed by id in code. Migrations
+and data cases are per database (chapter 8).
+
+### Ownership is a scope (L43)
+
+The runner works out the scope from the actor and the row: `own` is
+`{ ownerId }`, `any` is `{ any: true }`. The operation hands it to the
+store, and the store has no default. A read, an update and a delete
+take a `Scope`; an insert takes `Own`, since a new row needs an owner.
+Reads and writes are scoped alike, in the statement itself:
+`UPDATE … WHERE id = ? AND user_id = ?`, returning the change count,
+never a read and then a write.
+
+The scope's SQL is one of two fixed terms: `user_id = ?n` when an
+owner is bound, or `TRUE` when nothing is. It goes after the
+statement's own placeholders. The index `todos(user_id)` keeps the
+rowid after the key, so an owner's list comes in `seq` order with no
+sort.
+
+No row in scope is a fact, and the operation names it `not_found`: a
+todo of another user's is not found, never forbidden. Every todo
+operation is `own` in slice A, the admin's included. `any` is in the
+type and the store, and no operation uses it until slice D.
+
+### The gates in the entry chain index
+
+`apps/api/entry-chains.md` lists the gates first among its shared
+links, in `constructGates`' order, read from its body. The runner
+follows them: `run` and `verdict`, since units import `run` and
+`route.ts` imports `verdict`. A unit that declares no port ends its
+chain at the unit:
+
+```text
+GET /sessions/current → getCurrentSession → currentSession
+```
+
+**Open.**
+- Sign-in, sign-out and the sessions page (slice B), sign-up as the
+  first process with the step record (slice C), roles and the admin
+  pages (slice D), and a second identity method (slice E).
+- The gated cost. Each gated request is one identity round trip more.
+  The 500-add cap test shows it as a number: it now needs a 30-second
+  timeout, for 500 extra lookups in one test.
+- Whether the CLI is a provider or a consumer (handoff 11, Q7). L38
+  and L40 are written so either works.
+- Isolation beyond two databases, such as a separate auth Worker or a
+  Durable Object as the session write authority. The `sessions` port
+  is the seam.

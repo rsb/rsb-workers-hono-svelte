@@ -10,6 +10,11 @@ export default defineConfig({
   workers: 1,
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   use: { baseURL: "http://localhost:5173" },
+  // The JSON report is what the pillars view reads (logbook/pillars.md). It
+  // sits beside the unit report, so Playwright's own output, which it empties
+  // each run, goes one level down and leaves test-results/unit.json alone.
+  reporter: [[process.env.CI ? "dot" : "list"], ["json", { outputFile: "test-results/e2e.json" }]],
+  outputDir: "test-results/e2e",
   webServer: [
     {
       command: "pnpm --filter @todo/api dev:e2e",
