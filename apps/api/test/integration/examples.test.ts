@@ -55,7 +55,7 @@ const seed = async (example: Example) => {
   if (id === undefined) {
     return;
   }
-  const store = createDbStore(env.DB);
+  const store = createDbStore(env.APP_DB);
   const listed = await store.listTodos({});
   if (!listed.ok) {
     throw new Error("the seed could not list the todos");

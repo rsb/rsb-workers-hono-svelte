@@ -1,7 +1,7 @@
 {
   "name": "@todo/data-d1",
   "private": true,
-  "description": "A D1 database as the app's DbStore, with its migrations. Imports business and fail.",
+  "description": "The app and identity D1 databases as the DbStore and the IdentityStore, with their migrations. Imports business and fail.",
   "type": "module",
   "exports": {
     "./*": "./src/*"

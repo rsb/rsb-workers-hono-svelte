@@ -26,7 +26,7 @@ import { routing } from "./route.ts";
 // takes the one below, so a caller can enter at any level and replace a piece.
 
 /** What the platform hands over already configured and built: not config. */
-export type Bindings = { db: D1Database };
+export type Bindings = { appDb: D1Database };
 
 /** The concrete world: the database store and the id source. */
 export type Infra = { dbStore: DbStore; newId: () => string };
@@ -47,7 +47,7 @@ export type Operations = {
  * The running Worker always stores todos in D1 (DB4).
  */
 export const constructInfra = (bindings: Bindings): Infra => ({
-  dbStore: createDbStore(bindings.db),
+  dbStore: createDbStore(bindings.appDb),
   newId: () => crypto.randomUUID(),
 });
 
