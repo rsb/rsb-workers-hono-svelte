@@ -4,6 +4,7 @@
 // helper that loosens fails here, and each refusal is beside an accepted
 // call, so a helper that refuses everything fails too.
 
+import { type AccessRow, access } from "@todo/business/access.ts";
 import type { AddTodo } from "@todo/operations/todos/add-todo.ts";
 import { toNewTodo } from "@todo/valid/todos/new-todo.ts";
 import { toTodoPatch } from "@todo/valid/todos/todo-patch.ts";
@@ -17,7 +18,7 @@ import { routing } from "../../src/route.ts";
 
 declare const operations: Operations;
 const { addTodo, countTodos, listTodos } = operations;
-const { route, probe } = routing<Operations>();
+const { route, probe } = routing<Operations>(access);
 
 // Accepted: a handler with its unit, with its validator when it takes one.
 route({ postTodos }, { addTodo }, { toNewTodo });
@@ -46,16 +47,21 @@ const takesANumber = (unit: (n: number) => Promise<number>) => (c: Context) => c
 // @ts-expect-error
 route({ takesANumber }, { addTodo });
 
+declare const row: AccessRow;
 declare const twins: { first: AddTodo; second: AddTodo };
-const twinned = routing<typeof twins>();
+const twinned = routing<typeof twins>({ first: row, second: row });
 const { first } = twins;
 // @ts-expect-error
 twinned.route({ postTodos }, { first }, { toNewTodo });
 
-const single = routing<{ first: AddTodo }>();
+const single = routing<{ first: AddTodo }>({ first: row });
 single.route({ postTodos }, { first }, { toNewTodo });
 
-// 6. The table has a route for every endpoint, and none the contract lacks.
+// 6. Every operation has its row, so each route's handler runs behind one.
+// @ts-expect-error
+routing<typeof twins>({ first: row });
+
+// 7. The table has a route for every endpoint, and none the contract lacks.
 // Each case names one endpoint, so a new endpoint does not edit this file.
 declare const any: Route;
 declare const short: Omit<Routes, "DELETE /todos/{id}">;

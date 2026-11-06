@@ -2,8 +2,11 @@
 // (L24). The route table gives each entry point and its unit; the imports
 // give their files; two strict patterns give the rest: the port declared in
 // the operation's own file, and the data method named as the port method.
-// Private symbols (Stmt, Raw) are not links. The driver helpers every chain
-// shares are listed once.
+// Private symbols (Stmt, Raw) are not links. What every chain shares is
+// listed once: the gates, in the order construct lists them, the runner
+// every unit is wrapped in, the HTTP module, the failure handlers, the
+// handlers' helpers and the driver. A unit that declares no port reads
+// nothing of its own, so its chain ends at the unit.
 
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
@@ -11,8 +14,10 @@ import type { RouteRow } from "./routes.ts";
 import {
   type Import,
   type Workspace,
+  declaresPort,
   exports,
   fail,
+  gateLinesOf,
   importOf,
   importsOf,
   portOf,
@@ -131,6 +136,27 @@ export const readChains = (constructPath: string, routes: readonly RouteRow[], r
     share(shared, "errors", resolveImport(constructPath, statement.from, workspaces), values);
   }
 
+  // The gates: each a binding in the app's own files, under gates/.
+  for (const gate of gateLinesOf(constructText, constructPath)) {
+    const imported = importOf(constructPath, constructImports, gate, (specifier) => specifier.startsWith("./gates/"), "a gate");
+    share(shared, "gates", resolveImport(constructPath, imported.from, workspaces), [gate]);
+  }
+
+  // The runner: what the route helpers take from it, to answer a unit's row
+  // before its handler; each unit adds what it is wrapped in.
+  const runner = (path: string, imports: Import[]) => {
+    for (const statement of imports) {
+      const values = statement.names.filter((imported) => !imported.typeOnly).map((imported) => imported.name);
+      const resolved = statement.from.startsWith(".") || statement.from.startsWith("@todo/") ? resolveImport(path, statement.from, workspaces) : "";
+      if (resolved.endsWith("/run.ts") && values.length > 0) {
+        share(shared, "runner", resolved, values);
+      }
+    }
+  };
+  const helpers = importOf(constructPath, constructImports, "routing", (specifier) => specifier.startsWith("./"), "the route helpers");
+  const helpersPath = resolveImport(constructPath, helpers.from, workspaces);
+  runner(helpersPath, importsOf(read(helpersPath), helpersPath));
+
   const methods = dataMethods(constructPath, constructImports, workspaces, shared);
   const routePath = relative(root, constructPath);
   const chains: Chain[] = [];
@@ -194,9 +220,24 @@ export const readChains = (constructPath: string, routes: readonly RouteRow[], r
     if (!exports(unitText, route.unit)) {
       return fail(unitPath, `does not export ${route.unit}, the unit construct gives the route ${route.key}`);
     }
+    runner(unitPath, importsOf(unitText, unitPath));
     const useCase = useCaseOf(unitText, unitPath);
     if (!existsSync(join(root, useCase))) {
       return fail(unitPath, `cites ${useCase}, which does not exist`);
+    }
+    const head = [
+      { label: "use case", path: useCase, symbols: [] },
+      { label: "route", path: routePath, symbols: ["constructRoutes"] },
+      { label: "handler", path: handlerPath, symbols: [route.name] },
+      ...rules,
+    ];
+    if (!declaresPort(unitText)) {
+      chains.push({
+        key: route.key,
+        line: `${route.key} → ${route.name} → ${route.unit}`,
+        rows: [...head, { label: "op", path: unitPath, symbols: [route.unit] }],
+      });
+      continue;
     }
     const port = portOf(unitText, unitPath);
     if (port.methods.length !== 1) {
@@ -216,21 +257,23 @@ export const readChains = (constructPath: string, routes: readonly RouteRow[], r
       key: route.key,
       line,
       rows: [
-        { label: "use case", path: useCase, symbols: [] },
-        { label: "route", path: routePath, symbols: ["constructRoutes"] },
-        { label: "handler", path: handlerPath, symbols: [route.name] },
-        ...rules,
+        ...head,
         { label: "op", path: unitPath, symbols: [route.unit, port.name] },
         { label: "data", path: data.path, symbols: [`${data.store}.${portMethod}`] },
       ],
     });
   }
 
-  const order = ["http", "errors", "handlers", "driver"];
+  // In the order a request meets them. The gates keep construct's order,
+  // which is the order they run; the rest of a label is by path.
+  const order = ["gates", "runner", "http", "errors", "handlers", "driver"];
   const sharedRows = [...shared.values()].sort((a, b) => {
     const byLabel = order.indexOf(a.label) - order.indexOf(b.label);
     if (byLabel !== 0) {
       return byLabel;
+    }
+    if (a.label === "gates") {
+      return 0;
     }
     if (a.path < b.path) {
       return -1;

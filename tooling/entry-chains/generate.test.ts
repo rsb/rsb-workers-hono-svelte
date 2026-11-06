@@ -18,6 +18,7 @@ const apiCheck = (openApi: string) =>
   run([
     "tooling/api-spec/generate.ts",
     "prd/todo/api.md",
+    "prd/todo/access.md",
     "packages/contract/api/src",
     openApi,
     "apps/api/src/construct.ts",

@@ -43,7 +43,7 @@ Reply: 200
 
 /** An endpoint `GET /a` with the given examples. */
 const getA = (examples: string, errors = "none") =>
-  `\n### \`GET /a\`\nServes: x.\n\nReply: 200 \`R\`\n- \`ok\`: boolean\n\nErrors: ${errors}\n${examples}`;
+  `\n### \`GET /a\`\nServes: x.\nSecurity: \`anonymous\`\n\nReply: 200 \`R\`\n- \`ok\`: boolean\n\nErrors: ${errors}\n${examples}`;
 
 const problems = (source: string) => {
   const parsed = parse(source);
@@ -98,13 +98,17 @@ describe("parse", () => {
   it("reads the todo api", () => {
     const parsed = parse(readFileSync("prd/todo/api.md", "utf8"));
     assert.ok(parsed.ok, JSON.stringify(!parsed.ok && parsed.problems));
-    assert.equal(parsed.spec.endpoints.length, 8);
+    assert.equal(parsed.spec.endpoints.length, 9);
     assert.deepEqual(parsed.spec.everyKinds, ["unauthenticated", "forbidden", "too_large", "internal"]);
     const applies = Object.fromEntries(parsed.spec.endpoints.map((e) => [`${e.method} ${e.path}`, e.applies]));
     assert.deepEqual(applies["POST /todos"], ["title.length"]);
     assert.deepEqual(applies["PATCH /todos/{id}"], ["patch.nonempty", "title.length"]);
     assert.deepEqual(applies["GET /todos"], []);
     assert.equal(applies["GET /health"], undefined);
+    const security = Object.fromEntries(parsed.spec.endpoints.map((e) => [`${e.method} ${e.path}`, e.security]));
+    assert.equal(security["GET /health"], "anonymous");
+    assert.equal(security["GET /sessions/current"], "anonymous");
+    assert.equal(security["POST /todos"], "member");
   });
 
   it("reads an endpoint's parts and its inline shapes", () => {
@@ -113,6 +117,7 @@ describe("parse", () => {
 ### \`PATCH /todos/{id}\`
 Serves: \`use-cases/todos/change-a-todo.md\`.
 Applies: \`patch.nonempty\`, \`title.length\`
+Security: \`member\`
 
 Path:
 - \`id\`: text
@@ -162,6 +167,7 @@ Reply: 404
     const [endpoint] = parsed.spec.endpoints;
     assert.equal(endpoint?.serves, "`use-cases/todos/change-a-todo.md`");
     assert.deepEqual(endpoint?.applies, ["patch.nonempty", "title.length"]);
+    assert.equal(endpoint?.security, "member");
     assert.deepEqual(endpoint?.params.map((param) => param.name), ["id"]);
     assert.equal(endpoint?.body, "PatchTodoBody");
     assert.equal(endpoint?.status, 200);
@@ -213,12 +219,12 @@ Reply: 404
   });
 
   it("refuses parts out of order", () => {
-    const found = problems(spec(`\n### \`GET /a\`\nReply: 200 \`R\`\n- \`ok\`: boolean\n\nServes: x.\n\nErrors: none\n${works}`));
-    assert.deepEqual(found, ["Serves: is out of order; the order is Serves, Applies, Path, Query, Body, Reply, Errors, Examples"]);
+    const found = problems(spec(`\n### \`GET /a\`\nReply: 200 \`R\`\n- \`ok\`: boolean\n\nServes: x.\nSecurity: \`anonymous\`\n\nErrors: none\n${works}`));
+    assert.deepEqual(found, ["Serves: is out of order; the order is Serves, Applies, Security, Path, Query, Body, Reply, Errors, Examples"]);
   });
 
   it("refuses a shape that is not defined", () => {
-    const found = problems(spec(`\n### \`GET /a\`\nServes: x.\n\nReply: 200 \`Missing\`\n\nErrors: none\n${works}`));
+    const found = problems(spec(`\n### \`GET /a\`\nServes: x.\nSecurity: \`anonymous\`\n\nReply: 200 \`Missing\`\n\nErrors: none\n${works}`));
     assert.deepEqual(found, ["shape Missing is not defined"]);
   });
 
@@ -299,13 +305,23 @@ Reply: 403
     assert.deepEqual(problems(source), ['example "refused" gives the reason role, which is not among channel']);
   });
 
+  it("refuses an endpoint without Security:", () => {
+    const found = problems(spec(getA(works).replace("Security: `anonymous`\n", "")));
+    assert.deepEqual(found, ['GET /a has no Security:; write "Security: `anonymous`" when anyone may call it']);
+  });
+
+  it("refuses a Security: that is not one of access.md's levels", () => {
+    const found = problems(spec(getA(works).replace("Security: `anonymous`", "Security: `owner`")));
+    assert.deepEqual(found, ["Security: is one of `anonymous`, `member`, `verified_member`, `admin`"]);
+  });
+
   it("refuses an endpoint without Errors:", () => {
-    const found = problems(spec(`\n### \`GET /a\`\nServes: x.\n\nReply: 200 \`R\`\n- \`ok\`: boolean\n${works}`));
+    const found = problems(spec(`\n### \`GET /a\`\nServes: x.\nSecurity: \`anonymous\`\n\nReply: 200 \`R\`\n- \`ok\`: boolean\n${works}`));
     assert.deepEqual(found, ['GET /a has no Errors:; write "Errors: none" when it adds none']);
   });
 
   it("refuses a table row", () => {
-    const found = problems(spec(`\n### \`GET /a\`\nServes: x.\n\n| a | b |\n\nReply: 200 \`R\`\n- \`ok\`: boolean\n\nErrors: none\n${works}`));
+    const found = problems(spec(`\n### \`GET /a\`\nServes: x.\nSecurity: \`anonymous\`\n\n| a | b |\n\nReply: 200 \`R\`\n- \`ok\`: boolean\n\nErrors: none\n${works}`));
     assert.equal(found.length, 1);
     assert.match(found[0] ?? "", /^an endpoint holds only/);
   });
@@ -313,7 +329,7 @@ Reply: 403
   it("reads a shared list shape", () => {
     const parsed = parse(
       spec(
-        `\n### \`GET /a\`\nServes: x.\n\nReply: 200 \`TodoList\`\n\nErrors: none\n${works}`,
+        `\n### \`GET /a\`\nServes: x.\nSecurity: \`anonymous\`\n\nReply: 200 \`TodoList\`\n\nErrors: none\n${works}`,
         "\n### `Todo`\nA todo.\n- `id`: text\n\n### `TodoList`\nlist of `Todo`\n",
       ),
     );
@@ -333,7 +349,7 @@ Reply: 403
 
   it("reads a query string into its keys and values", () => {
     const query = spec(
-      "\n### `GET /a`\nServes: x.\n\nQuery: `Q`\n- `c`: text, optional\n\nReply: 200 `R`\n- `ok`: boolean\n\nErrors: none\n" +
+      "\n### `GET /a`\nServes: x.\nSecurity: `anonymous`\n\nQuery: `Q`\n- `c`: text, optional\n\nReply: 200 `R`\n- `ok`: boolean\n\nErrors: none\n" +
         works.replace("`GET /a`", "`GET /a?c=x%20y&c=z`"),
     );
     const parsed = parse(query);

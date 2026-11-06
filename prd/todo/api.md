@@ -34,7 +34,10 @@ A body that is not JSON is refused as `validation`, with the field
 - Any request whose operation's row in `access.md` refuses its actor,
   before the operation's body runs (L43): an anonymous actor,
   `unauthenticated`; a signed-in one below the row, `forbidden`, reason
-  `role`. Every todo endpoint requires a member.
+  `role`. Each endpoint's `Security:` names the least actor its row
+  requires; every todo endpoint requires a member. The refusal comes
+  before the request's query or body is read, so a request refused
+  this way is never told its input was invalid.
 - Any request can fail on the server: `internal`.
 - A method and path not listed here: `not_found`.
 
@@ -115,10 +118,19 @@ A todo on the wire.
 Todos in creation order.
 list of `TodoReply`
 
+### `SessionUser`
+The signed-in user a request acts for, with what the frame shows.
+- `id`: text
+- `role`: one of `"member"` `"admin"`
+- `emailVerified`: boolean
+- `name`: text
+- `email`: text
+
 ## Endpoints
 
 ### `GET /health`
 Serves: `prd/todo.md`, deviation 13 and scenario 1.
+Security: `anonymous`
 
 Reply: 200 `HealthReply`
 - `ok`: literal `true`
@@ -139,9 +151,66 @@ Reply: 200
 }
 ```
 
+### `GET /sessions/current`
+Serves: `use-cases/auth/current-session.md`.
+Applies: none
+Security: `anonymous`
+
+Reply: 200 `SessionReply`
+- `user`: `SessionUser`, optional
+- `clearCookie`: boolean
+
+Errors: none
+
+Examples:
+
+Example: no one is signed in
+Request: `GET /sessions/current`
+Reply: 200
+```json
+{
+  "ok": true,
+  "data": {
+    "clearCookie": false
+  }
+}
+```
+
+Example: a member is signed in
+Request: `GET /sessions/current`
+Reply: 200
+```json
+{
+  "ok": true,
+  "data": {
+    "user": {
+      "id": "u-member",
+      "role": "member",
+      "emailVerified": true,
+      "name": "Ada Lovelace",
+      "email": "ada@example.com"
+    },
+    "clearCookie": false
+  }
+}
+```
+
+Example: the session cookie names no live session
+Request: `GET /sessions/current`
+Reply: 200
+```json
+{
+  "ok": true,
+  "data": {
+    "clearCookie": true
+  }
+}
+```
+
 ### `GET /todos`
 Serves: `use-cases/todos/list-todos.md`.
 Applies: none
+Security: `member`
 
 Query: `GetTodosQuery`
 - `completed`: one of `"true"` `"false"`, optional "completed must be true or false"
@@ -220,6 +289,7 @@ Reply: 422
 ### `GET /todos/counts`
 Serves: `use-cases/todos/count-todos.md`.
 Applies: none
+Security: `member`
 
 Reply: 200 `TodoCountsReply`
 - `active`: integer, min 0
@@ -245,6 +315,7 @@ Reply: 200
 ### `POST /todos`
 Serves: `use-cases/todos/add-a-todo.md`.
 Applies: `title.length`
+Security: `member`
 
 Body: `AddTodoBody`
 - `title`: text "title must be text"
@@ -333,6 +404,7 @@ Reply: 409
 ### `PATCH /todos`
 Serves: `use-cases/todos/mark-all-completed.md`.
 Applies: none
+Security: `member`
 
 Body: `PatchTodosBody`
 - `completed`: boolean "completed must be true or false"
@@ -391,6 +463,7 @@ Reply: 422
 ### `PATCH /todos/{id}`
 Serves: `use-cases/todos/change-a-todo.md`.
 Applies: `patch.nonempty`, `title.length`
+Security: `member`
 
 Path:
 - `id`: text
@@ -462,6 +535,7 @@ Reply: 404
 ### `DELETE /todos`
 Serves: `use-cases/todos/clear-completed.md`.
 Applies: none
+Security: `member`
 
 Query: `DeleteTodosQuery`
 - `completed`: literal `"true"` "completed must be true"
@@ -505,6 +579,7 @@ Reply: 422
 ### `DELETE /todos/{id}`
 Serves: `use-cases/todos/remove-a-todo.md`.
 Applies: none
+Security: `member`
 
 Path:
 - `id`: text

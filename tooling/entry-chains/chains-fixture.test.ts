@@ -25,8 +25,22 @@ const files: Record<string, string> = {
     'import { notFound } from "./app/handlers/errors/errors.ts";',
     'import { getHealth } from "./app/handlers/health/health.ts";',
     'import { getTodos } from "./app/handlers/todos/get-todos.ts";',
+    'import { authenticate } from "./gates/authenticate.ts";',
+    'import { requestId } from "./gates/request-id.ts";',
+    'import { routing } from "./route.ts";',
+    "",
+    "export const constructGates = (infra: Infra, config: Config): Gates => [",
+    "  requestId,",
+    "  authenticate({",
+    "    sessions: infra.identityStore,",
+    "  }),",
+    "];",
     "",
   ].join("\n"),
+  "apps/api/src/gates/request-id.ts": "export const requestId = async () => {};\n",
+  "apps/api/src/gates/authenticate.ts": "export const authenticate = () => async () => {};\n",
+  "apps/api/src/route.ts": 'import { verdict } from "@todo/operations/run.ts";\n\nexport const routing = () => verdict;\n',
+  "packages/operations/src/run.ts": "export const run = (name, body) => body;\nexport const verdict = () => undefined;\n",
   "apps/api/src/app/handlers/health/health.ts": "export const getHealth = (c: Context) => c.json({});\n",
   "apps/api/src/app/handlers/todos/get-todos.ts": [
     'import { success } from "../present.ts";',
@@ -38,6 +52,8 @@ const files: Record<string, string> = {
   ].join("\n"),
   "packages/operations/package.json": exportsAll("@todo/operations"),
   "packages/operations/src/todos/list-todos.ts": [
+    'import { run } from "../run.ts";',
+    "",
     "export type ListStore = {",
     "  listTodos(): Promise<R>;",
     "};",
@@ -91,7 +107,58 @@ const fixture = (changed: Record<string, string> = {}) => {
 
 const read = () => readChains("apps/api/src/construct.ts", routes);
 
+/** The fixture's list unit, with no port: it reads nothing of its own. */
+const portless = [
+  'import { run } from "../run.ts";',
+  "",
+  "/**",
+  " * Lists.",
+  " *",
+  " * Use case: `prd/todo/use-cases/list-todos.md`",
+  " */",
+  'export const listTodos = () => run("listTodos", async () => ok([]));',
+  "",
+].join("\n");
+
 describe("readChains on a fixture", () => {
+  it("lists the gates first, in construct's order, then the runner, as shared links", () => {
+    fixture();
+    const shared = read().shared.map((row) => [row.label, row.path, row.symbols.join(", ")]);
+    assert.deepEqual(shared.slice(0, 3), [
+      ["gates", "apps/api/src/gates/request-id.ts", "requestId"],
+      ["gates", "apps/api/src/gates/authenticate.ts", "authenticate"],
+      ["runner", "packages/operations/src/run.ts", "run, verdict"],
+    ]);
+  });
+
+  it("ends the chain of a unit that declares no port at the unit", () => {
+    fixture({ "packages/operations/src/todos/list-todos.ts": portless });
+    const chain = read().chains[1];
+    assert.equal(chain?.line, "GET /todos → getTodos → listTodos");
+    assert.deepEqual(
+      chain?.rows.map((row) => [row.label, row.symbols.join(", ")]),
+      [
+        ["use case", ""],
+        ["route", "constructRoutes"],
+        ["handler", "getTodos"],
+        ["rules", "toTodoFilter"],
+        ["op", "listTodos"],
+      ],
+    );
+  });
+
+  it("fails on a gate construct does not import from gates/", () => {
+    const text = files["apps/api/src/construct.ts"]?.replace('from "./gates/request-id.ts"', 'from "./request-id.ts"') ?? "";
+    fixture({ "apps/api/src/construct.ts": text });
+    assert.throws(read, /requestId/);
+  });
+
+  it("fails on a construct with no constructGates", () => {
+    const text = files["apps/api/src/construct.ts"]?.replace("export const constructGates", "export const gates") ?? "";
+    fixture({ "apps/api/src/construct.ts": text });
+    assert.throws(read, /exactly one "export const constructGates/);
+  });
+
   it("follows a route to its data method", () => {
     fixture();
     const index = read();

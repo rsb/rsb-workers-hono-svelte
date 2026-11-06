@@ -3,10 +3,39 @@
 // schema, each kind a failure schema at its own status, and each example a
 // named example on the request and on the reply it gets. Each route adds
 // what the spec does not hold: `operationId`, the entry point's name, and
-// `x-unit`, the unit it runs, read from the construct (L23, L24).
+// `x-unit`, the unit it runs, read from the construct (L23, L24). Each
+// endpoint's `Security:` is checked against its unit's row in `access.md`
+// before it is written (L43).
 
+import type { Requires } from "../access/parse.ts";
 import type { RouteRow } from "../entry-chains/routes.ts";
 import type { Endpoint, Example, Field, Shape, Spec, Type } from "./parse.ts";
+
+/** What the document needs of `access.md`: each operation's least actor. */
+export type AccessRows = readonly { operation: string; requires: Requires }[];
+
+/**
+ * The session cookie's name (`prd/todo.md` › Security). The api reads it
+ * from its config, `SESSION_COOKIE`; a tooling test holds the two equal.
+ * Under `http://localhost` the cookie is `sid`, which the document does not
+ * describe.
+ */
+export const SESSION_COOKIE = "__Host-sid";
+
+/**
+ * The two ways a request names its session (L38): the BFF's cookie, or a
+ * bearer token. OpenAPI cannot say which actor a session must be, so each
+ * operation also says it as `x-requires`, in `access.md`'s words.
+ */
+const securitySchemes = {
+  session: {
+    type: "apiKey",
+    in: "cookie",
+    name: SESSION_COOKIE,
+    description: "The BFF's session cookie. A request that changes something with it must come from the BFF's page.",
+  },
+  bearer: { type: "http", scheme: "bearer", description: "A session token, for a client that is not the BFF." },
+};
 
 const VERSION = "3.1.2";
 
@@ -173,6 +202,11 @@ const operation = (spec: Spec, endpoint: Endpoint, route: RouteRow): Json => {
     op["x-unit"] = route.unit;
   }
   op.description = `Serves: ${endpoint.serves}.`;
+  // Either credential names a session; with neither, the request is
+  // anonymous, which `{}` allows where the row lets anyone call.
+  const credentials = [{ session: [] }, { bearer: [] }];
+  op.security = endpoint.security === "anonymous" ? [{}, ...credentials] : credentials;
+  op["x-requires"] = endpoint.security;
 
   const params = parameters(spec, endpoint);
   if (params.length > 0) {
@@ -243,12 +277,35 @@ const routeByKey = (spec: Spec, routes: readonly RouteRow[]) => {
   return byKey;
 };
 
+/**
+ * Fails unless each endpoint's `Security:` is what its route runs under: its
+ * unit's row in `access.md`, or `anonymous` for a probe, which runs no unit
+ * and so no row (L20, L43).
+ */
+const checkSecurity = (endpoint: Endpoint, route: RouteRow, access: AccessRows) => {
+  const key = `${endpoint.method} ${endpoint.path}`;
+  if (route.unit === null) {
+    if (endpoint.security !== "anonymous") {
+      throw new Error(`${key} says Security: ${endpoint.security}, but it is a probe, which runs no unit: anonymous`);
+    }
+    return;
+  }
+  const row = access.find((found) => found.operation === route.unit);
+  if (row === undefined) {
+    throw new Error(`${key} runs ${route.unit}, which has no row in access.md`);
+  }
+  if (endpoint.security !== row.requires) {
+    throw new Error(`${key} says Security: ${endpoint.security}, but ${route.unit}'s row in access.md requires ${row.requires}`);
+  }
+};
+
 /** `openapi.json`: the whole document, as the text to write. */
-export const emitOpenApi = (spec: Spec, routes: readonly RouteRow[], source: string, script: string) => {
+export const emitOpenApi = (spec: Spec, routes: readonly RouteRow[], access: AccessRows, source: string, script: string) => {
   const byKey = routeByKey(spec, routes);
   const paths: Record<string, Json> = {};
   for (const endpoint of spec.endpoints) {
     const route = byKey.get(`${endpoint.method} ${endpoint.path}`) as RouteRow;
+    checkSecurity(endpoint, route, access);
     paths[endpoint.path] ??= {};
     (paths[endpoint.path] as Json)[endpoint.method.toLowerCase()] = operation(spec, endpoint, route);
   }
@@ -278,7 +335,7 @@ export const emitOpenApi = (spec: Spec, routes: readonly RouteRow[], source: str
     servers: [{ url: "/" }],
     security: [],
     paths,
-    components: { schemas, responses },
+    components: { schemas, responses, securitySchemes },
   };
   return `${JSON.stringify(doc, null, 2)}\n`;
 };

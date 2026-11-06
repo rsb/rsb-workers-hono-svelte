@@ -16,7 +16,7 @@ const add = (headers: Record<string, string>, body = '{"title":"buy milk"}') => 
   return api.request("/todos", { method: "POST", body, headers });
 };
 
-/** Refused by the runner, after the gates: the request passed the channel gate as anonymous. */
+/** Refused by the row, after the gates: the request passed the channel gate as anonymous. */
 const refusedAsAnonymous = async (response: Response) => {
   expect(response.status).toBe(401);
   expect(v.parse(Failure, await response.json()).error.kind).toBe("unauthenticated");

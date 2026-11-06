@@ -1,9 +1,10 @@
-import { DeletedReply, Failure, TodoCountsReply, TodoListReply, TodoReply, envelope } from "@todo/contract-api";
+import { DeletedReply, Failure, SessionReply, TodoCountsReply, TodoListReply, TodoReply, envelope, success } from "@todo/contract-api";
 import * as v from "valibot";
 import { expect, it } from "vitest";
 import { fakeDbStore } from "./fake-db-store.ts";
+import { UNKNOWN_TOKEN } from "./gates/session-rows.ts";
 import { ADMIN, MEMBER, signedIn } from "./signed-in.ts";
-import { testApi } from "./test-api.ts";
+import { config, testApi } from "./test-api.ts";
 
 // The whole api on fake stores, entered below `constructInfra` (A10): no
 // workerd, no database, and a fixed id so the reply is exact. Every
@@ -179,6 +180,54 @@ it("every todo endpoint refuses an anonymous request as unauthenticated, and sto
     expect(v.parse(Failure, await refused.json()).error.kind).toBe("unauthenticated");
   }
   expect(await dbStore.countTodos({ any: true })).toEqual({ ok: true, value: { active: 0, completed: 0 } });
+});
+
+it("refuses an anonymous request before reading its input: unauthenticated, never validation", async () => {
+  // A presentation choice (L43): the route answers the row first, so a
+  // caller who may not run the operation is not told what its input lacks.
+  const dbStore = fakeDbStore();
+  const anonymous = testApi({ dbStore });
+  const requests: [string, RequestInit?][] = [
+    ["/todos?completed=yes"],
+    ["/todos", { method: "POST", body: '{"title":3}' }],
+    ["/todos", { method: "POST", body: "not json" }],
+    ["/todos/id-1", { method: "PATCH", body: "{}" }],
+    ["/todos?completed=false", { method: "DELETE" }],
+  ];
+
+  for (const [path, init] of requests) {
+    const refused = await anonymous.request(path, init);
+    expect(refused.status, `${init?.method ?? "GET"} ${path}`).toBe(401);
+    expect(v.parse(Failure, await refused.json()).error.kind).toBe("unauthenticated");
+  }
+});
+
+it("GET /sessions/current says who the request acts for, with what the frame shows", async () => {
+  const anonymous = await testApi().request("/sessions/current");
+  expect(anonymous.status).toBe(200);
+  expect(v.parse(envelope(SessionReply), await anonymous.json())).toEqual({ ok: true, data: { clearCookie: false } });
+
+  const member = await signedIn(MEMBER).request("/sessions/current");
+  expect(v.parse(envelope(SessionReply), await member.json())).toEqual({
+    ok: true,
+    data: {
+      user: { id: "u1", role: "member", emailVerified: false, name: "Ada Lovelace", email: "ada@example.com" },
+      clearCookie: false,
+    },
+  });
+
+  const admin = await signedIn(ADMIN).request("/sessions/current");
+  expect(v.parse(success(SessionReply), await admin.json()).data.user).toMatchObject({ id: "u-admin", role: "admin" });
+});
+
+it("GET /sessions/current tells the BFF to clear a cookie that names no live session", async () => {
+  const response = await testApi().request("/sessions/current", {
+    headers: { Cookie: `${config.sessionCookie}=${UNKNOWN_TOKEN}` },
+  });
+
+  // Anonymous, and not refused (L39): the BFF deletes the cookie.
+  expect(response.status).toBe(200);
+  expect(v.parse(envelope(SessionReply), await response.json())).toEqual({ ok: true, data: { clearCookie: true } });
 });
 
 it("a member's todo is not in the admin's list, and the admin's change or delete of it is not_found", async () => {

@@ -89,6 +89,12 @@ export const useCaseOf = (text: string, path: string): string => {
   return only?.[1] ?? "";
 };
 
+/**
+ * Whether an operation declares a port at all. One that declares none reads
+ * and writes nothing of its own, so its chain ends at the unit.
+ */
+export const declaresPort = (text: string) => /^export type \w+Store = \{$/m.test(text);
+
 /** An operation's port: its exported type and the methods it declares. */
 export type Port = { name: string; methods: string[] };
 
@@ -380,6 +386,30 @@ export const operationLinesOf = (text: string, path: string): OperationLine[] =>
     lines.push({ name: built[1] ?? "", builder: built[2] ?? "" });
   }
   return lines;
+};
+
+/**
+ * The gates construct lists, in the order they run (L38): each element of
+ * `export const constructGates = (infra: Infra, config: Config): Gates => [`,
+ * closed by `];`, written at two spaces as `  gate,` or `  gate(`. The
+ * arguments under a gate are deeper, so they are not gates.
+ */
+export const gateLinesOf = (text: string, path: string): string[] => {
+  const declared = [...text.matchAll(/^export const constructGates = \(infra: Infra, config: Config\): Gates => \[\n((?:.*\n)*?)\];$/gm)];
+  if (declared.length !== 1) {
+    return fail(path, `exactly one "export const constructGates = (infra: Infra, config: Config): Gates => ["; found ${declared.length}`);
+  }
+  const gates: string[] = [];
+  for (const line of (declared[0]?.[1] ?? "").split("\n")) {
+    const gate = /^ {2}([a-z]\w*)(?:,|\()/.exec(line);
+    if (gate !== null) {
+      gates.push(gate[1] ?? "");
+    }
+  }
+  if (gates.length === 0) {
+    return fail(path, "constructGates lists no gate");
+  }
+  return gates;
 };
 
 /** The import of `name` whose specifier passes `where`, which must be exactly one, value not type. */

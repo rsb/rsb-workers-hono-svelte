@@ -1,12 +1,13 @@
 // Generates an api's contract files and its OpenAPI document from its spec
 // (L26), with each route's entry point and unit read from its construct.
 //
-//   node tooling/api-spec/generate.ts <spec> <contract src dir> <openapi file> <construct file>
-//   node tooling/api-spec/generate.ts <spec> <contract src dir> <openapi file> <construct file> --check
+//   node tooling/api-spec/generate.ts <spec> <access> <contract src dir> <openapi file> <construct file>
+//   node tooling/api-spec/generate.ts <spec> <access> <contract src dir> <openapi file> <construct file> --check
 //
 // With --check it writes nothing: it fails when a committed file differs
-// from what the spec and the construct generate. Paths are relative to the
-// repo root.
+// from what the spec and the construct generate. Either way it fails when
+// an endpoint's `Security:` is not its unit's row in `<access>`
+// (`access.md`, L43). Paths are relative to the repo root.
 //
 // The contract is written before the construct is read, since the construct
 // imports it. With --check the construct reads the committed contract, the
@@ -14,6 +15,7 @@
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
+import { parse as parseAccess } from "../access/parse.ts";
 import { ChainError } from "../entry-chains/read.ts";
 import { type RouteRow, readRoutes } from "../entry-chains/routes.ts";
 import { emitEndpoints, emitExamples, emitKinds, emitMessages } from "./emit-contract.ts";
@@ -24,7 +26,8 @@ const SCRIPT = "tooling/api-spec/generate.ts";
 
 const REGENERATE = "pnpm gen:api";
 
-const USAGE = "usage: node tooling/api-spec/generate.ts <spec> <contract src dir> <openapi file> <construct file> [--check]";
+const USAGE =
+  "usage: node tooling/api-spec/generate.ts <spec> <access> <contract src dir> <openapi file> <construct file> [--check]";
 
 type File = { path: string; text: string };
 
@@ -54,8 +57,14 @@ const settle = (files: File[], check: boolean, source: string, verb: string) => 
 
 const main = async (args: string[]) => {
   const check = args.includes("--check");
-  const [specPath, contractDir, openApiPath, constructPath] = args.filter((arg) => arg !== "--check");
-  if (specPath === undefined || contractDir === undefined || openApiPath === undefined || constructPath === undefined) {
+  const [specPath, accessPath, contractDir, openApiPath, constructPath] = args.filter((arg) => arg !== "--check");
+  if (
+    specPath === undefined ||
+    accessPath === undefined ||
+    contractDir === undefined ||
+    openApiPath === undefined ||
+    constructPath === undefined
+  ) {
     console.error(USAGE);
     return 2;
   }
@@ -64,6 +73,14 @@ const main = async (args: string[]) => {
   if (!parsed.ok) {
     for (const problem of parsed.problems) {
       console.error(`${specPath}:${problem.line}: ${problem.message}`);
+    }
+    return 1;
+  }
+
+  const access = parseAccess(readFileSync(accessPath, "utf8"));
+  if (!access.ok) {
+    for (const problem of access.problems) {
+      console.error(`${accessPath}:${problem.line}: ${problem.message}`);
     }
     return 1;
   }
@@ -89,7 +106,7 @@ const main = async (args: string[]) => {
   }
   let openApi = "";
   try {
-    openApi = emitOpenApi(parsed.spec, routes, source, SCRIPT);
+    openApi = emitOpenApi(parsed.spec, routes, access.rows, source, SCRIPT);
   } catch (error) {
     // The routes against the spec: the construct's routes are what is wrong.
     console.error(`${constructPath}: ${(error as Error).message}`);

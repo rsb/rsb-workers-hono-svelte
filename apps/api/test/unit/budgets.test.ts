@@ -14,6 +14,8 @@ type Budget = { storeCalls: number; path: string; init?: RequestInit };
  */
 const budgets: Record<EndpointKey, Budget> = {
   "GET /health": { storeCalls: 0, path: "/health" },
+  // What the gate attached is the reply: the identity round trip is the gate's.
+  "GET /sessions/current": { storeCalls: 0, path: "/sessions/current" },
   "GET /todos": { storeCalls: 1, path: "/todos?completed=true" },
   "GET /todos/counts": { storeCalls: 1, path: "/todos/counts" },
   "POST /todos": { storeCalls: 1, path: "/todos", init: { method: "POST", body: '{"title":"walk dog"}' } },

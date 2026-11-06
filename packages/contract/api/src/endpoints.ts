@@ -9,6 +9,7 @@ import {
   HealthReply,
   PatchTodoBody,
   PatchTodosBody,
+  SessionReply,
   TodoCountsReply,
   TodoListReply,
   TodoReply,
@@ -38,6 +39,14 @@ export const endpoints = {
     params: [],
     status: 200,
     reply: HealthReply,
+    errors: ["unauthenticated", "forbidden", "too_large", "internal"],
+  },
+  "GET /sessions/current": {
+    method: "GET",
+    path: "/sessions/current",
+    params: [],
+    status: 200,
+    reply: SessionReply,
     errors: ["unauthenticated", "forbidden", "too_large", "internal"],
   },
   "GET /todos": {
