@@ -7,6 +7,31 @@ export const TITLE_MAX = 256;
 export const TODO_LIMIT = 500;
 
 /**
+ * The longest email, after trim: RFC 5321's longest path, less its angle
+ * brackets.
+ */
+export const EMAIL_MAX = 254;
+
+/**
+ * The shortest password that may be set (L47). Applied by the set-time rule
+ * slice C writes; sign-in never applies it, so raising it cannot lock anyone
+ * out.
+ */
+export const PASSWORD_MIN = 15;
+
+/**
+ * The longest password, a request bound: the hash is given a fixed 32 bytes
+ * whatever the length (L48).
+ */
+export const PASSWORD_MAX = 128;
+
+/**
+ * The most sessions one list of a user's sessions returns, the most recently
+ * active first.
+ */
+export const SESSIONS_LIST_MAX = 50;
+
+/**
  * What a rule is (L29): an input rule is applied to an input, a state rule
  * holds of the state an operation is given, and a guarantee is kept by the
  * store.
@@ -17,6 +42,9 @@ export type RuleKind = "input" | "state" | "guarantee";
 export type RuleId =
   | "title.length"
   | "patch.nonempty"
+  | "email.length"
+  | "email.shape"
+  | "password.given"
   | "todos.cap"
   | "todo.exists"
   | "todo.owned"
@@ -52,6 +80,27 @@ export const RULES: Readonly<Record<RuleId, Rule>> = {
     parameters: {},
     violations: ["empty"],
     source: "PRD › API, `PATCH /todos/:id` (\"at least one\").",
+  },
+  "email.length": {
+    kind: "input",
+    statement: "An email is 1 to `max` long, counted in UTF-16 code units.",
+    parameters: { max: EMAIL_MAX },
+    violations: ["empty", "too_long"],
+    source: "L47.",
+  },
+  "email.shape": {
+    kind: "input",
+    statement: "An email is a WHATWG \"valid email address\", the definition `<input type=email>` applies, so the browser and the api never disagree. Not RFC 5322. It is ASCII only, which keeps `users.email`'s `CHECK (email = lower(email))` honest, since SQLite folds ASCII only.",
+    parameters: {},
+    violations: ["malformed"],
+    source: "L47.",
+  },
+  "password.given": {
+    kind: "input",
+    statement: "A password is 1 to `max` long, counted in UTF-16 code units. It is never trimmed and never lower-cased. Sign-in applies only this; the minimum is a set-time rule (L47).",
+    parameters: { max: PASSWORD_MAX },
+    violations: ["empty", "too_long"],
+    source: "L47.",
   },
   "todos.cap": {
     kind: "state",

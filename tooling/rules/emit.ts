@@ -251,10 +251,13 @@ export const emitRule = (spec: Spec, rule: Rule, source: string, script: string)
 };
 
 /** A field needs a local function when it is more than its decode. */
-const ownFunction = (field: InputField) => field.trimmed || field.rules.length > 0;
+const ownFunction = (field: InputField) => field.trimmed || field.lowerCased || field.rules.length > 0;
+
+/** What a field's modifiers do to its decoded text, in the order the spec writes them. */
+const modifiers = (field: InputField) => `${field.trimmed ? ".trim()" : ""}${field.lowerCased ? ".toLowerCase()" : ""}`;
 
 const fieldFunction = (field: InputField) => {
-  const steps = [field.type, ...(field.trimmed ? ["trimmed"] : [])].join(", ");
+  const steps = [field.type, ...(field.trimmed ? ["trimmed"] : []), ...(field.lowerCased ? ["lower-cased"] : [])].join(", ");
   const rules = field.rules.map((id) => `\`${id}\``).join(", ");
   const lines = [
     ...doc(`\`${field.name}\`: ${steps}${rules === "" ? "" : `, then ${rules}`}.`),
@@ -264,7 +267,7 @@ const fieldFunction = (field: InputField) => {
     "    return decoded;",
     "  }",
     "",
-    `  const applied = decoded.value${field.trimmed ? ".trim()" : ""};`,
+    `  const applied = decoded.value${modifiers(field)};`,
   ];
   for (const id of field.rules) {
     const name = `${camel(id)}Problem`;

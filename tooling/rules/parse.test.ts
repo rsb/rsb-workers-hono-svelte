@@ -22,6 +22,9 @@ describe("parse", () => {
       [
         ["title.length", "input"],
         ["patch.nonempty", "input"],
+        ["email.length", "input"],
+        ["email.shape", "input"],
+        ["password.given", "input"],
         ["todos.cap", "state"],
         ["todo.exists", "state"],
         ["todo.owned", "state"],
@@ -37,6 +40,7 @@ describe("parse", () => {
         ["TodoPatch", "todos/todo.ts"],
         ["TodoFilter", "todos/todo.ts"],
         ["Completed", "builds completed"],
+        ["SignIn", "auth/credential.ts"],
       ],
     );
   });
@@ -54,7 +58,7 @@ describe("parse", () => {
       type: "todos/todo.ts",
       builds: undefined,
       rules: [],
-      fields: [{ name: "title", type: "text", trimmed: true, optional: false, rules: ["title.length"], line: 22 }],
+      fields: [{ name: "title", type: "text", trimmed: true, lowerCased: false, optional: false, rules: ["title.length"], line: 22 }],
       line: 16,
     });
     assert.deepEqual(parsed.spec.rules[0]?.violations, [
@@ -111,6 +115,11 @@ orders by \`seq\`.
     assert.match(problems(spec(input, TITLE_RULE)).join("\n"), /an input has no Applies:/);
   });
 
+  it("refuses a modifier on a boolean field", () => {
+    const input = TITLE_INPUT.replace("Fields:", "Fields:\n- `done`: boolean, lower-cased");
+    assert.match(problems(spec(input, TITLE_RULE)).join("\n"), /done is boolean: only a text field is trimmed or lower-cased/);
+  });
+
   it("refuses an at least rule whose fields the input does not have as optional", () => {
     const input = TITLE_INPUT.replace("Fields:", "Rules:\n- `patch.nonempty`\n\nFields:");
     const rule = "\n### `patch.nonempty`\nSomething.\nKind: input\nForm: at least 1 of `title`\n\nViolations:\n- `empty`: fewer\n\nSource: PRD.\n";
@@ -136,19 +145,29 @@ describe("parseForm", () => {
 });
 
 describe("parseField", () => {
-  it("reads a field's type, trimmed and optional", () => {
+  it("reads a field's type, trimmed, lower-cased and optional", () => {
     assert.deepEqual(parseField("`title`: text, trimmed, optional"), {
       name: "title",
       type: "text",
       trimmed: true,
+      lowerCased: false,
       optional: true,
+    });
+    assert.deepEqual(parseField("`email`: text, trimmed, lower-cased"), {
+      name: "email",
+      type: "text",
+      trimmed: true,
+      lowerCased: true,
+      optional: false,
     });
     assert.deepEqual(parseField("`completed`: boolean"), {
       name: "completed",
       type: "boolean",
       trimmed: false,
+      lowerCased: false,
       optional: false,
     });
     assert.equal(parseField("`title`: text, optional, trimmed"), undefined);
+    assert.equal(parseField("`email`: text, lower-cased, trimmed"), undefined);
   });
 });

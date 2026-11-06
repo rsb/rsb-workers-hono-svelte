@@ -22,6 +22,9 @@ describe("problemMessage", () => {
     ["not_text", { field: "title", rule: "not_text" }, SOMETHING_WENT_WRONG],
     ["not_boolean", { field: "completed", rule: "not_boolean" }, SOMETHING_WENT_WRONG],
     ["patch.nonempty", { rule: "patch.nonempty", violation: "empty" }, SOMETHING_WENT_WRONG],
+    ["email.length, which no todo form carries", { field: "email", rule: "email.length", violation: "empty", max: 254 }, SOMETHING_WENT_WRONG],
+    ["email.shape, which no todo form carries", { field: "email", rule: "email.shape", violation: "malformed" }, SOMETHING_WENT_WRONG],
+    ["password.given, which no todo form carries", { field: "password", rule: "password.given", violation: "empty", max: 128 }, SOMETHING_WENT_WRONG],
   ])("words %s", (_, problem, message) => {
     expect(problemMessage(problem)).toBe(message);
   });

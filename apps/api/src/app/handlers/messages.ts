@@ -20,6 +20,18 @@ const message = (problem: Problem): string => {
       return `title is longer than ${problem.max} characters`;
     case "patch.nonempty":
       return "body must have title, completed or both";
+    case "email.length":
+      if (problem.violation === "empty") {
+        return "email is empty";
+      }
+      return `email is longer than ${problem.max} characters`;
+    case "email.shape":
+      return "email is not a valid email address";
+    case "password.given":
+      if (problem.violation === "empty") {
+        return "password is empty";
+      }
+      return `password is longer than ${problem.max} characters`;
     default: {
       const unworded: never = problem;
       return unworded;

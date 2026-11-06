@@ -4,7 +4,7 @@ The business rules of the todo app and the inputs they are applied to
 (L29, L34). Written in the vocabulary of `api.md` (L26). Generated from
 this file:
 - `packages/business/src/rules.ts`: the constants and the rule table.
-  It is the only home of `TITLE_MAX` and `TODO_LIMIT`; every other file,
+  It is the only home of the constants below; every other file,
   `todos/todo.ts` included, imports them from there.
 - `packages/valid/src`: the `Problem` union, the validators, and the
   rules of form `length` and `at least`.
@@ -30,6 +30,10 @@ such as `BODY_LIMIT_BYTES`, a closed object or a query given once, are
 - A field marked `trimmed` is trimmed after its decode and before its
   rules, as JavaScript's `String.prototype.trim` does. The input is
   built with the trimmed value.
+- A field marked `lower-cased` is lower-cased after its decode, after
+  its trim when it is also `trimmed`, and before its rules, as
+  JavaScript's `String.prototype.toLowerCase` does. The input is built
+  with the lower-cased value.
 - A field has at most one problem: the first one that fails, taking
   its decode first and then its rules in the order they are listed.
 - The rules on the whole input are applied before any field. When one
@@ -56,8 +60,9 @@ such as `BODY_LIMIT_BYTES`, a closed object or a query given once, are
   is built as that field's value.
 - `Rules:` (optional) the rules on the whole input, one id per item.
 - `Fields:` the fields, in order. Each one is
-  `` - `name`: type `` followed by `, trimmed` or `, optional` or both,
-  in that order. The field's rules are listed under it, one id per
+  `` - `name`: type `` followed by any of `, trimmed`, `, lower-cased`
+  and `, optional`, in that order. Only a `text` field is `trimmed` or
+  `lower-cased`. The field's rules are listed under it, one id per
   item.
 
 ### How a rule is written
@@ -89,6 +94,15 @@ such as `BODY_LIMIT_BYTES`, a closed object or a query given once, are
 
 - `TITLE_MAX`: 256. The longest title, after trim.
 - `TODO_LIMIT`: 500. The most todos one owner's list holds.
+- `EMAIL_MAX`: 254. The longest email, after trim: RFC 5321's longest
+  path, less its angle brackets.
+- `PASSWORD_MIN`: 15. The shortest password that may be set (L47).
+  Applied by the set-time rule slice C writes; sign-in never applies
+  it, so raising it cannot lock anyone out.
+- `PASSWORD_MAX`: 128. The longest password, a request bound: the hash
+  is given a fixed 32 bytes whatever the length (L48).
+- `SESSIONS_LIST_MAX`: 50. The most sessions one list of a user's
+  sessions returns, the most recently active first.
 
 ## Inputs
 
@@ -131,6 +145,18 @@ Builds: `completed`
 Fields:
 - `completed`: boolean
 
+### `SignIn`
+What someone signs in with: an email and a password.
+Area: `auth`
+Type: `auth/credential.ts`
+
+Fields:
+- `email`: text, trimmed, lower-cased
+  - `email.length`
+  - `email.shape`
+- `password`: text
+  - `password.given`
+
 ## Rules
 
 ### `title.length`
@@ -156,6 +182,49 @@ Violations:
 - `empty`: fewer
 
 Source: PRD › API, `PATCH /todos/:id` ("at least one").
+
+### `email.length`
+An email is 1 to `max` long, counted in UTF-16 code units.
+Kind: input
+Form: length, 1 to `max`
+
+Parameters:
+- `max`: `EMAIL_MAX`
+
+Violations:
+- `empty`: below
+- `too_long`: above
+
+Source: L47.
+
+### `email.shape`
+An email is a WHATWG "valid email address", the definition
+`<input type=email>` applies, so the browser and the api never
+disagree. Not RFC 5322. It is ASCII only, which keeps `users.email`'s
+`CHECK (email = lower(email))` honest, since SQLite folds ASCII only.
+Kind: input
+Form: custom
+
+Violations:
+- `malformed`
+
+Source: L47.
+
+### `password.given`
+A password is 1 to `max` long, counted in UTF-16 code units. It is
+never trimmed and never lower-cased. Sign-in applies only this; the
+minimum is a set-time rule (L47).
+Kind: input
+Form: length, 1 to `max`
+
+Parameters:
+- `max`: `PASSWORD_MAX`
+
+Violations:
+- `empty`: below
+- `too_long`: above
+
+Source: L47.
 
 ### `todos.cap`
 The owner's list holds fewer than `limit` todos when one is added.

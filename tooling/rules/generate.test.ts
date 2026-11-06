@@ -100,3 +100,18 @@ describe("rules generate with a custom rule", () => {
     assert.equal(generate("--check").status, 0);
   });
 });
+
+describe("rules generate with a lower-cased field", () => {
+  const root = join(scratch, "lower-cased");
+  const paths = { spec: join(root, "rules.md"), useCases: join(root, "use-cases"), business: join(root, "business"), valid: join(root, "valid") };
+  mkdirSync(paths.useCases, { recursive: true });
+  writeFileSync(paths.spec, spec(TITLE_INPUT.replace("text, trimmed", "text, trimmed, lower-cased"), TITLE_RULE));
+
+  it("lower-cases after the trim and before the rules, and says so", () => {
+    const result = run([paths.spec, paths.useCases, paths.business, paths.valid]);
+    assert.equal(result.status, 0, result.stderr);
+    const validator = readFileSync(join(paths.valid, "src", "todos", "new-todo.ts"), "utf8");
+    assert.match(validator, /\/\*\* `title`: text, trimmed, lower-cased, then `title\.length`\. \*\//);
+    assert.match(validator, /const applied = decoded\.value\.trim\(\)\.toLowerCase\(\);\n  const titleLengthProblem/);
+  });
+});

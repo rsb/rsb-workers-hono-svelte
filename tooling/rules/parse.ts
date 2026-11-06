@@ -11,6 +11,7 @@ export type InputField = {
   name: string;
   type: FieldType;
   trimmed: boolean;
+  lowerCased: boolean;
   optional: boolean;
   rules: string[];
   line: number;
@@ -201,14 +202,20 @@ export const parseForm = (text: string): Form | undefined => {
   return undefined;
 };
 
-/** A field item: `` `name`: type[, trimmed][, optional] ``. */
+/** A field item: `` `name`: type[, trimmed][, lower-cased][, optional] ``. */
 export const parseField = (text: string): Omit<InputField, "rules" | "line"> | undefined => {
-  const match = /^`([a-z][A-Za-z]*)`: (text|boolean)((?:, trimmed)?)((?:, optional)?)$/.exec(text);
+  const match = /^`([a-z][A-Za-z]*)`: (text|boolean)((?:, trimmed)?)((?:, lower-cased)?)((?:, optional)?)$/.exec(text);
   if (match === null) {
     return undefined;
   }
-  const [, name = "", type = "text", trimmed, optional] = match;
-  return { name, type: type as FieldType, trimmed: trimmed !== "", optional: optional !== "" };
+  const [, name = "", type = "text", trimmed, lowerCased, optional] = match;
+  return {
+    name,
+    type: type as FieldType,
+    trimmed: trimmed !== "",
+    lowerCased: lowerCased !== "",
+    optional: optional !== "",
+  };
 };
 
 /** A list of ids, one per item, each alone in backticks. */
@@ -260,7 +267,7 @@ const parseInput = (block: Block, problems: SpecProblem[]): Input | undefined =>
   for (const item of fieldsList?.items ?? []) {
     const field = parseField(item.text);
     if (field === undefined) {
-      problems.push({ line: item.line, message: `a field is \`name\`: type[, trimmed][, optional]: ${item.text}` });
+      problems.push({ line: item.line, message: `a field is \`name\`: type[, trimmed][, lower-cased][, optional]: ${item.text}` });
       continue;
     }
     if (fields.some((other) => other.name === field.name)) {
@@ -479,6 +486,9 @@ export const validate = (spec: Spec): SpecProblem[] => {
       }
     }
     for (const field of input.fields) {
+      if (field.type !== "text" && (field.trimmed || field.lowerCased)) {
+        problems.push({ line: field.line, message: `${field.name} is ${field.type}: only a text field is trimmed or lower-cased` });
+      }
       for (const id of field.rules) {
         applied.add(id);
         const rule = rules.get(id);

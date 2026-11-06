@@ -20,6 +20,21 @@ describe("invalidOf", () => {
       "title is longer than 256 characters",
     ],
     ["patch.nonempty", [{ rule: "patch.nonempty", violation: "empty" }], "body", "body must have title, completed or both"],
+    ["email.length empty", [{ field: "email", rule: "email.length", violation: "empty", max: 254 }], "email", "email is empty"],
+    [
+      "email.length too_long",
+      [{ field: "email", rule: "email.length", violation: "too_long", max: 254 }],
+      "email",
+      "email is longer than 254 characters",
+    ],
+    ["email.shape", [{ field: "email", rule: "email.shape", violation: "malformed" }], "email", "email is not a valid email address"],
+    ["password.given empty", [{ field: "password", rule: "password.given", violation: "empty", max: 128 }], "password", "password is empty"],
+    [
+      "password.given too_long",
+      [{ field: "password", rule: "password.given", violation: "too_long", max: 128 }],
+      "password",
+      "password is longer than 128 characters",
+    ],
   ])("words %s as prd/todo/api.md does", (_, problems, field, message) => {
     expect(shown(problems)).toEqual({ kind: "invalid", field, message });
   });
