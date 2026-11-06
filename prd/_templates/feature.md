@@ -14,7 +14,7 @@ Slice: <the slice that ships it, or "shipped, slice N">
 Design: `design/<folder>/` (boards named `<view>.<state>.<viewport>.<theme>`)
 
 ## Purpose
-Two sentences: what the user gets done, and what this feature is not.
+A short description: what the user gets done, and what this feature is not.
 
 ## Who
 Which actors may use it, as `access.md` says: `anonymous`, `member`,
