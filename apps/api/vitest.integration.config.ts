@@ -26,6 +26,9 @@ export default defineConfig(async () => {
     ],
     test: {
       include: ["test/integration/**/*.test.ts"],
+      // The JSON report is what the pillars view reads (logbook/pillars.md).
+      reporters: ["default", "json"],
+      outputFile: { json: "test-results/integration.json" },
       // Storage is isolated per test file, so each file starts on an empty,
       // migrated database (DB9), holding a member's and an admin's session.
       setupFiles: ["./test/integration/apply-migrations.ts", "./test/integration/seed-sessions.ts"],
