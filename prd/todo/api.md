@@ -21,11 +21,12 @@ A body that is not JSON is refused as `validation`, with the field
 - Every object is closed: a field not listed is refused.
 - Any request whose body is over `BODY_LIMIT_BYTES` (8192) is refused
   before routing: `too_large`.
-- Any request that carries the session cookie and changes something is
-  refused unless it comes from the BFF's own page: `Sec-Fetch-Site` is
-  `same-origin` or `none`, or, without it, `Origin` is the BFF's. Its
-  body, if it has one, is `application/json`. Otherwise: `forbidden`,
-  reason `channel` (L38).
+- Any request that changes something and does not carry a bearer token,
+  with the session cookie or without it, is refused unless it comes from
+  the BFF's own page: `Sec-Fetch-Site` is `same-origin` or `none`, or,
+  without it, `Origin` is the BFF's. Its body, if it has one, is
+  `application/json`. Otherwise: `forbidden`, reason `channel` (L38,
+  amended by L49 so a sign-in, which has no cookie yet, is checked too).
 - Any request whose bearer token names no live session, or that gives a
   cookie and a bearer token together: `unauthenticated`. A cookie that
   names no live session is not refused: the request is anonymous (L39).

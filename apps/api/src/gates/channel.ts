@@ -12,8 +12,8 @@ const SAFE = new Set(["GET", "HEAD", "OPTIONS"]);
 const OWN_SITE = new Set(["same-origin", "none"]);
 
 /**
- * Why an unsafe, cookie-bearing request is refused, or undefined when it may
- * go on. A browser always sends `Sec-Fetch-Site` today; `Origin` is the
+ * Why an unsafe request that is not bearer is refused, or undefined when it
+ * may go on. A browser always sends `Sec-Fetch-Site` today; `Origin` is the
  * fallback for one that does not, and a request with neither is refused,
  * since nothing then says where it came from. A body must be JSON: a form
  * or `text/plain` body is what another site can send without a preflight.
@@ -37,19 +37,22 @@ const refusal = (c: Context, bffOrigin: string): string | undefined => {
   if (c.req.raw.body !== null) {
     const type = c.req.header("Content-Type")?.split(";")[0]?.trim().toLowerCase();
     if (type !== "application/json") {
-      return "a request with the session cookie sends its body as application/json";
+      return "a request from a browser sends its body as application/json";
     }
   }
   return undefined;
 };
 
 /**
- * The third gate (L38, binding only): attaches how the request came, and
- * refuses an unsafe request with the session cookie that is not the BFF's
- * own, as `forbidden`, reason `channel`. A bearer token is not sent by a
- * browser on its own, so a request without the cookie is not checked here.
- * SvelteKit's origin check covers only form posts, and only in production;
- * this one covers every unsafe request, in every environment.
+ * The third gate (L38, amended by L49; binding only): attaches how the
+ * request came, and refuses an unsafe request that is not bearer and is not
+ * the BFF's own, as `forbidden`, reason `channel`. That is cookie or none:
+ * a request without the cookie is checked too, since a sign-in carries no
+ * cookie and another site's forged one would sign the victim in as the
+ * attacker (login CSRF, threats row 1). A bearer token is not sent by a
+ * browser on its own, so a bearer request is not checked here. SvelteKit's
+ * origin check covers only form posts, and only in production; this one
+ * covers every unsafe request, in every environment.
  */
 export const channel = (deps: { bffOrigin: string; sessionCookie: string }): MiddlewareHandler => {
   return async (c, next) => {
@@ -62,7 +65,7 @@ export const channel = (deps: { bffOrigin: string; sessionCookie: string }): Mid
     }
     c.set("channel", came);
 
-    if (came === "cookie" && !SAFE.has(c.req.method)) {
+    if (came !== "bearer" && !SAFE.has(c.req.method)) {
       const why = refusal(c, deps.bffOrigin);
       if (why !== undefined) {
         return userFailure(c, forbidden("channel" satisfies Reason, why));

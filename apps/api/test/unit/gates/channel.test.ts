@@ -5,11 +5,13 @@ import { fakeIdentityStore } from "../fake-identity-store.ts";
 import { config, testApi } from "../test-api.ts";
 import { BEARER_TOKEN, MEMBER_TOKEN, sessionRows } from "./session-rows.ts";
 
-// The `channel` gate (L38) through the whole api: an unsafe request with
-// the session cookie must come from the BFF's page and send JSON.
+// The `channel` gate (L38, amended by L49) through the whole api: an
+// unsafe request that is not bearer, with the session cookie or without
+// it, must come from the BFF's page and send JSON.
 
 const COOKIE = `${config.sessionCookie}=${MEMBER_TOKEN}`;
 const JSON_TYPE = { "Content-Type": "application/json" };
+const JSON_ONLY = "a request from a browser sends its body as application/json";
 
 const add = (headers: Record<string, string>, body = '{"title":"buy milk"}') => {
   const api = testApi({ identityStore: fakeIdentityStore(sessionRows).store });
@@ -59,12 +61,12 @@ describe("an unsafe request with the session cookie", () => {
     ["a multipart form", "multipart/form-data; boundary=x"],
   ])("is refused when its body is %s", async (_, type) => {
     const response = await add({ Cookie: COOKIE, "Sec-Fetch-Site": "same-origin", "Content-Type": type });
-    await refusedForChannel(response, "a request with the session cookie sends its body as application/json");
+    await refusedForChannel(response, JSON_ONLY);
   });
 
   it("is refused when its body has no type", async () => {
     const response = await add({ Cookie: COOKIE, "Sec-Fetch-Site": "same-origin" });
-    await refusedForChannel(response, "a request with the session cookie sends its body as application/json");
+    await refusedForChannel(response, JSON_ONLY);
   });
 
   it("goes on with JSON and a charset", async () => {
@@ -82,6 +84,40 @@ describe("an unsafe request with the session cookie", () => {
   });
 });
 
+describe("an unsafe request with no cookie (L49: a sign-in has none yet)", () => {
+  it("is refused from another site, so no other site can sign a browser in", async () => {
+    const response = await add({ "Sec-Fetch-Site": "cross-site", ...JSON_TYPE });
+    await refusedForChannel(response, "the request does not come from the BFF's page");
+  });
+
+  it("is refused with neither Sec-Fetch-Site nor Origin", async () => {
+    const response = await add(JSON_TYPE);
+    await refusedForChannel(response, "the request says neither its site nor its origin");
+  });
+
+  it("is refused when its body is plain text", async () => {
+    const response = await add({ "Sec-Fetch-Site": "same-origin", "Content-Type": "text/plain" });
+    await refusedForChannel(response, JSON_ONLY);
+  });
+
+  it("goes on from the BFF's page, and is then anonymous", async () => {
+    const response = await add({ "Sec-Fetch-Site": "same-origin", ...JSON_TYPE });
+    // Past the gate it is anonymous, and adding requires a member: the
+    // runner's 401, not the gate's 403.
+    await refusedAsAnonymous(response);
+  });
+
+  it("is checked when its cookie is of another name, since it then has no session cookie", async () => {
+    const response = await add({ Cookie: `other=${MEMBER_TOKEN}`, "Sec-Fetch-Site": "cross-site", ...JSON_TYPE });
+    await refusedForChannel(response, "the request does not come from the BFF's page");
+  });
+
+  it("goes on with a cookie of another name from the BFF's page, and is then anonymous", async () => {
+    const response = await add({ Cookie: `other=${MEMBER_TOKEN}`, "Sec-Fetch-Site": "same-origin", ...JSON_TYPE });
+    await refusedAsAnonymous(response);
+  });
+});
+
 describe("a request the gate does not check", () => {
   it("is a safe one with the session cookie, from another site", async () => {
     const api = testApi({ identityStore: fakeIdentityStore(sessionRows).store });
@@ -89,21 +125,14 @@ describe("a request the gate does not check", () => {
     expect(response.status).toBe(200);
   });
 
-  it("is an unsafe one with no cookie, since there is no session to ride", async () => {
-    const response = await add({ "Sec-Fetch-Site": "cross-site", "Content-Type": "text/plain" });
-    // Past the gate it is anonymous, and adding requires a member: the
-    // runner's 401, not the gate's 403.
-    await refusedAsAnonymous(response);
-  });
-
   it("is an unsafe one with a bearer token, which no browser sends on its own", async () => {
     const response = await add({ Authorization: `Bearer ${BEARER_TOKEN}`, "Sec-Fetch-Site": "cross-site", ...JSON_TYPE });
     expect(response.status).toBe(201);
   });
 
-  it("is one with a cookie of another name", async () => {
-    const response = await add({ Cookie: `other=${MEMBER_TOKEN}`, "Sec-Fetch-Site": "cross-site", ...JSON_TYPE });
-    // Not the session cookie, so no session: anonymous, past the gate.
+  it("is a safe one with no cookie, from another site", async () => {
+    const api = testApi({ identityStore: fakeIdentityStore(sessionRows).store });
+    const response = await api.request("/todos", { headers: { "Sec-Fetch-Site": "cross-site" } });
     await refusedAsAnonymous(response);
   });
 });

@@ -15,8 +15,8 @@ type Api = Pick<Fetcher, "fetch">;
 
 /**
  * A call with a JSON body, saying so: the api's `channel` gate refuses a
- * cookie-bearing body of any other type (L38), and a string body is
- * otherwise sent as `text/plain`.
+ * body of any other type on a request that is not bearer (L38, L49), and a
+ * string body is otherwise sent as `text/plain`.
  */
 const json = (method: "POST" | "PATCH", body: unknown): RequestInit => ({
   method,

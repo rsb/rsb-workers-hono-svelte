@@ -57,16 +57,33 @@ test("given the member's session cookie, a cross-site form post is refused and a
   await expect(rowOf(page, "from elsewhere")).toHaveCount(0);
 });
 
-test("without a session cookie, the same cross-site post is not the channel gate's to refuse", async ({ page }) => {
-  // The control for the refusal above: what the gate refused was the cookie
-  // arriving from elsewhere. Without one there is no session to ride on,
-  // so the gate lets the post go on (L38), and it is anonymous: adding
-  // requires a member, and the runner refuses it, 401 and not the gate's
-  // 403 (`access.md`).
+test("without a session cookie, the same cross-site post is refused too, and adds nothing", async ({ page }) => {
+  // L49 amends L38: the gate checks every unsafe request that is not
+  // bearer, cookie or not, since a sign-in has no cookie yet and a forged
+  // one would sign the browser in as someone else (login CSRF).
   const response = await crossSitePost(page, "no cookie, from elsewhere");
+
+  expect(response.status()).toBe(403);
+  await signInAsMember(page);
+  await open(page);
+  await expect(rowOf(page, "no cookie, from elsewhere")).toHaveCount(0);
+});
+
+test("without a session cookie, a post from the page itself passes the gate and is refused as anonymous", async ({
+  page,
+}) => {
+  // The control for the two refusals above: what the gate refused was the
+  // post arriving from elsewhere. From the BFF's own page it goes on, and
+  // it is anonymous: adding requires a member, and the runner refuses it,
+  // 401 and not the gate's 403 (`access.md`).
+  const response = await page.request.post(`${BASE}/?/add`, {
+    form: { title: "no cookie, from the page" },
+    headers: { "Sec-Fetch-Site": "same-origin", "Sec-Fetch-Mode": "navigate" },
+    maxRedirects: 0,
+  });
 
   expect(response.status()).toBe(401);
   await signInAsMember(page);
   await open(page);
-  await expect(rowOf(page, "no cookie, from elsewhere")).toHaveCount(0);
+  await expect(rowOf(page, "no cookie, from the page")).toHaveCount(0);
 });
