@@ -1,6 +1,6 @@
 import { fail } from "@sveltejs/kit";
 import { deleteTodo } from "../api/todos.ts";
-import { SOMETHING_WENT_WRONG } from "./messages.ts";
+import { SOMETHING_WENT_WRONG, failedMessage } from "./messages.ts";
 import { status } from "./status.ts";
 
 /** A form value as text, or empty when it is missing or a file. */
@@ -35,7 +35,7 @@ export async function removeTodo(api: Pick<Fetcher, "fetch">, form: FormData) {
     if (alreadyGone) {
       return { removed: id };
     }
-    return fail(status(kind), { remove: { id, message: SOMETHING_WENT_WRONG } });
+    return fail(status(kind), { remove: { id, message: failedMessage(reply.error) } });
   }
 
   return { removed: reply.data.id };

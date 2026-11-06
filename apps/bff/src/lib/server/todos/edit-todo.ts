@@ -1,7 +1,7 @@
 import { fail } from "@sveltejs/kit";
 import { toTodoPatch } from "@todo/valid/todos/todo-patch.ts";
 import { patchTodo } from "../api/todos.ts";
-import { SOMETHING_WENT_WRONG, problemMessage } from "./messages.ts";
+import { SOMETHING_WENT_WRONG, failedMessage, problemMessage } from "./messages.ts";
 import { status } from "./status.ts";
 
 /** A form value as text, or empty when it is missing or a file. */
@@ -43,7 +43,7 @@ export async function editTodo(api: Pick<Fetcher, "fetch">, form: FormData) {
   const reply = await patchTodo(api, id, patch.value);
   if (!reply.ok) {
     const kind = reply.error.kind;
-    return fail(status(kind), { edit: { id, title, message: SOMETHING_WENT_WRONG } });
+    return fail(status(kind), { edit: { id, title, message: failedMessage(reply.error) } });
   }
 
   return { edited: reply.data.id };

@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type { ErrorKind } from "@todo/contract-api";
+import type { ApiError } from "@todo/contract-api";
 import type { Problem } from "@todo/valid/problem.ts";
 import {
   LIST_FULL,
   SOMETHING_WENT_WRONG,
   addFailedMessage,
+  failedMessage,
   problemMessage,
 } from "../../../src/lib/server/todos/messages.ts";
 
@@ -33,15 +34,32 @@ describe("problemMessage", () => {
   });
 });
 
+/** An error the API answers with, for each kind and, for `forbidden`, each reason. */
+const errors: [string, ApiError][] = [
+  ["validation", { kind: "validation", field: "title", message: "for developers" }],
+  ["unauthenticated", { kind: "unauthenticated", message: "for developers" }],
+  ["forbidden channel", { kind: "forbidden", reason: "channel", message: "for developers" }],
+  ["forbidden account_disabled", { kind: "forbidden", reason: "account_disabled", message: "for developers" }],
+  ["forbidden role", { kind: "forbidden", reason: "role", message: "for developers" }],
+  ["not_found", { kind: "not_found", message: "for developers" }],
+  ["limit", { kind: "limit", message: "for developers" }],
+  ["too_large", { kind: "too_large", message: "for developers" }],
+  ["internal", { kind: "internal", message: "for developers" }],
+];
+
+describe("failedMessage", () => {
+  // In slice A no failure is one the person can fix; D words `role`.
+  it.each(errors)("words %s as something went wrong", (_, error) => {
+    expect(failedMessage(error)).toBe(SOMETHING_WENT_WRONG);
+  });
+});
+
 describe("addFailedMessage", () => {
-  it.each<[ErrorKind, string]>([
-    ["limit", LIST_FULL],
-    ["validation", SOMETHING_WENT_WRONG],
-    ["internal", SOMETHING_WENT_WRONG],
-    // Interim, until the shell's error view (stage 23, commit 10).
-    ["unauthenticated", SOMETHING_WENT_WRONG],
-    ["forbidden", SOMETHING_WENT_WRONG],
-  ])("words %s", (kind, message) => {
-    expect(addFailedMessage(kind)).toBe(message);
+  it.each(errors)("words %s as any action does, but limit", (name, error) => {
+    let message = SOMETHING_WENT_WRONG;
+    if (name === "limit") {
+      message = LIST_FULL;
+    }
+    expect(addFailedMessage(error)).toBe(message);
   });
 });

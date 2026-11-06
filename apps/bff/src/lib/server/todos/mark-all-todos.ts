@@ -1,7 +1,7 @@
 import { fail } from "@sveltejs/kit";
 import { toCompleted } from "@todo/valid/todos/completed.ts";
 import { patchTodos } from "../api/todos.ts";
-import { SOMETHING_WENT_WRONG, problemMessage } from "./messages.ts";
+import { failedMessage, problemMessage } from "./messages.ts";
 import { status } from "./status.ts";
 
 /**
@@ -23,7 +23,7 @@ export async function markAllTodos(api: Pick<Fetcher, "fetch">, form: FormData) 
   const reply = await patchTodos(api, { completed: value });
   if (!reply.ok) {
     const kind = reply.error.kind;
-    return fail(status(kind), { markAll: { message: SOMETHING_WENT_WRONG } });
+    return fail(status(kind), { markAll: { message: failedMessage(reply.error) } });
   }
 
   return { markedAll: value };

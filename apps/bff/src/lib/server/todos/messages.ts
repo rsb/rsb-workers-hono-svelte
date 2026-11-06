@@ -1,4 +1,4 @@
-import type { ErrorKind } from "@todo/contract-api";
+import type { ApiError, Reason } from "@todo/contract-api";
 import type { Problem } from "@todo/valid/problem.ts";
 
 /**
@@ -43,16 +43,60 @@ export const problemMessage = (problem: Problem): string => {
 };
 
 /**
- * The message for a failed add, from the kind the API answered with. The BFF
- * checked the title before sending it, so a `validation` answer is skew or a
- * bug, not something the person can fix: it gets the generic message.
- * So do `unauthenticated` and `forbidden`, for now: the shell's error view
- * (stage 23, commit 10) replaces this interim wording.
+ * The message for a refused action, by its reason. Every reason gets the
+ * generic message in slice A: `channel` is a request that did not come
+ * from the page, `account_disabled` is `failed` until D, and `role` cannot
+ * happen while every todo operation requires only a member. D words `role`
+ * here. Every reason must have words, so a new one does not compile until
+ * it is given some.
  */
-export const addFailedMessage = (kind: ErrorKind): string => {
-  if (kind === "limit") {
+const forbiddenMessage = (reason: Reason): string => {
+  switch (reason) {
+    case "channel":
+    case "account_disabled":
+    case "role":
+      return SOMETHING_WENT_WRONG;
+    default: {
+      const unworded: never = reason;
+      return unworded;
+    }
+  }
+};
+
+/**
+ * The message for a failed action, from the error the API answered with:
+ * `todos.list.action_failed` on the control whose action failed. The
+ * person can fix none of them by changing what they typed: the BFF checked
+ * it first, so `validation` is skew or a bug. `unauthenticated` is a
+ * session that ended since the page loaded; the reload after the action
+ * renders the shell's `signed_out`. Every kind must have words, so a new
+ * one does not compile until it is given some.
+ */
+export const failedMessage = (failed: ApiError): string => {
+  switch (failed.kind) {
+    case "forbidden":
+      return forbiddenMessage(failed.reason);
+    case "validation":
+    case "unauthenticated":
+    case "not_found":
+    case "limit":
+    case "too_large":
+    case "internal":
+      return SOMETHING_WENT_WRONG;
+    default: {
+      const unworded: never = failed;
+      return unworded;
+    }
+  }
+};
+
+/**
+ * The message for a failed add: a full list says so, and every other
+ * failure is worded as any action's is.
+ */
+export const addFailedMessage = (failed: ApiError): string => {
+  if (failed.kind === "limit") {
     return LIST_FULL;
   }
-
-  return SOMETHING_WENT_WRONG;
+  return failedMessage(failed);
 };

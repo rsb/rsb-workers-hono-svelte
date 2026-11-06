@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Filter } from "../../src/lib/filter.ts";
+import { loadFrame } from "../../src/lib/server/session/frame.ts";
 import { addTodo } from "../../src/lib/server/todos/add-todo.ts";
 import { clearCompletedTodos } from "../../src/lib/server/todos/clear-completed-todos.ts";
 import { editTodo } from "../../src/lib/server/todos/edit-todo.ts";
@@ -13,9 +14,13 @@ import type * as page from "../../src/routes/[[filter=filter]]/+page.server.ts";
 type Api = Pick<Fetcher, "fetch">;
 
 const todo = { id: "id-1", title: "buy milk", completed: false };
+const user = { id: "u1", role: "member", emailVerified: true, name: "Dev Member", email: "member@example.test" };
 
 /** The reply the API gives a successful request, by method and path. */
 const reply = (method: string, path: string): unknown => {
+  if (method === "GET" && path === "/sessions/current") {
+    return { user, clearCookie: false };
+  }
   if (method === "GET" && path === "/todos/counts") {
     return { active: 1, completed: 0 };
   }
@@ -62,12 +67,22 @@ type Budget = { apiCalls: number; run: (api: Api) => Promise<unknown> };
  * load, not the action (Q4). A change to a number goes in the commit that
  * changes the cost, with its reason.
  */
+/**
+ * A page load: the root layout's and the page's, which SvelteKit runs side
+ * by side. Every page but the probe spends the frame's actor read, 1 call
+ * (`feature-accounts-shell.md`, Budget).
+ */
+const pageLoad = (api: Api, filter: Filter) => {
+  const cookies = { delete: () => {} };
+  return Promise.all([loadFrame(api, "/[[filter=filter]]", cookies, "sid"), loadTodos(api, filter)]);
+};
+
 const loads: Record<Filter, Budget> = {
-  // The list only; the counts are derived from it (deviation 5).
-  all: { apiCalls: 1, run: (api) => loadTodos(api, "all") },
-  // The filtered list and the counts, side by side (deviation 5).
-  active: { apiCalls: 2, run: (api) => loadTodos(api, "active") },
-  completed: { apiCalls: 2, run: (api) => loadTodos(api, "completed") },
+  // The actor, and the list; the counts are derived from it (deviation 5).
+  all: { apiCalls: 2, run: (api) => pageLoad(api, "all") },
+  // The actor, and the filtered list and the counts (deviation 5).
+  active: { apiCalls: 3, run: (api) => pageLoad(api, "active") },
+  completed: { apiCalls: 3, run: (api) => pageLoad(api, "completed") },
 };
 
 const actions: Record<keyof typeof page.actions, Budget> = {
@@ -84,9 +99,11 @@ const spends = async (unit: string, { apiCalls, run }: Budget) => {
 
   const result = await run(api);
 
-  // A failed load or action can stop short of its cost, so only a success counts.
+  // A failed load or action can stop short of its cost, so only a success
+  // counts. A failed page read throws, a failed actor read is `failed`, and
+  // a failed action has a status.
   expect(result, `${unit} failed, so its cost was not measured`).not.toHaveProperty("status");
-  expect(result, `${unit} failed, so its cost was not measured`).not.toMatchObject({ error: expect.any(String) });
+  expect(JSON.stringify(result), `${unit} failed, so its cost was not measured`).not.toContain('"state":"failed"');
   const words = `${unit}: budget ${apiCalls} api calls, spent ${calls.length} (${calls.join(", ")})`;
   expect(calls.length, words).toBe(apiCalls);
 };

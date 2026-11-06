@@ -1,12 +1,3 @@
-<script lang="ts">
-	type Props = {
-		/** Why the list could not be loaded, or nothing. */
-		error: string | null;
-	};
-
-	let { error }: Props = $props();
-</script>
-
 <div class="empty">
 	<svg
 		width="28"
@@ -22,12 +13,8 @@
 		<path d="M12 20V5"></path>
 		<path d="M6 11l6-6 6 6"></path>
 	</svg>
-	{#if error}
-		<p class="lead">{error}</p>
-	{:else}
-		<p class="lead">Nothing to do yet.</p>
-		<p class="hint">Type a to-do above and press Enter to add it.</p>
-	{/if}
+	<p class="lead">Nothing to do yet.</p>
+	<p class="hint">Type a to-do above and press Enter to add it.</p>
 </div>
 
 <style>
