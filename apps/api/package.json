@@ -4,11 +4,12 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler d1 migrations apply APP_DB --local && wrangler d1 migrations apply IDENTITY_DB --local && wrangler dev",
-    "dev:e2e": "rm -rf .wrangler/e2e && wrangler d1 migrations apply APP_DB --local --persist-to .wrangler/e2e && wrangler d1 migrations apply IDENTITY_DB --local --persist-to .wrangler/e2e && wrangler dev --persist-to .wrangler/e2e",
-    "check": "wrangler types --check && tsc -p tsconfig.json",
+    "dev:e2e": "rm -rf .wrangler/e2e && wrangler d1 migrations apply APP_DB --local --persist-to .wrangler/e2e && wrangler d1 migrations apply IDENTITY_DB --local --persist-to .wrangler/e2e && node scripts/seed-dev.ts .wrangler/e2e && wrangler dev --persist-to .wrangler/e2e",
+    "seed:dev": "wrangler d1 migrations apply APP_DB --local && wrangler d1 migrations apply IDENTITY_DB --local && node scripts/seed-dev.ts",
+    "check": "wrangler types --strict-vars=false --check && tsc -p tsconfig.json && tsc -p scripts/tsconfig.json",
     "test:unit": "vitest run -c vitest.unit.config.ts",
     "test:integration": "vitest run -c vitest.integration.config.ts",
-    "types": "wrangler types"
+    "types": "wrangler types --strict-vars=false"
   },
   "dependencies": {
     "@todo/business": "workspace:*",
@@ -23,6 +24,7 @@
   },
   "devDependencies": {
     "@cloudflare/vitest-plugin": "1.4.11",
+    "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:",
     "wrangler": "catalog:"

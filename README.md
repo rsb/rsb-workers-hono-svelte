@@ -11,6 +11,7 @@ Needs Node 26.13.0 and pnpm 12.5.1 (enforced by `engines`).
 
 ```sh
 pnpm install
+pnpm seed:dev          # a dev member and admin, each with a session (prints their cookies)
 pnpm dev               # start the API and web Workers locally
 pnpm check             # verify binding types, type-check every package
 pnpm test:unit         # run the unit tests
@@ -23,6 +24,11 @@ There is no bundled test run. Each tier runs on its own, and
 
 With `pnpm dev` running, http://localhost:5173/health shows whether
 the BFF reaches the API through the binding.
+
+`pnpm seed:dev` writes `SESSION_COOKIE=sid` to `apps/api/.dev.vars`
+and the two raw session tokens to `apps/api/.dev.tokens`, each only
+when missing; both files are gitignored. `test:e2e` seeds its own fresh
+database with the same tokens.
 
 ## Layout
 
