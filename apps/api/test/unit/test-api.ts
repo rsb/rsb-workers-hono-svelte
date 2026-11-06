@@ -1,5 +1,6 @@
 import type { DbStore } from "@todo/data-d1/store.ts";
 import type { IdentityStore } from "@todo/data-d1/identity/store.ts";
+import type { Hasher } from "@todo/operations/auth/sign-in.ts";
 import type { Config } from "../../src/config.ts";
 import { type Infra, constructApi, constructGates, constructOperations, constructRoutes } from "../../src/construct.ts";
 import { serve } from "../../src/http.ts";
@@ -25,7 +26,7 @@ export const TEST_TOKEN = "n".repeat(43);
  * default, a fixed id.
  */
 export const testApi = (
-  parts: { dbStore?: DbStore; identityStore?: IdentityStore; newId?: () => string; now?: () => number } = {},
+  parts: { dbStore?: DbStore; identityStore?: IdentityStore; hasher?: Hasher; newId?: () => string; now?: () => number } = {},
 ) => {
   const infra: Infra = {
     dbStore: parts.dbStore ?? fakeDbStore(),
@@ -34,7 +35,7 @@ export const testApi = (
     now: parts.now ?? (() => NOW),
     newToken: () => TEST_TOKEN,
     digest,
-    hasher: fakeHasher().hasher,
+    hasher: parts.hasher ?? fakeHasher().hasher,
   };
   const gates = constructGates(infra, config);
   const routes = constructRoutes(constructOperations(infra));

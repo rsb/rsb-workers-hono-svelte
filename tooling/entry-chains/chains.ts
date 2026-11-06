@@ -1,4 +1,4 @@
-// Follows every route from construct down to the data method it reaches
+// Follows every route from construct down to the data methods it reaches
 // (L24). The route table gives each entry point and its unit; the imports
 // give their files; two strict patterns give the rest: the port declared in
 // the operation's own file, and the data method named as the port method.
@@ -71,42 +71,58 @@ const relativeImports = (path: string, imports: Import[], workspaces: Workspace[
 /** Where each data method lives: the table store that has it, and the data package it is in. */
 type DataMethod = { path: string; store: string; packageName: string };
 
+/** A store builder construct imports from a data package: `createDbStore`, `createIdentityStore` (L42). */
+const STORE_BUILDER = /^create\w*Store$/;
+
 /**
- * Every data method the `DbStore` holds, from the store file construct
- * builds it with: each table store it spreads, and that store's methods.
- * Each table file's driver imports are shared links.
+ * Every data method the stores hold, from each store file construct builds
+ * one with (`createDbStore`, `createIdentityStore`): each table store it
+ * spreads, and that store's methods. A port method is named as its data
+ * method, so no two table stores, in one store or across two, may have the
+ * same method. Each table file's driver imports are shared links.
  */
 const dataMethods = (constructPath: string, constructImports: Import[], workspaces: Workspace[], shared: Map<string, Row>) => {
-  const builder = importOf(
-    constructPath,
-    constructImports,
-    "createDbStore",
-    (specifier) => specifier.startsWith("@todo/data-"),
-    "the DbStore's builder",
-  );
-  const storePath = resolveImport(constructPath, builder.from, workspaces);
-  const storeText = read(storePath);
-  const storeImports = importsOf(storeText, storePath);
-  const packageName = /^packages\/data\/([^/]+)\//.exec(storePath)?.[1];
-  if (packageName === undefined) {
-    return fail(storePath, "a DbStore is built in a package under packages/data/");
+  const builders: string[] = [];
+  for (const statement of constructImports) {
+    if (!statement.from.startsWith("@todo/data-")) {
+      continue;
+    }
+    for (const imported of statement.names) {
+      if (!imported.typeOnly && STORE_BUILDER.test(imported.name)) {
+        builders.push(imported.name);
+      }
+    }
+  }
+  if (builders.length === 0) {
+    return fail(constructPath, "imports no store builder (create<Name>Store) from a data package");
   }
 
   const methods = new Map<string, DataMethod>();
-  for (const local of spreadsOf(storeText, storePath)) {
-    const table = importOf(storePath, storeImports, local, (specifier) => specifier.startsWith("./"), "a table store");
-    const tablePath = resolveImport(storePath, table.from, workspaces);
-    const tableText = read(tablePath);
-    const store = tableStoreOf(tableText, tablePath);
-    for (const method of store.methods) {
-      if (methods.has(method)) {
-        return fail(tablePath, `${store.name}.${method}: another table store already has ${method}`);
-      }
-      methods.set(method, { path: tablePath, store: store.name, packageName });
+  for (const name of builders) {
+    const builder = importOf(constructPath, constructImports, name, (specifier) => specifier.startsWith("@todo/data-"), "a store builder");
+    const storePath = resolveImport(constructPath, builder.from, workspaces);
+    const storeText = read(storePath);
+    const storeImports = importsOf(storeText, storePath);
+    const packageName = /^packages\/data\/([^/]+)\//.exec(storePath)?.[1];
+    if (packageName === undefined) {
+      return fail(storePath, "a store is built in a package under packages/data/");
     }
-    for (const helper of relativeImports(tablePath, importsOf(tableText, tablePath), workspaces)) {
-      if (helper.path.endsWith("/driver.ts")) {
-        share(shared, "driver", helper.path, helper.names);
+
+    for (const local of spreadsOf(storeText, storePath, name)) {
+      const table = importOf(storePath, storeImports, local, (specifier) => specifier.startsWith("./"), "a table store");
+      const tablePath = resolveImport(storePath, table.from, workspaces);
+      const tableText = read(tablePath);
+      const store = tableStoreOf(tableText, tablePath);
+      for (const method of store.methods) {
+        if (methods.has(method)) {
+          return fail(tablePath, `${store.name}.${method}: another table store already has ${method}`);
+        }
+        methods.set(method, { path: tablePath, store: store.name, packageName });
+      }
+      for (const helper of relativeImports(tablePath, importsOf(tableText, tablePath), workspaces)) {
+        if (helper.path.endsWith("/driver.ts")) {
+          share(shared, "driver", helper.path, helper.names);
+        }
       }
     }
   }
@@ -240,27 +256,34 @@ export const readChains = (constructPath: string, routes: readonly RouteRow[], r
       continue;
     }
     const port = portOf(unitText, unitPath);
-    if (port.methods.length !== 1) {
-      return fail(unitPath, `${port.name} has ${port.methods.length} methods; the index writes a chain through one`);
+    // Each port method reaches the data method of its name. A port of
+    // several methods, as sign-in's read and batch, is one chain through
+    // all of them, in the order the port declares them.
+    const reached: { method: string; data: DataMethod }[] = [];
+    for (const portMethod of port.methods) {
+      const data = methods.get(portMethod);
+      if (data === undefined) {
+        return fail(unitPath, `${port.name}.${portMethod} has no data method of the same name in a store`);
+      }
+      reached.push({ method: portMethod, data });
     }
-    const portMethod = port.methods[0] as string;
-    const data = methods.get(portMethod);
-    if (data === undefined) {
-      return fail(unitPath, `${port.name}.${portMethod} has no data method of the same name in the DbStore`);
+    const dataRows: Row[] = [];
+    for (const { method, data } of reached) {
+      const row = dataRows.find((each) => each.path === data.path);
+      if (row === undefined) {
+        dataRows.push({ label: "data", path: data.path, symbols: [`${data.store}.${method}`] });
+      } else {
+        row.symbols.push(`${data.store}.${method}`);
+      }
     }
 
-    const line = [
-      `${route.key} → ${route.name} → ${route.unit}`,
-      `⇢ ${port.name}.${portMethod} → ${data.packageName}.${portMethod}`,
-    ].join(" ");
+    const portMethods = reached.map(({ method }) => method).join(", ");
+    const dataMethodsReached = reached.map(({ method, data }) => `${data.packageName}.${method}`).join(", ");
+    const line = [`${route.key} → ${route.name} → ${route.unit}`, `⇢ ${port.name}.${portMethods} → ${dataMethodsReached}`].join(" ");
     chains.push({
       key: route.key,
       line,
-      rows: [
-        ...head,
-        { label: "op", path: unitPath, symbols: [route.unit, port.name] },
-        { label: "data", path: data.path, symbols: [`${data.store}.${portMethod}`] },
-      ],
+      rows: [...head, { label: "op", path: unitPath, symbols: [route.unit, port.name] }, ...dataRows],
     });
   }
 

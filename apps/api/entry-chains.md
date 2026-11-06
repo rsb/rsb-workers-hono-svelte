@@ -17,18 +17,20 @@ every request, in the order construct lists them; then each route
 answers its unit's row with the runner's verdict before its handler.
 
 ```text
-gates     apps/api/src/gates/request-id.ts                           requestId
-gates     apps/api/src/gates/body-limit.ts                           bodyLimit
-gates     apps/api/src/gates/channel.ts                              channel
-gates     apps/api/src/gates/authenticate.ts                         authenticate
-runner    packages/operations/src/run.ts                             run, verdict
-http      apps/api/src/http.ts                                       serve
-errors    apps/api/src/app/handlers/errors/errors.ts                 notFound, onError, tooLarge
-handlers  apps/api/src/app/handlers/messages.ts                      invalidOf
-handlers  apps/api/src/app/handlers/present.ts                       created, mapFailure, serverFailure, success, userFailure
-handlers  apps/api/src/app/handlers/todos/present.ts                 presentTodo
-handlers  apps/api/src/app/handlers/validate.ts                      validateBody, validateQuery
-driver    packages/data/d1/src/driver.ts                             execute, queryAll, writeThenQueryAll
+gates     apps/api/src/gates/request-id.ts                              requestId
+gates     apps/api/src/gates/body-limit.ts                              bodyLimit
+gates     apps/api/src/gates/channel.ts                                 channel
+gates     apps/api/src/gates/authenticate.ts                            authenticate
+runner    packages/operations/src/run.ts                                run, verdict
+http      apps/api/src/http.ts                                          serve
+errors    apps/api/src/app/handlers/errors/errors.ts                    notFound, onError, tooLarge
+handlers  apps/api/src/app/handlers/messages.ts                         invalidOf
+handlers  apps/api/src/app/handlers/present.ts                          created, mapFailure, serverFailure, success, userFailure
+handlers  apps/api/src/app/handlers/sessions/session-id.ts              sessionIdOf
+handlers  apps/api/src/app/handlers/todos/present.ts                    presentTodo
+handlers  apps/api/src/app/handlers/validate.ts                         validateBody, validateQuery
+handlers  apps/api/src/log.ts                                           consoleLog
+driver    packages/data/d1/src/driver.ts                                execute, executeBatch, queryAll, writeThenQueryAll
 ```
 
 ## GET /health
@@ -36,8 +38,8 @@ driver    packages/data/d1/src/driver.ts                             execute, qu
 ```text
 GET /health → getHealth
 
-route     apps/api/src/construct.ts                                  constructRoutes
-probe     apps/api/src/app/handlers/health/health.ts                 getHealth
+route     apps/api/src/construct.ts                                     constructRoutes
+probe     apps/api/src/app/handlers/health/health.ts                    getHealth
 ```
 
 ## GET /sessions/current
@@ -46,9 +48,59 @@ probe     apps/api/src/app/handlers/health/health.ts                 getHealth
 GET /sessions/current → getCurrentSession → currentSession
 
 use case  prd/todo/use-cases/auth/current-session.md
-route     apps/api/src/construct.ts                                  constructRoutes
-handler   apps/api/src/app/handlers/sessions/get-current-session.ts  getCurrentSession
-op        packages/operations/src/auth/current-session.ts            currentSession
+route     apps/api/src/construct.ts                                     constructRoutes
+handler   apps/api/src/app/handlers/sessions/get-current-session.ts     getCurrentSession
+op        packages/operations/src/auth/current-session.ts               currentSession
+```
+
+## POST /sessions
+
+```text
+POST /sessions → postSessions → signIn ⇢ SignInStore.findForSignIn, recordSignIn → d1.findForSignIn, d1.recordSignIn
+
+use case  prd/todo/use-cases/auth/sign-in.md
+route     apps/api/src/construct.ts                                     constructRoutes
+handler   apps/api/src/app/handlers/sessions/post-sessions.ts           postSessions
+rules     packages/valid/src/auth/sign-in.ts                            toSignIn
+op        packages/operations/src/auth/sign-in.ts                       signIn, SignInStore
+data      packages/data/d1/src/identity/credentials.ts                  credentialStore.findForSignIn
+data      packages/data/d1/src/identity/sign-in.ts                      signInStore.recordSignIn
+```
+
+## GET /sessions
+
+```text
+GET /sessions → getSessions → listSessions ⇢ ListSessionsStore.listSessions → d1.listSessions
+
+use case  prd/todo/use-cases/auth/list-sessions.md
+route     apps/api/src/construct.ts                                     constructRoutes
+handler   apps/api/src/app/handlers/sessions/get-sessions.ts            getSessions
+op        packages/operations/src/auth/list-sessions.ts                 listSessions, ListSessionsStore
+data      packages/data/d1/src/identity/sessions.ts                     sessionStore.listSessions
+```
+
+## DELETE /sessions
+
+```text
+DELETE /sessions → deleteSessions → signOutEverywhere ⇢ SignOutEverywhereStore.endAllSessions → d1.endAllSessions
+
+use case  prd/todo/use-cases/auth/sign-out-everywhere.md
+route     apps/api/src/construct.ts                                     constructRoutes
+handler   apps/api/src/app/handlers/sessions/delete-sessions.ts         deleteSessions
+op        packages/operations/src/auth/sign-out-everywhere.ts           signOutEverywhere, SignOutEverywhereStore
+data      packages/data/d1/src/identity/sessions.ts                     sessionStore.endAllSessions
+```
+
+## DELETE /sessions/current
+
+```text
+DELETE /sessions/current → deleteCurrentSession → signOut ⇢ SignOutStore.endSession → d1.endSession
+
+use case  prd/todo/use-cases/auth/sign-out.md
+route     apps/api/src/construct.ts                                     constructRoutes
+handler   apps/api/src/app/handlers/sessions/delete-current-session.ts  deleteCurrentSession
+op        packages/operations/src/auth/sign-out.ts                      signOut, SignOutStore
+data      packages/data/d1/src/identity/sessions.ts                     sessionStore.endSession
 ```
 
 ## GET /todos
@@ -57,11 +109,11 @@ op        packages/operations/src/auth/current-session.ts            currentSess
 GET /todos → getTodos → listTodos ⇢ ListStore.listTodos → d1.listTodos
 
 use case  prd/todo/use-cases/todos/list-todos.md
-route     apps/api/src/construct.ts                                  constructRoutes
-handler   apps/api/src/app/handlers/todos/get-todos.ts               getTodos
-rules     packages/valid/src/todos/todo-filter.ts                    toTodoFilter
-op        packages/operations/src/todos/list-todos.ts                listTodos, ListStore
-data      packages/data/d1/src/todos.ts                              todoStore.listTodos
+route     apps/api/src/construct.ts                                     constructRoutes
+handler   apps/api/src/app/handlers/todos/get-todos.ts                  getTodos
+rules     packages/valid/src/todos/todo-filter.ts                       toTodoFilter
+op        packages/operations/src/todos/list-todos.ts                   listTodos, ListStore
+data      packages/data/d1/src/todos.ts                                 todoStore.listTodos
 ```
 
 ## GET /todos/counts
@@ -70,10 +122,10 @@ data      packages/data/d1/src/todos.ts                              todoStore.l
 GET /todos/counts → getTodoCounts → countTodos ⇢ CountStore.countTodos → d1.countTodos
 
 use case  prd/todo/use-cases/todos/count-todos.md
-route     apps/api/src/construct.ts                                  constructRoutes
-handler   apps/api/src/app/handlers/todos/get-todo-counts.ts         getTodoCounts
-op        packages/operations/src/todos/count-todos.ts               countTodos, CountStore
-data      packages/data/d1/src/todos.ts                              todoStore.countTodos
+route     apps/api/src/construct.ts                                     constructRoutes
+handler   apps/api/src/app/handlers/todos/get-todo-counts.ts            getTodoCounts
+op        packages/operations/src/todos/count-todos.ts                  countTodos, CountStore
+data      packages/data/d1/src/todos.ts                                 todoStore.countTodos
 ```
 
 ## POST /todos
@@ -82,11 +134,11 @@ data      packages/data/d1/src/todos.ts                              todoStore.c
 POST /todos → postTodos → addTodo ⇢ AddStore.addTodoUnlessFull → d1.addTodoUnlessFull
 
 use case  prd/todo/use-cases/todos/add-a-todo.md
-route     apps/api/src/construct.ts                                  constructRoutes
-handler   apps/api/src/app/handlers/todos/post-todos.ts              postTodos
-rules     packages/valid/src/todos/new-todo.ts                       toNewTodo
-op        packages/operations/src/todos/add-todo.ts                  addTodo, AddStore
-data      packages/data/d1/src/todos.ts                              todoStore.addTodoUnlessFull
+route     apps/api/src/construct.ts                                     constructRoutes
+handler   apps/api/src/app/handlers/todos/post-todos.ts                 postTodos
+rules     packages/valid/src/todos/new-todo.ts                          toNewTodo
+op        packages/operations/src/todos/add-todo.ts                     addTodo, AddStore
+data      packages/data/d1/src/todos.ts                                 todoStore.addTodoUnlessFull
 ```
 
 ## PATCH /todos
@@ -95,11 +147,11 @@ data      packages/data/d1/src/todos.ts                              todoStore.a
 PATCH /todos → patchTodos → setAllCompleted ⇢ SetAllCompletedStore.setAllCompleted → d1.setAllCompleted
 
 use case  prd/todo/use-cases/todos/mark-all-completed.md
-route     apps/api/src/construct.ts                                  constructRoutes
-handler   apps/api/src/app/handlers/todos/patch-todos.ts             patchTodos
-rules     packages/valid/src/todos/completed.ts                      toCompleted
-op        packages/operations/src/todos/set-all-completed.ts         setAllCompleted, SetAllCompletedStore
-data      packages/data/d1/src/todos.ts                              todoStore.setAllCompleted
+route     apps/api/src/construct.ts                                     constructRoutes
+handler   apps/api/src/app/handlers/todos/patch-todos.ts                patchTodos
+rules     packages/valid/src/todos/completed.ts                         toCompleted
+op        packages/operations/src/todos/set-all-completed.ts            setAllCompleted, SetAllCompletedStore
+data      packages/data/d1/src/todos.ts                                 todoStore.setAllCompleted
 ```
 
 ## PATCH /todos/{id}
@@ -108,11 +160,11 @@ data      packages/data/d1/src/todos.ts                              todoStore.s
 PATCH /todos/{id} → patchTodo → updateTodo ⇢ UpdateStore.updateTodo → d1.updateTodo
 
 use case  prd/todo/use-cases/todos/change-a-todo.md
-route     apps/api/src/construct.ts                                  constructRoutes
-handler   apps/api/src/app/handlers/todos/patch-todo.ts              patchTodo
-rules     packages/valid/src/todos/todo-patch.ts                     toTodoPatch
-op        packages/operations/src/todos/update-todo.ts               updateTodo, UpdateStore
-data      packages/data/d1/src/todos.ts                              todoStore.updateTodo
+route     apps/api/src/construct.ts                                     constructRoutes
+handler   apps/api/src/app/handlers/todos/patch-todo.ts                 patchTodo
+rules     packages/valid/src/todos/todo-patch.ts                        toTodoPatch
+op        packages/operations/src/todos/update-todo.ts                  updateTodo, UpdateStore
+data      packages/data/d1/src/todos.ts                                 todoStore.updateTodo
 ```
 
 ## DELETE /todos
@@ -121,10 +173,10 @@ data      packages/data/d1/src/todos.ts                              todoStore.u
 DELETE /todos → deleteTodos → deleteCompleted ⇢ DeleteCompletedStore.deleteCompleted → d1.deleteCompleted
 
 use case  prd/todo/use-cases/todos/clear-completed.md
-route     apps/api/src/construct.ts                                  constructRoutes
-handler   apps/api/src/app/handlers/todos/delete-todos.ts            deleteTodos
-op        packages/operations/src/todos/delete-completed.ts          deleteCompleted, DeleteCompletedStore
-data      packages/data/d1/src/todos.ts                              todoStore.deleteCompleted
+route     apps/api/src/construct.ts                                     constructRoutes
+handler   apps/api/src/app/handlers/todos/delete-todos.ts               deleteTodos
+op        packages/operations/src/todos/delete-completed.ts             deleteCompleted, DeleteCompletedStore
+data      packages/data/d1/src/todos.ts                                 todoStore.deleteCompleted
 ```
 
 ## DELETE /todos/{id}
@@ -133,8 +185,8 @@ data      packages/data/d1/src/todos.ts                              todoStore.d
 DELETE /todos/{id} → deleteTodo → deleteTodo ⇢ DeleteStore.deleteTodo → d1.deleteTodo
 
 use case  prd/todo/use-cases/todos/remove-a-todo.md
-route     apps/api/src/construct.ts                                  constructRoutes
-handler   apps/api/src/app/handlers/todos/delete-todo.ts             deleteTodo
-op        packages/operations/src/todos/delete-todo.ts               deleteTodo, DeleteStore
-data      packages/data/d1/src/todos.ts                              todoStore.deleteTodo
+route     apps/api/src/construct.ts                                     constructRoutes
+handler   apps/api/src/app/handlers/todos/delete-todo.ts                deleteTodo
+op        packages/operations/src/todos/delete-todo.ts                  deleteTodo, DeleteStore
+data      packages/data/d1/src/todos.ts                                 todoStore.deleteTodo
 ```

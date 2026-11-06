@@ -76,16 +76,16 @@ export const fakeDbStore = (): DbStore => {
 };
 
 /**
- * Wraps a store so that each method call is recorded by name, then passed
- * to the store unchanged. The api's budgets count these: one call is one
- * call through an operation's port.
+ * Wraps a store, the `DbStore` or the `IdentityStore`, so that each method
+ * call is recorded by name, then passed to the store unchanged. The api's
+ * budgets count these: one call is one call through a port, or the gate's.
  */
-export const countingDbStore = (store: DbStore) => {
-  const calls: (keyof DbStore)[] = [];
+export const countingStore = <S extends object>(store: S) => {
+  const calls: (keyof S & string)[] = [];
   const counted = { ...store };
-  for (const name of Object.keys(store) as (keyof DbStore)[]) {
+  for (const name of Object.keys(store) as (keyof S & string)[]) {
     const method = store[name] as (...args: unknown[]) => unknown;
-    (counted as Record<keyof DbStore, unknown>)[name] = (...args: unknown[]) => {
+    (counted as Record<keyof S, unknown>)[name] = (...args: unknown[]) => {
       calls.push(name);
       return method(...args);
     };

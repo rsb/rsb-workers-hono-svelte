@@ -14,13 +14,18 @@ import { type DeleteTodo, deleteTodo } from "@todo/operations/todos/delete-todo.
 import { type ListTodos, listTodos } from "@todo/operations/todos/list-todos.ts";
 import { type SetAllCompleted, setAllCompleted } from "@todo/operations/todos/set-all-completed.ts";
 import { type UpdateTodo, updateTodo } from "@todo/operations/todos/update-todo.ts";
+import { toSignIn } from "@todo/valid/auth/sign-in.ts";
 import { toCompleted } from "@todo/valid/todos/completed.ts";
 import { toNewTodo } from "@todo/valid/todos/new-todo.ts";
 import { toTodoFilter } from "@todo/valid/todos/todo-filter.ts";
 import { toTodoPatch } from "@todo/valid/todos/todo-patch.ts";
 import { notFound, onError, tooLarge } from "./app/handlers/errors/errors.ts";
 import { getHealth } from "./app/handlers/health/health.ts";
+import { deleteCurrentSession } from "./app/handlers/sessions/delete-current-session.ts";
+import { deleteSessions } from "./app/handlers/sessions/delete-sessions.ts";
 import { getCurrentSession } from "./app/handlers/sessions/get-current-session.ts";
+import { getSessions } from "./app/handlers/sessions/get-sessions.ts";
+import { postSessions } from "./app/handlers/sessions/post-sessions.ts";
 import { deleteTodo as deleteTodoHandler } from "./app/handlers/todos/delete-todo.ts";
 import { deleteTodos } from "./app/handlers/todos/delete-todos.ts";
 import { getTodoCounts } from "./app/handlers/todos/get-todo-counts.ts";
@@ -153,11 +158,15 @@ const { route, probe } = routing<Operations>(access);
 export const constructRoutes = (operations: Operations): Routes => {
   // The built operations, named as the units they are. Inside this function
   // they hide the builders of the same name imported above.
-  const { addTodo, listTodos, countTodos, updateTodo, setAllCompleted, deleteTodo, deleteCompleted, currentSession } = operations;
+  const { addTodo, listTodos, countTodos, updateTodo, setAllCompleted, deleteTodo, deleteCompleted, currentSession, signIn, signOut, signOutEverywhere, listSessions } = operations;
 
   return {
     "GET /health": probe({ getHealth }),
     "GET /sessions/current": route({ getCurrentSession }, { currentSession }),
+    "POST /sessions": route({ postSessions }, { signIn }, { toSignIn }),
+    "GET /sessions": route({ getSessions }, { listSessions }),
+    "DELETE /sessions": route({ deleteSessions }, { signOutEverywhere }),
+    "DELETE /sessions/current": route({ deleteCurrentSession }, { signOut }),
     "GET /todos": route({ getTodos }, { listTodos }, { toTodoFilter }),
     "GET /todos/counts": route({ getTodoCounts }, { countTodos }),
     "POST /todos": route({ postTodos }, { addTodo }, { toNewTodo }),

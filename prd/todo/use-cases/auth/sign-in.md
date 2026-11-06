@@ -23,8 +23,8 @@ session on this device.
   (L40).
 - What the session shows later in Sessions (L51): a label from the
   forwarded `User-Agent` ("Firefox on Linux"), and the city, when the
-  request carries one. Neither is checked or trusted; both are display
-  only.
+  request carries one in its `cf` object, where the BFF puts the browser
+  request's. Neither is checked or trusted; both are display only.
 - `now`. No scope: there is no actor to scope by until this succeeds,
   so its access row says `anonymous` and `n/a`.
 

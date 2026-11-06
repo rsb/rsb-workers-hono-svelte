@@ -1,18 +1,22 @@
+import type { SignInCredential, SignInWrite } from "@todo/business/auth/credential.ts";
 import type { SessionRow } from "@todo/business/auth/session.ts";
 import { ok } from "@todo/business/result.ts";
 import type { IdentityStore } from "@todo/data-d1/identity/store.ts";
 import type { User } from "@todo/data-d1/identity/users.ts";
 
 /**
- * A fake identity store that keeps session rows by token hash, and records
- * each hash it is asked for and each touch it makes. Only the gates read it
- * today; the user methods keep users by email, and the slice B methods
- * answer as if nothing were stored until the operations that call them
- * arrive.
+ * A fake identity store that keeps session rows by token hash and
+ * credentials by email, and records what it is asked: each hash looked up,
+ * each touch, each sign-in's batch and each session ended. It does not
+ * apply a write to what it keeps: the integration tests run the real
+ * statements, and these say only what the api asked for. The user methods
+ * keep users by email, for the seed's tests.
  */
-export const fakeIdentityStore = (sessions: Record<string, SessionRow> = {}) => {
+export const fakeIdentityStore = (sessions: Record<string, SessionRow> = {}, credentials: Record<string, SignInCredential> = {}) => {
   const asked: string[] = [];
   const touched: { id: string; idleUntil: number; now: number }[] = [];
+  const signIns: SignInWrite[] = [];
+  const ended: { ownerId: string; id: string | null; reason: string }[] = [];
   const users = new Map<string, User>();
 
   const store: IdentityStore = {
@@ -24,11 +28,20 @@ export const fakeIdentityStore = (sessions: Record<string, SessionRow> = {}) => 
       touched.push(input);
       return ok(true);
     },
-    endSession: async () => ok(true),
-    endAllSessions: async () => ok(0),
+    endSession: async (scope, input) => {
+      ended.push({ ownerId: scope.ownerId, id: input.id, reason: input.reason });
+      return ok(true);
+    },
+    endAllSessions: async (scope, input) => {
+      ended.push({ ownerId: scope.ownerId, id: null, reason: input.reason });
+      return ok(1);
+    },
     listSessions: async () => ok({ sessions: [], more: false }),
-    recordSignIn: async () => ok({ started: true }),
-    findForSignIn: async () => ok(null),
+    recordSignIn: async (write) => {
+      signIns.push(write);
+      return ok({ started: true });
+    },
+    findForSignIn: async (email) => ok(credentials[email] ?? null),
     setCredential: async () => ok(undefined),
     createUser: async (user) => {
       if (users.has(user.email)) {
@@ -39,5 +52,5 @@ export const fakeIdentityStore = (sessions: Record<string, SessionRow> = {}) => 
     },
     findUserByEmail: async (email) => ok(users.get(email) ?? null),
   };
-  return { store, asked, touched };
+  return { store, asked, touched, signIns, ended };
 };

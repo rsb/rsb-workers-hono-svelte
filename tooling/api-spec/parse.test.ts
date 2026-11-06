@@ -98,17 +98,20 @@ describe("parse", () => {
   it("reads the todo api", () => {
     const parsed = parse(readFileSync("prd/todo/api.md", "utf8"));
     assert.ok(parsed.ok, JSON.stringify(!parsed.ok && parsed.problems));
-    assert.equal(parsed.spec.endpoints.length, 9);
+    assert.equal(parsed.spec.endpoints.length, 13);
     assert.deepEqual(parsed.spec.everyKinds, ["unauthenticated", "forbidden", "too_large", "internal"]);
     const applies = Object.fromEntries(parsed.spec.endpoints.map((e) => [`${e.method} ${e.path}`, e.applies]));
     assert.deepEqual(applies["POST /todos"], ["title.length"]);
     assert.deepEqual(applies["PATCH /todos/{id}"], ["patch.nonempty", "title.length"]);
     assert.deepEqual(applies["GET /todos"], []);
+    assert.deepEqual(applies["POST /sessions"], ["email.length", "email.shape", "password.given"]);
     assert.equal(applies["GET /health"], undefined);
     const security = Object.fromEntries(parsed.spec.endpoints.map((e) => [`${e.method} ${e.path}`, e.security]));
     assert.equal(security["GET /health"], "anonymous");
     assert.equal(security["GET /sessions/current"], "anonymous");
     assert.equal(security["POST /todos"], "member");
+    assert.equal(security["POST /sessions"], "anonymous");
+    assert.equal(security["DELETE /sessions/current"], "member");
   });
 
   it("reads an endpoint's parts and its inline shapes", () => {

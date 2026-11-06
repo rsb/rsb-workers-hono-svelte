@@ -23,6 +23,23 @@ export const SessionUser = v.strictObject({
 });
 export type SessionUser = v.InferOutput<typeof SessionUser>;
 
+/** What a sign-out answers: only that it holds. The BFF deletes its own cookie; the api never writes `Set-Cookie` (L40). The data of `DELETE /sessions` and `DELETE /sessions/current`. */
+export const SignedOutReply = v.strictObject({
+  signedOut: v.literal(true),
+});
+export type SignedOutReply = v.InferOutput<typeof SignedOutReply>;
+
+/** One live session of the actor's, as Sessions shows it (L51). `label` and `city` are absent when the request that started it gave neither. Both are display only. Times are milliseconds since the epoch. */
+export const DeviceSessionReply = v.strictObject({
+  id: v.string(),
+  label: v.exactOptional(v.string()),
+  city: v.exactOptional(v.string()),
+  createdAt: v.pipe(v.number(), v.integer(), v.minValue(0)),
+  touchedAt: v.pipe(v.number(), v.integer(), v.minValue(0)),
+  thisDevice: v.boolean(),
+});
+export type DeviceSessionReply = v.InferOutput<typeof DeviceSessionReply>;
+
 /** The data of `GET /health`. */
 export const HealthReply = v.strictObject({
   ok: v.literal(true),
@@ -35,6 +52,27 @@ export const SessionReply = v.strictObject({
   clearCookie: v.boolean(),
 });
 export type SessionReply = v.InferOutput<typeof SessionReply>;
+
+/** The body of `POST /sessions`. */
+export const SignInBody = v.strictObject({
+  email: v.string("email must be text"),
+  password: v.string("password must be text"),
+});
+export type SignInBody = v.InferOutput<typeof SignInBody>;
+
+/** The data of `POST /sessions`. */
+export const SignedInReply = v.strictObject({
+  token: v.string(),
+  expiresAt: v.pipe(v.number(), v.integer(), v.minValue(0)),
+});
+export type SignedInReply = v.InferOutput<typeof SignedInReply>;
+
+/** The data of `GET /sessions`. */
+export const DeviceSessionListReply = v.strictObject({
+  sessions: v.array(DeviceSessionReply),
+  more: v.boolean(),
+});
+export type DeviceSessionListReply = v.InferOutput<typeof DeviceSessionListReply>;
 
 /** The query of `GET /todos`. */
 export const GetTodosQuery = v.strictObject({

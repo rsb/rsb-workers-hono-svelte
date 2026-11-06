@@ -167,6 +167,389 @@
             "$ref": "#/components/responses/Internal"
           }
         }
+      },
+      "delete": {
+        "operationId": "deleteCurrentSession",
+        "x-unit": "signOut",
+        "description": "Serves: `use-cases/auth/sign-out.md`.",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-requires": "member",
+        "responses": {
+          "200": {
+            "description": "`SignedOutReply` in the success envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/SignedOutReply"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                },
+                "examples": {
+                  "signs-out": {
+                    "summary": "signs out",
+                    "value": {
+                      "ok": true,
+                      "data": {
+                        "signedOut": true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "500": {
+            "$ref": "#/components/responses/Internal"
+          }
+        }
+      }
+    },
+    "/sessions": {
+      "post": {
+        "operationId": "postSessions",
+        "x-unit": "signIn",
+        "description": "Serves: `use-cases/auth/sign-in.md`.",
+        "security": [
+          {},
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-requires": "anonymous",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignInBody"
+              },
+              "examples": {
+                "signs-in": {
+                  "summary": "signs in",
+                  "value": {
+                    "email": "ada@example.com",
+                    "password": "correct horse battery staple"
+                  }
+                },
+                "the-password-is-wrong": {
+                  "summary": "the password is wrong",
+                  "value": {
+                    "email": "ada@example.com",
+                    "password": "wrong horse battery staple"
+                  }
+                },
+                "no-account-has-the-email": {
+                  "summary": "no account has the email",
+                  "value": {
+                    "email": "nobody@example.com",
+                    "password": "correct horse battery staple"
+                  }
+                },
+                "the-email-is-not-an-email-address": {
+                  "summary": "the email is not an email address",
+                  "value": {
+                    "email": "ada",
+                    "password": "correct horse battery staple"
+                  }
+                },
+                "the-password-is-empty": {
+                  "summary": "the password is empty",
+                  "value": {
+                    "email": "ada@example.com",
+                    "password": ""
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "`SignedInReply` in the success envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/SignedInReply"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                },
+                "examples": {
+                  "signs-in": {
+                    "summary": "signs in",
+                    "value": {
+                      "ok": true,
+                      "data": {
+                        "token": "Yq3bS8rK2vXw0fJ7nLm4pQeTzA1uHcD9oGiR5sVyB6E",
+                        "expiresAt": 1794700800000
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`invalid_credentials`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidCredentialsFailure"
+                },
+                "examples": {
+                  "the-password-is-wrong": {
+                    "summary": "the password is wrong",
+                    "value": {
+                      "ok": false,
+                      "error": {
+                        "kind": "invalid_credentials",
+                        "message": "the email and password do not match an account"
+                      }
+                    }
+                  },
+                  "no-account-has-the-email": {
+                    "summary": "no account has the email",
+                    "value": {
+                      "ok": false,
+                      "error": {
+                        "kind": "invalid_credentials",
+                        "message": "the email and password do not match an account"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "422": {
+            "description": "`validation`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationFailure"
+                },
+                "examples": {
+                  "the-email-is-not-an-email-address": {
+                    "summary": "the email is not an email address",
+                    "value": {
+                      "ok": false,
+                      "error": {
+                        "kind": "validation",
+                        "message": "email is not a valid email address",
+                        "field": "email"
+                      }
+                    }
+                  },
+                  "the-password-is-empty": {
+                    "summary": "the password is empty",
+                    "value": {
+                      "ok": false,
+                      "error": {
+                        "kind": "validation",
+                        "message": "password is empty",
+                        "field": "password"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/Internal"
+          }
+        }
+      },
+      "get": {
+        "operationId": "getSessions",
+        "x-unit": "listSessions",
+        "description": "Serves: `use-cases/auth/list-sessions.md`.",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-requires": "member",
+        "responses": {
+          "200": {
+            "description": "`DeviceSessionListReply` in the success envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/DeviceSessionListReply"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                },
+                "examples": {
+                  "lists-the-member-s-sessions": {
+                    "summary": "lists the member's sessions",
+                    "value": {
+                      "ok": true,
+                      "data": {
+                        "sessions": [
+                          {
+                            "id": "7e1f0c2a-4b6d-4e8f-9a1b-3c5d7e9f1a2b",
+                            "label": "Firefox on Linux",
+                            "city": "Lisbon",
+                            "createdAt": 1793880000000,
+                            "touchedAt": 1794052800000,
+                            "thisDevice": true
+                          },
+                          {
+                            "id": "2c4e6a8b-0d1f-4a3c-8e5b-7d9f1b3d5f7a",
+                            "label": "Safari on iOS",
+                            "createdAt": 1793793600000,
+                            "touchedAt": 1793966400000,
+                            "thisDevice": false
+                          }
+                        ],
+                        "more": false
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "500": {
+            "$ref": "#/components/responses/Internal"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteSessions",
+        "x-unit": "signOutEverywhere",
+        "description": "Serves: `use-cases/auth/sign-out-everywhere.md`.",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-requires": "member",
+        "responses": {
+          "200": {
+            "description": "`SignedOutReply` in the success envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/SignedOutReply"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                },
+                "examples": {
+                  "signs-out-everywhere": {
+                    "summary": "signs out everywhere",
+                    "value": {
+                      "ok": true,
+                      "data": {
+                        "signedOut": true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "500": {
+            "$ref": "#/components/responses/Internal"
+          }
+        }
       }
     },
     "/todos": {
@@ -1109,6 +1492,53 @@
         ],
         "additionalProperties": false
       },
+      "SignedOutReply": {
+        "description": "What a sign-out answers: only that it holds. The BFF deletes its own cookie; the api never writes `Set-Cookie` (L40).",
+        "type": "object",
+        "properties": {
+          "signedOut": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "signedOut"
+        ],
+        "additionalProperties": false
+      },
+      "DeviceSessionReply": {
+        "description": "One live session of the actor's, as Sessions shows it (L51). `label` and `city` are absent when the request that started it gave neither. Both are display only. Times are milliseconds since the epoch.",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "city": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "touchedAt": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "thisDevice": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "createdAt",
+          "touchedAt",
+          "thisDevice"
+        ],
+        "additionalProperties": false
+      },
       "HealthReply": {
         "type": "object",
         "properties": {
@@ -1134,6 +1564,60 @@
         },
         "required": [
           "clearCookie"
+        ],
+        "additionalProperties": false
+      },
+      "SignInBody": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "x-message": "email must be text"
+          },
+          "password": {
+            "type": "string",
+            "x-message": "password must be text"
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ],
+        "additionalProperties": false
+      },
+      "SignedInReply": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "token",
+          "expiresAt"
+        ],
+        "additionalProperties": false
+      },
+      "DeviceSessionListReply": {
+        "type": "object",
+        "properties": {
+          "sessions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeviceSessionReply"
+            }
+          },
+          "more": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "sessions",
+          "more"
         ],
         "additionalProperties": false
       },

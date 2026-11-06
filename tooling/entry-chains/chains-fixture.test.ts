@@ -211,6 +211,54 @@ describe("readChains on a fixture", () => {
     assert.throws(read, /tags\.ts: tagStore\.listTodos: another table store already has listTodos/);
   });
 
+  it("follows a port of several methods to each data method, across two stores", () => {
+    // The identity store, beside the DbStore (L42); the unit's port reads
+    // from one table of each and declares its methods in order.
+    fixture({
+      "apps/api/src/construct.ts": files["apps/api/src/construct.ts"]?.replace(
+        'import { createDbStore } from "@todo/data-d1/store.ts";',
+        'import { createIdentityStore } from "@todo/data-d1/identity/store.ts";\nimport { createDbStore } from "@todo/data-d1/store.ts";',
+      ) ?? "",
+      "packages/data/d1/src/identity/store.ts": [
+        'import { sessionStore } from "./sessions.ts";',
+        "",
+        "export const createIdentityStore = (db: D1Database) => ({",
+        "  ...sessionStore(db),",
+        "});",
+        "",
+      ].join("\n"),
+      "packages/data/d1/src/identity/sessions.ts": [
+        "export const sessionStore = (db: D1Database) => ({",
+        "  endSession: async (",
+        "    id: string,",
+        "  ): Promise<R> => {",
+        "    return ok(true);",
+        "  },",
+        "});",
+        "",
+      ].join("\n"),
+      "packages/operations/src/todos/list-todos.ts": files["packages/operations/src/todos/list-todos.ts"]?.replace(
+        "  listTodos(): Promise<R>;",
+        "  listTodos(): Promise<R>;\n  endSession(id: string): Promise<R>;",
+      ) ?? "",
+    });
+    const chain = read().chains[1];
+    assert.equal(chain?.line, "GET /todos → getTodos → listTodos ⇢ ListStore.listTodos, endSession → d1.listTodos, d1.endSession");
+    assert.deepEqual(
+      chain?.rows.filter((row) => row.label === "data").map((row) => [row.path, row.symbols.join(", ")]),
+      [
+        ["packages/data/d1/src/todos.ts", "todoStore.listTodos"],
+        ["packages/data/d1/src/identity/sessions.ts", "sessionStore.endSession"],
+      ],
+    );
+  });
+
+  it("fails on a construct that imports no store builder", () => {
+    const text = files["apps/api/src/construct.ts"]?.replace('import { createDbStore } from "@todo/data-d1/store.ts";\n', "") ?? "";
+    fixture({ "apps/api/src/construct.ts": text });
+    assert.throws(read, /imports no store builder/);
+  });
+
   it("fails on a construct that imports the unit twice", () => {
     const text = `${files["apps/api/src/construct.ts"]}import { listTodos as again } from "@todo/operations/todos/list-todos.ts";\n`;
     fixture({ "apps/api/src/construct.ts": text });

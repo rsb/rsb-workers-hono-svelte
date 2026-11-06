@@ -1,10 +1,16 @@
 import { TODO_LIMIT } from "@todo/business/rules.ts";
 import { BODY_LIMIT_BYTES, type EndpointKey, endpoints, success } from "@todo/contract-api";
 import { type Example, everyExamples, examples } from "@todo/contract-api/examples";
+import argon2Wasm from "@phi-ag/argon2/argon2.wasm";
+import { SESSION_ABSOLUTE_MS } from "@todo/business/auth/session.ts";
+import { createIdentityStore } from "@todo/data-d1/identity/store.ts";
 import { createDbStore } from "@todo/data-d1/store.ts";
 import { env, exports } from "cloudflare:workers";
 import * as v from "valibot";
 import { describe, expect, it } from "vitest";
+import { argon2FromWasm, createHasher } from "../../src/auth/hasher.ts";
+import { readConfig } from "../../src/config.ts";
+import { sha256Hex } from "../../src/gates/digest.ts";
 import { MEMBER } from "./signed-in.ts";
 
 /**
@@ -14,7 +20,9 @@ import { MEMBER } from "./signed-in.ts";
  * accepts; its exact data stays with the hand-written tests, because the
  * examples share one database (DB9) and the spec does not state what each
  * one starts from. An endpoint's example is sent as the member, since every
- * todo operation requires one; a shared one is sent as the spec words it.
+ * todo operation requires one, on a bearer session of its own, so an
+ * example that signs out ends only its own; a sign-in is sent as the BFF's
+ * page sends it, with no session. A shared one is sent as the spec words it.
  */
 
 /**
@@ -46,7 +54,35 @@ const sharedRequests: Record<string, () => Request> = {
     }),
 };
 
-const toRequest = (request: NonNullable<Example["request"]>) => {
+/** Starts a fresh bearer session for the member and gives its raw token. */
+let sessions = 0;
+const freshMemberToken = async () => {
+  sessions += 1;
+  const token = `${sessions}`.padStart(43, "x");
+  const now = Date.now();
+  const started = await createIdentityStore(env.IDENTITY_DB).recordSignIn({
+    session: {
+      id: `s-example-${sessions}`,
+      tokenHash: await sha256Hex(token),
+      userId: MEMBER.userId,
+      channel: "bearer",
+      createdAt: now,
+      idleUntil: null,
+      expiresAt: now + SESSION_ABSOLUTE_MS,
+      label: null,
+      city: null,
+    },
+  });
+  if (!started.ok || !started.value.started) {
+    throw new Error("the example's session could not be started");
+  }
+  return token;
+};
+
+/** The endpoints whose examples are sent as the BFF's page sends them, with no session. */
+const FROM_THE_PAGE: EndpointKey[] = ["POST /sessions"];
+
+const toRequest = async (key: EndpointKey, request: NonNullable<Example["request"]>) => {
   const url = new URL(request.path, "https://todo-api");
   for (const [name, value] of request.query) {
     url.searchParams.append(name, value);
@@ -55,17 +91,51 @@ const toRequest = (request: NonNullable<Example["request"]>) => {
   if (request.body !== undefined) {
     body = JSON.stringify(request.body);
   }
-  // As the member, by their bearer session: every todo operation requires one.
-  return new Request(url, { method: request.method, body, headers: { Authorization: `Bearer ${MEMBER.token}` } });
+  if (FROM_THE_PAGE.includes(key)) {
+    return new Request(url, { method: request.method, body, headers: { "Sec-Fetch-Site": "same-origin", "Content-Type": "application/json" } });
+  }
+  // As the member, by a bearer session: every todo operation requires one.
+  return new Request(url, { method: request.method, body, headers: { Authorization: `Bearer ${await freshMemberToken()}` } });
+};
+
+/** Ada's account, which the sign-in examples name: the user, then the password. */
+const ADA = { id: "u-ada", email: "ada@example.com", password: "correct horse battery staple" };
+
+const seedAda = async () => {
+  const identity = createIdentityStore(env.IDENTITY_DB);
+  const created = await identity.createUser({ id: ADA.id, email: ADA.email, name: "Ada Lovelace", role: "member", createdAt: Date.now() });
+  if (!created.ok) {
+    throw created.error;
+  }
+  if (!created.value) {
+    return;
+  }
+  const config = readConfig(env);
+  if (!config.ok) {
+    throw new Error("the integration config does not read");
+  }
+  const hashed = await createHasher({ argon2: argon2FromWasm(argon2Wasm), peppers: config.value.peppers }).hash(ADA.password);
+  if (!hashed.ok) {
+    throw hashed.error;
+  }
+  const set = await identity.setCredential({ userId: ADA.id, kind: "password", ...hashed.value, now: Date.now() });
+  if (!set.ok) {
+    throw set.error;
+  }
 };
 
 /**
  * Seed what the request names and nothing more: a succeeding example whose
- * path names an id needs a todo with that id. It goes in through the store,
+ * path names an id needs a todo with that id, and a sign-in needs the
+ * account it names. It goes in through the store,
  * so the replay never knows the table, and is skipped when an earlier example
  * left it there.
  */
-const seed = async (example: Example) => {
+const seed = async (key: EndpointKey, example: Example) => {
+  if (key === "POST /sessions") {
+    await seedAda();
+    return;
+  }
   const id = example.request?.params.id;
   if (id === undefined) {
     return;
@@ -112,10 +182,10 @@ describe("the spec's examples, replayed", () => {
       throw new Error("an endpoint example has no request");
     }
     if (example.status === endpoints[key].status) {
-      await seed(example);
+      await seed(key, example);
     }
 
-    await check(await exports.default.fetch(toRequest(request)), example, key);
+    await check(await exports.default.fetch(await toRequest(key, request)), example, key);
   });
 
   it.each(sharedCases)("%s", async (name, example) => {
