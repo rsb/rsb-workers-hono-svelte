@@ -13,6 +13,8 @@
     "check": "pnpm -r check",
     "gen:api": "node tooling/api-spec/generate.ts prd/todo/api.md packages/contract/api/src apps/api/openapi.json apps/api/src/construct.ts",
     "check:api": "node tooling/api-spec/generate.ts prd/todo/api.md packages/contract/api/src apps/api/openapi.json apps/api/src/construct.ts --check",
+    "gen:access": "node tooling/access/generate.ts prd/todo/access.md apps/api/src/construct.ts packages/business",
+    "check:access": "node tooling/access/generate.ts prd/todo/access.md apps/api/src/construct.ts packages/business --check",
     "gen:entry-chains": "node tooling/entry-chains/generate.ts apps/api/src/construct.ts apps/api/entry-chains.md",
     "check:entry-chains": "node tooling/entry-chains/generate.ts apps/api/src/construct.ts apps/api/entry-chains.md --check",
     "gen:rules": "node tooling/rules/generate.ts prd/todo/rules.md prd/todo/use-cases packages/business packages/valid",

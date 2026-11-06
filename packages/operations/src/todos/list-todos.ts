@@ -1,27 +1,30 @@
+import type { Actor } from "@todo/business/auth/actor.ts";
+import type { Own } from "@todo/business/auth/scope.ts";
 import { type Result, err, ok } from "@todo/business/result.ts";
 import type { Todo, TodoFilter } from "@todo/business/todos/todo.ts";
 import { type AnyFail, wrap } from "@todo/fail/fail.ts";
+import { run } from "../run.ts";
 
-/** What listing needs from the store: the todos the filter keeps, in the order they were added. */
+/** What listing needs from the store: the owner's todos the filter keeps, in the order they were added. */
 export type ListStore = {
-  listTodos(filter: TodoFilter): Promise<Result<readonly Todo[], AnyFail>>;
+  listTodos(scope: Own, filter: TodoFilter): Promise<Result<readonly Todo[], AnyFail>>;
 };
 
-export type ListTodos = (filter: TodoFilter) => Promise<Result<readonly Todo[], AnyFail>>;
+export type ListTodos = (actor: Actor, filter: TodoFilter) => Promise<Result<readonly Todo[], AnyFail>>;
 
 /**
- * Lists the todos the filter keeps, in creation order; an empty filter keeps
- * every todo. No business rule refuses it; the store can still fail.
+ * Lists the actor's todos the filter keeps, in creation order; an empty
+ * filter keeps every one. No business rule refuses it; the store can still fail.
  *
  * Use case: `prd/todo/use-cases/todos/list-todos.md`
  */
 export const listTodos =
   (deps: { dbStore: ListStore }): ListTodos =>
-  async (filter) => {
-    const listed = await deps.dbStore.listTodos(filter);
+  run("listTodos", async (scope, filter) => {
+    const listed = await deps.dbStore.listTodos(scope, filter);
     if (!listed.ok) {
       return err(wrap(listed.error, "list todos"));
     }
 
     return ok(listed.value);
-  };
+  });

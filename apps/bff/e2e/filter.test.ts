@@ -1,4 +1,5 @@
-import { type Page, expect, test } from "@playwright/test";
+import { type Page, expect } from "@playwright/test";
+import { test } from "./signed-in.ts";
 import { add, input, items, open, removeAll, rowOf } from "./todos.ts";
 
 // PRD scenarios 8.1–8.7. Each test first removes every todo through the

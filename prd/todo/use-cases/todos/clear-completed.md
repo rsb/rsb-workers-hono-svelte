@@ -10,7 +10,9 @@ Remove every completed todo at once.
 - Scenarios 7.2 and 7.3.
 
 ## Input
-none
+- The actor's own scope, `{ ownerId }`, which the runner hands it as
+  the operation's access row says (L43). Every todo below is one of the
+  actor's.
 
 ## Given
 none
@@ -28,6 +30,7 @@ The todos left.
 
 ## Guarantees
 - `todos.order`
+- `todos.scoped`
 
 ## Atomic
 The delete and the read of what is left are one step, so the list

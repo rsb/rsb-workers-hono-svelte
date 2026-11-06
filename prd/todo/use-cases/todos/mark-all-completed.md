@@ -11,6 +11,9 @@ Make every todo completed, or every todo active, at once.
 
 ## Input
 - A `Completed`: the value every todo's `completed` takes.
+- The actor's own scope, `{ ownerId }`, which the runner hands it as
+  the operation's access row says (L43). Every todo below is one of the
+  actor's.
 
 ## Given
 none
@@ -29,6 +32,7 @@ Every todo as it now is.
 
 ## Guarantees
 - `todos.order`
+- `todos.scoped`
 
 ## Atomic
 The change and the read of the list are one step, so the list returned

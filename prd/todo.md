@@ -214,9 +214,10 @@ One per line, each with its constraint.
     says to sign in (C-accounts).
 22. The envelope has the kinds `unauthenticated` (401) and `forbidden`
     (403), in addition to those of deviation 14. A `forbidden` error
-    carries a `reason`: `account_disabled` when the session's user is
-    disabled, `role` when the actor lacks what the operation requires
-    (C-accounts).
+    carries a `reason`: `channel` when a change with the session cookie
+    does not come from the BFF's own page, `account_disabled` when the
+    session's user is disabled, `role` when the actor lacks what the
+    operation requires (C-accounts).
 
 ## Design
 The page's screens are the views and states of

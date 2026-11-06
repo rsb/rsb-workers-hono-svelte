@@ -1,4 +1,5 @@
-import { type Locator, type Page, expect, test } from "@playwright/test";
+import { type Locator, type Page, expect } from "@playwright/test";
+import { test } from "./signed-in.ts";
 
 // PRD scenarios 2.1–2.8. The API's store is shared by the whole run (D19):
 // 2.1 needs it empty and runs first; the rest assert on the end of the list.

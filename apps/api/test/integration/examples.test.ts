@@ -5,6 +5,7 @@ import { createDbStore } from "@todo/data-d1/store.ts";
 import { env, exports } from "cloudflare:workers";
 import * as v from "valibot";
 import { describe, expect, it } from "vitest";
+import { MEMBER } from "./signed-in.ts";
 
 /**
  * The spec's examples (`prd/todo/api.md`, generated into the contract) sent
@@ -12,7 +13,8 @@ import { describe, expect, it } from "vitest";
  * A success must answer its status and a reply the endpoint's schema
  * accepts; its exact data stays with the hand-written tests, because the
  * examples share one database (DB9) and the spec does not state what each
- * one starts from.
+ * one starts from. An endpoint's example is sent as the member, since every
+ * todo operation requires one; a shared one is sent as the spec words it.
  */
 
 /**
@@ -53,7 +55,8 @@ const toRequest = (request: NonNullable<Example["request"]>) => {
   if (request.body !== undefined) {
     body = JSON.stringify(request.body);
   }
-  return new Request(url, { method: request.method, body });
+  // As the member, by their bearer session: every todo operation requires one.
+  return new Request(url, { method: request.method, body, headers: { Authorization: `Bearer ${MEMBER.token}` } });
 };
 
 /**
@@ -68,14 +71,15 @@ const seed = async (example: Example) => {
     return;
   }
   const store = createDbStore(env.APP_DB);
-  const listed = await store.listTodos({});
+  const own = { ownerId: MEMBER.userId };
+  const listed = await store.listTodos(own, {});
   if (!listed.ok) {
     throw new Error("the seed could not list the todos");
   }
   if (listed.value.some((todo) => todo.id === id)) {
     return;
   }
-  const added = await store.addTodoUnlessFull({ id, title: "seeded", completed: false }, TODO_LIMIT);
+  const added = await store.addTodoUnlessFull(own, { id, title: "seeded", completed: false }, TODO_LIMIT);
   if (!added.ok || !added.value) {
     throw new Error(`the seed could not add todo ${id}`);
   }

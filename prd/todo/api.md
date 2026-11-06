@@ -31,6 +31,10 @@ A body that is not JSON is refused as `validation`, with the field
   names no live session is not refused: the request is anonymous (L39).
 - Any request whose live session is a disabled user's: `forbidden`,
   reason `account_disabled` (L39).
+- Any request whose operation's row in `access.md` refuses its actor,
+  before the operation's body runs (L43): an anonymous actor,
+  `unauthenticated`; a signed-in one below the row, `forbidden`, reason
+  `role`. Every todo endpoint requires a member.
 - Any request can fail on the server: `internal`.
 - A method and path not listed here: `not_found`.
 
@@ -93,7 +97,7 @@ Reply: 500
 
 - `validation`: 422, with field
 - `unauthenticated`: 401
-- `forbidden`: 403, with reason: channel | account_disabled
+- `forbidden`: 403, with reason: channel | account_disabled | role
 - `not_found`: 404
 - `limit`: 409
 - `too_large`: 413

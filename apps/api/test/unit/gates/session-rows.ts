@@ -9,6 +9,7 @@ export const BEARER_TOKEN = "b".repeat(43);
 export const DISABLED_TOKEN = "d".repeat(43);
 export const STALE_TOKEN = "s".repeat(43);
 export const UNKNOWN_TOKEN = "u".repeat(43);
+export const ADMIN_BEARER_TOKEN = "a".repeat(43);
 
 const user = { role: "member", disabled: false, emailVerifiedAt: null, name: "Ada Lovelace", email: "ada@example.com" } as const;
 
@@ -27,6 +28,11 @@ export const sessionRows: Record<string, SessionRow> = {
   [`hash:${BEARER_TOKEN}`]: {
     session: { ...cookieSession("s-bearer"), channel: "bearer", idleUntil: null },
     user,
+  },
+  // Another user, the admin, so a test can tell two actors' todos apart.
+  [`hash:${ADMIN_BEARER_TOKEN}`]: {
+    session: { ...cookieSession("s-admin"), userId: "u-admin", channel: "bearer", idleUntil: null },
+    user: { ...user, role: "admin", name: "Grace Hopper", email: "grace@example.com" },
   },
   [`hash:${DISABLED_TOKEN}`]: { session: cookieSession("s-disabled"), user: { ...user, disabled: true } },
   // Less than half the idle window is left, so a touch is due.

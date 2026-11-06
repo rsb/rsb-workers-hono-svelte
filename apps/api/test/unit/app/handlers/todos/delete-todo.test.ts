@@ -6,10 +6,11 @@ import { err, ok } from "@todo/business/result.ts";
 import { notFound, unavailable, wrap } from "@todo/fail/fail.ts";
 import { deleteTodo } from "../../../../../src/app/handlers/todos/delete-todo.ts";
 import type { DeleteTodo } from "@todo/operations/todos/delete-todo.ts";
+import { asMember, member } from "../actor.ts";
 
 /** Sends a DELETE through one route, so the handler gets its `:id` as it would be served. */
 const remove = (operation: DeleteTodo, id: string) => {
-  const app = new Hono().delete("/todos/:id", deleteTodo(operation));
+  const app = new Hono().use(asMember).delete("/todos/:id", deleteTodo(operation));
   return app.request(`/todos/${id}`, { method: "DELETE" });
 };
 
@@ -20,10 +21,10 @@ const failed = async (response: Response) => ({
 });
 
 describe("deleteTodo", () => {
-  it("deletes the todo the path names and presents its id", async () => {
-    const asked: string[] = [];
-    const operation: DeleteTodo = async (id) => {
-      asked.push(id);
+  it("deletes the todo the path names, as the attached actor, and presents its id", async () => {
+    const asked: unknown[] = [];
+    const operation: DeleteTodo = async (actor, id) => {
+      asked.push(actor, id);
       return ok(id);
     };
 
@@ -31,7 +32,7 @@ describe("deleteTodo", () => {
 
     expect(response.status).toBe(200);
     expect(v.parse(envelope(DeletedReply), await response.json())).toEqual({ ok: true, data: { id: "id-1" } });
-    expect(asked).toEqual(["id-1"]);
+    expect(asked).toEqual([member, "id-1"]);
   });
 
   it("answers not_found when no todo has the id", async () => {

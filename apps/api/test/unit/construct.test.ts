@@ -1,12 +1,14 @@
 import { DeletedReply, Failure, TodoCountsReply, TodoListReply, TodoReply, envelope } from "@todo/contract-api";
 import * as v from "valibot";
 import { expect, it } from "vitest";
+import { fakeDbStore } from "./fake-db-store.ts";
+import { ADMIN, MEMBER, signedIn } from "./signed-in.ts";
 import { testApi } from "./test-api.ts";
 
 // The whole api on fake stores, entered below `constructInfra` (A10): no
-// workerd, no database, and a fixed id so the reply is exact. No request
-// carries a credential, so each is anonymous.
-const app = (newId = () => "id-1") => testApi({ newId });
+// workerd, no database, and a fixed id so the reply is exact. Every
+// request is the member's, by their bearer session, unless it says.
+const app = (newId = () => "id-1") => signedIn(MEMBER, { newId });
 
 it("an added todo is in the next list", async () => {
   const api = app();
@@ -155,5 +157,53 @@ it("a filtered list keeps only the todos asked for, and the counts cover every t
   expect(v.parse(envelope(TodoCountsReply), await counted.json())).toEqual({
     ok: true,
     data: { active: 1, completed: 1 },
+  });
+});
+
+it("every todo endpoint refuses an anonymous request as unauthenticated, and stores nothing", async () => {
+  const dbStore = fakeDbStore();
+  const anonymous = testApi({ dbStore });
+  const requests: [string, RequestInit?][] = [
+    ["/todos"],
+    ["/todos/counts"],
+    ["/todos", { method: "POST", body: '{"title":"buy milk"}' }],
+    ["/todos", { method: "PATCH", body: '{"completed":true}' }],
+    ["/todos/id-1", { method: "PATCH", body: '{"completed":true}' }],
+    ["/todos?completed=true", { method: "DELETE" }],
+    ["/todos/id-1", { method: "DELETE" }],
+  ];
+
+  for (const [path, init] of requests) {
+    const refused = await anonymous.request(path, init);
+    expect(refused.status, `${init?.method ?? "GET"} ${path}`).toBe(401);
+    expect(v.parse(Failure, await refused.json()).error.kind).toBe("unauthenticated");
+  }
+  expect(await dbStore.countTodos({ any: true })).toEqual({ ok: true, value: { active: 0, completed: 0 } });
+});
+
+it("a member's todo is not in the admin's list, and the admin's change or delete of it is not_found", async () => {
+  // One database, two users (A.8): every todo operation is `own`, the admin's included.
+  const dbStore = fakeDbStore();
+  const member = signedIn(MEMBER, { dbStore, newId: () => "id-1" });
+  const admin = signedIn(ADMIN, { dbStore });
+  await member.request("/todos", { method: "POST", body: '{"title":"buy milk"}' });
+
+  const listed = await admin.request("/todos");
+  expect(v.parse(envelope(TodoListReply), await listed.json())).toEqual({ ok: true, data: [] });
+  const counted = await admin.request("/todos/counts");
+  expect(v.parse(envelope(TodoCountsReply), await counted.json())).toEqual({ ok: true, data: { active: 0, completed: 0 } });
+
+  // Another's todo is answered as a missing one is (`todo.owned`).
+  const changed = await admin.request("/todos/id-1", { method: "PATCH", body: '{"completed":true}' });
+  expect(changed.status).toBe(404);
+  const removed = await admin.request("/todos/id-1", { method: "DELETE" });
+  expect(removed.status).toBe(404);
+  await admin.request("/todos", { method: "PATCH", body: '{"completed":true}' });
+  await admin.request("/todos?completed=true", { method: "DELETE" });
+
+  const theirs = await member.request("/todos");
+  expect(v.parse(envelope(TodoListReply), await theirs.json())).toEqual({
+    ok: true,
+    data: [{ id: "id-1", title: "buy milk", completed: false }],
   });
 });

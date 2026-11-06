@@ -13,8 +13,10 @@ and the store, which do not declare them yet.
 | `patch.nonempty` | input | `toTodoPatch` | Change a todo |
 | `todos.cap` | state | none | Add a todo |
 | `todo.exists` | state | none | Change a todo, Remove a todo |
+| `todo.owned` | state | none | Change a todo, Remove a todo |
 | `todos.order` | guarantee | none | Add a todo, Clear completed, List todos, Mark all completed |
 | `todos.unique_id` | guarantee | none | Add a todo |
+| `todos.scoped` | guarantee | none | Add a todo, Change a todo, Clear completed, Count todos, List todos, Mark all completed, Remove a todo |
 
 ## `title.length`
 A title is 1 to `max` long, counted in UTF-16 code units.
@@ -44,11 +46,11 @@ A patch gives a title, a `completed`, or both.
   - [Change a todo](../../prd/todo/use-cases/todos/change-a-todo.md), Assumes
 
 ## `todos.cap`
-The list holds fewer than `limit` todos when one is added.
+The owner's list holds fewer than `limit` todos when one is added.
 
 - Kind: state
 - Parameters: `limit` is `TODO_LIMIT`, 500
-- Source: PRD deviation 9.
+- Source: PRD deviation 9; per owner from deviation 21.
 - Cited by:
   - [Add a todo](../../prd/todo/use-cases/todos/add-a-todo.md), Given
 
@@ -57,6 +59,15 @@ A todo has the id.
 
 - Kind: state
 - Source: PRD › API, `PATCH /todos/:id` and `DELETE /todos/:id` (404).
+- Cited by:
+  - [Change a todo](../../prd/todo/use-cases/todos/change-a-todo.md), Given
+  - [Remove a todo](../../prd/todo/use-cases/todos/remove-a-todo.md), Given
+
+## `todo.owned`
+The todo with the id is in the actor's scope. Another's todo is `not_found`, the same as a missing one, so a caller cannot tell whether another's id exists.
+
+- Kind: state
+- Source: PRD deviation 21; L43.
 - Cited by:
   - [Change a todo](../../prd/todo/use-cases/todos/change-a-todo.md), Given
   - [Remove a todo](../../prd/todo/use-cases/todos/remove-a-todo.md), Given
@@ -79,3 +90,17 @@ No two todos share an id.
 - Source: story chapter 8, the guarantees (L29). The id is a UUID from the id source (D13).
 - Cited by:
   - [Add a todo](../../prd/todo/use-cases/todos/add-a-todo.md), Guarantees
+
+## `todos.scoped`
+Every todo a store call reads or writes is in the scope it is given.
+
+- Kind: guarantee
+- Source: L43: the store has no default scope, and reads and writes are scoped alike.
+- Cited by:
+  - [Add a todo](../../prd/todo/use-cases/todos/add-a-todo.md), Guarantees
+  - [Change a todo](../../prd/todo/use-cases/todos/change-a-todo.md), Guarantees
+  - [Clear completed](../../prd/todo/use-cases/todos/clear-completed.md), Guarantees
+  - [Count todos](../../prd/todo/use-cases/todos/count-todos.md), Guarantees
+  - [List todos](../../prd/todo/use-cases/todos/list-todos.md), Guarantees
+  - [Mark all completed](../../prd/todo/use-cases/todos/mark-all-completed.md), Guarantees
+  - [Remove a todo](../../prd/todo/use-cases/todos/remove-a-todo.md), Guarantees

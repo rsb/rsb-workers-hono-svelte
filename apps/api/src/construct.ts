@@ -1,6 +1,7 @@
 import { type IdentityStore, createIdentityStore } from "@todo/data-d1/identity/store.ts";
 import { type DbStore, createDbStore } from "@todo/data-d1/store.ts";
 import { authenticate as authenticateUnit } from "@todo/gates/authenticate.ts";
+import { type CurrentSession, currentSession } from "@todo/operations/auth/current-session.ts";
 import { type AddTodo, addTodo } from "@todo/operations/todos/add-todo.ts";
 import { type CountTodos, countTodos } from "@todo/operations/todos/count-todos.ts";
 import { type DeleteCompleted, deleteCompleted } from "@todo/operations/todos/delete-completed.ts";
@@ -48,7 +49,10 @@ export type Infra = {
   digest: (token: string) => Promise<string>;
 };
 
-/** Every operation, each built with the ports it declares. */
+/**
+ * Every operation, each built with the ports it declares. Each has one row
+ * in `prd/todo/access.md`, which its builder applies (`check:access`).
+ */
 export type Operations = {
   addTodo: AddTodo;
   listTodos: ListTodos;
@@ -57,6 +61,7 @@ export type Operations = {
   setAllCompleted: SetAllCompleted;
   deleteTodo: DeleteTodo;
   deleteCompleted: DeleteCompleted;
+  currentSession: CurrentSession;
 };
 
 /**
@@ -101,6 +106,7 @@ export const constructOperations = (infra: Infra): Operations => ({
   setAllCompleted: setAllCompleted({ dbStore: infra.dbStore }),
   deleteTodo: deleteTodo({ dbStore: infra.dbStore }),
   deleteCompleted: deleteCompleted({ dbStore: infra.dbStore }),
+  currentSession: currentSession(),
 });
 
 /** The route helpers, bound to these operations. */

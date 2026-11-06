@@ -14,7 +14,7 @@ export const ReasonKind = v.picklist(["forbidden"]);
 export type ReasonKind = v.InferOutput<typeof ReasonKind>;
 
 /** Every `reason` the kind that carries one can give. */
-export const Reason = v.picklist(["channel", "account_disabled"]);
+export const Reason = v.picklist(["channel", "account_disabled", "role"]);
 export type Reason = v.InferOutput<typeof Reason>;
 
 /** The kinds that carry neither. */

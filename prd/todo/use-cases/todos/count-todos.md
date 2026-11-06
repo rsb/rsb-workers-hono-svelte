@@ -12,7 +12,9 @@ whole list.
 - Scenarios 3.3–3.5, 7.1 and 8.7.
 
 ## Input
-none
+- The actor's own scope, `{ ownerId }`, which the runner hands it as
+  the operation's access row says (L43). Every todo below is one of the
+  actor's.
 
 ## Given
 none
@@ -29,7 +31,7 @@ every todo. No todos at all is two zeros.
   shows: `accounts.error.failed` (the page's load fails)
 
 ## Guarantees
-none
+- `todos.scoped`
 
 ## Atomic
 Both counts are read in one step, so they describe the same moment and

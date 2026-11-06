@@ -6,10 +6,11 @@ import { err, ok } from "@todo/business/result.ts";
 import { unavailable, wrap } from "@todo/fail/fail.ts";
 import { deleteTodos } from "../../../../../src/app/handlers/todos/delete-todos.ts";
 import type { DeleteCompleted } from "@todo/operations/todos/delete-completed.ts";
+import { asMember, member } from "../actor.ts";
 
 /** Sends a DELETE through the route, with the query given, as it would be served. */
 const remove = (deleteCompleted: DeleteCompleted, query: string) => {
-  const app = new Hono().delete("/todos", deleteTodos(deleteCompleted));
+  const app = new Hono().use(asMember).delete("/todos", deleteTodos(deleteCompleted));
   return app.request(`/todos${query}`, { method: "DELETE" });
 };
 
@@ -57,16 +58,16 @@ describe("deleteTodos", () => {
   });
 
   it("deletes the completed todos and presents the list the operation returns", async () => {
-    let asked = 0;
+    const asked: unknown[] = [];
     const todos = [{ id: "id-2", title: "walk dog", completed: false }];
-    const deleteCompleted: DeleteCompleted = async () => {
-      asked += 1;
+    const deleteCompleted: DeleteCompleted = async (actor) => {
+      asked.push(actor);
       return ok(todos);
     };
 
     const response = await remove(deleteCompleted, "?completed=true");
 
-    expect(asked).toBe(1);
+    expect(asked).toEqual([member]);
     expect(response.status).toBe(200);
     expect(v.parse(envelope(TodoListReply), await response.json())).toEqual({ ok: true, data: todos });
   });

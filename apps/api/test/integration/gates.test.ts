@@ -1,5 +1,5 @@
 import { SESSION_IDLE_MS } from "@todo/business/auth/session.ts";
-import { Failure, TodoCountsReply, success } from "@todo/contract-api";
+import { Failure } from "@todo/contract-api";
 import { createIdentityStore } from "@todo/data-d1/identity/store.ts";
 import { env, exports } from "cloudflare:workers";
 import * as v from "valibot";
@@ -9,9 +9,10 @@ import { describe, expect, it } from "vitest";
  * The gates on the real Worker (L38, L39): the token's hash is SHA-256 in
  * hex, the session is read from the identity database, and the cookie is
  * the configured one. The unit and binding branches are tested without
- * workerd; this proves the parts only workerd has. No route reads the actor
- * yet, so a request that passes is told apart from one refused by its
- * status alone.
+ * workerd; this proves the parts only workerd has. No route answers with
+ * the actor yet, so who a request was taken for is told by its status:
+ * the runner refuses an anonymous count (401), the gate a disabled user's
+ * session (403), and a member's goes through.
  */
 
 const store = createIdentityStore(env.IDENTITY_DB);
@@ -66,9 +67,10 @@ describe("authenticate, on the identity database", () => {
 
     const response = await counts({ Cookie: `other=${other}` });
 
-    expect(response.status).toBe(200);
-    const reply = await response.json();
-    expect(() => v.parse(success(TodoCountsReply), reply)).not.toThrow();
+    // Anonymous, so the runner refuses the count; the disabled user's
+    // session would have been a 403.
+    expect(response.status).toBe(401);
+    expect(v.parse(Failure, await response.json()).error.kind).toBe("unauthenticated");
   });
 });
 

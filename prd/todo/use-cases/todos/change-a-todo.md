@@ -14,9 +14,13 @@ Set one todo's title, whether it is completed, or both.
 - An id: which todo.
 - A `TodoPatch`: a title, a value for `completed`, or both. Assumes
   `patch.nonempty`, `title.length`.
+- The actor's own scope, `{ ownerId }`, which the runner hands it as
+  the operation's access row says (L43). Every todo below is one of the
+  actor's.
 
 ## Given
 - `todo.exists`
+- `todo.owned`
 
 ## Effects
 The todo is stored as changed. Each field given is set to the value
@@ -30,12 +34,16 @@ The todo as it now is.
 ## Refused
 - `todo.exists` does not hold: `not_found`. Nothing is changed.
   shows: `todos.list.action_failed`
+- `todo.owned` does not hold: `not_found`, the same answer as a missing
+  todo, so whether another's todo has the id is not told. Nothing is
+  changed.
+  shows: `todos.list.action_failed`
 - The store fails: `unavailable` or `server`. Whether the change was
   stored is not known to the caller.
   shows: `todos.list.action_failed`
 
 ## Guarantees
-none
+- `todos.scoped`
 
 ## Atomic
 The change and the read of the todo as changed are one step, so the

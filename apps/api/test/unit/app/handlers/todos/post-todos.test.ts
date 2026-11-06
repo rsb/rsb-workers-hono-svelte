@@ -84,7 +84,7 @@ describe("postTodos", () => {
   });
 
   it("adds the trimmed title and presents the todo", async () => {
-    const add: AddTodo = async (input) => ok({ id: "id-1", title: input.title, completed: false });
+    const add: AddTodo = async (_actor, input) => ok({ id: "id-1", title: input.title, completed: false });
     const response = await postTodos(add, toNewTodo)(post('{"title":"  buy milk  "}'));
 
     expect(response.status).toBe(201);

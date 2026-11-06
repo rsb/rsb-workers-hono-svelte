@@ -8,10 +8,11 @@ import { patchTodo } from "../../../../../src/app/handlers/todos/patch-todo.ts";
 import type { TodoPatch } from "@todo/business/todos/todo.ts";
 import type { UpdateTodo } from "@todo/operations/todos/update-todo.ts";
 import { toTodoPatch } from "@todo/valid/todos/todo-patch.ts";
+import { asMember, member } from "../actor.ts";
 
 /** Sends a PATCH through one route, so the handler gets its `:id` as it would be served. */
 const patch = (updateTodo: UpdateTodo, id: string, body: string) => {
-  const app = new Hono().patch("/todos/:id", patchTodo(updateTodo, toTodoPatch));
+  const app = new Hono().use(asMember).patch("/todos/:id", patchTodo(updateTodo, toTodoPatch));
   return app.request(`/todos/${id}`, { method: "PATCH", body });
 };
 
@@ -97,10 +98,10 @@ describe("patchTodo", () => {
     expect(text).not.toContain("D1_ERROR");
   });
 
-  it("updates the todo the path names with completed and presents it", async () => {
-    const asked: { id: string; patch: TodoPatch }[] = [];
-    const update: UpdateTodo = async (id, patch) => {
-      asked.push({ id, patch });
+  it("updates the todo the path names with completed, as the attached actor, and presents it", async () => {
+    const asked: { actor: unknown; id: string; patch: TodoPatch }[] = [];
+    const update: UpdateTodo = async (actor, id, patch) => {
+      asked.push({ actor, id, patch });
       return ok({ id, title: "buy milk", completed: true });
     };
 
@@ -111,12 +112,12 @@ describe("patchTodo", () => {
       ok: true,
       data: { id: "id-1", title: "buy milk", completed: true },
     });
-    expect(asked).toEqual([{ id: "id-1", patch: { completed: true } }]);
+    expect(asked).toEqual([{ actor: member, id: "id-1", patch: { completed: true } }]);
   });
 
   it("passes the title on trimmed", async () => {
     const asked: TodoPatch[] = [];
-    const update: UpdateTodo = async (id, patch) => {
+    const update: UpdateTodo = async (_actor, id, patch) => {
       asked.push(patch);
       return ok({ id, title: "buy bread", completed: false });
     };
@@ -129,7 +130,7 @@ describe("patchTodo", () => {
 
   it("passes both fields on together", async () => {
     const asked: TodoPatch[] = [];
-    const update: UpdateTodo = async (id, patch) => {
+    const update: UpdateTodo = async (_actor, id, patch) => {
       asked.push(patch);
       return ok({ id, title: "buy bread", completed: true });
     };

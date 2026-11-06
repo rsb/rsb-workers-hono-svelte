@@ -1,10 +1,10 @@
 import { DeletedReply, Failure, TodoListReply, TodoReply, envelope } from "@todo/contract-api";
-import { exports } from "cloudflare:workers";
 import * as v from "valibot";
 import { expect, it } from "vitest";
+import { asMember } from "./signed-in.ts";
 
 const add = async (title: string) => {
-  const response = await exports.default.fetch("https://todo-api/todos", {
+  const response = await asMember("https://todo-api/todos", {
     method: "POST",
     body: JSON.stringify({ title }),
   });
@@ -15,10 +15,10 @@ const add = async (title: string) => {
   return reply.data;
 };
 
-const remove = (id: string) => exports.default.fetch(`https://todo-api/todos/${id}`, { method: "DELETE" });
+const remove = (id: string) => asMember(`https://todo-api/todos/${id}`, { method: "DELETE" });
 
 const listedIds = async () => {
-  const response = await exports.default.fetch("https://todo-api/todos");
+  const response = await asMember("https://todo-api/todos");
   const reply = v.parse(envelope(TodoListReply), await response.json());
   if (!reply.ok) {
     throw new Error("the list failed");

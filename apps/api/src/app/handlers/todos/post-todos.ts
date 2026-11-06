@@ -24,8 +24,10 @@ export const postTodos = (addTodo: AddTodo, toNewTodo: ToNewTodo) => async (c: C
     return userFailure(c, invalidOf(newTodo.error));
   }
 
-  // Adding can fail for the user (the list is full) or for us (the store).
-  const added = await addTodo(newTodo.value);
+  // It runs as the actor the gate attached, adding to their list. Adding
+  // can fail for the user (no session, or their list is full) or for us
+  // (the store).
+  const added = await addTodo(c.get("actor"), newTodo.value);
   if (!added.ok) {
     return mapFailure(c, added.error);
   }

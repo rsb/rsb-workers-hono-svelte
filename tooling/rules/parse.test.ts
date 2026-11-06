@@ -24,8 +24,10 @@ describe("parse", () => {
         ["patch.nonempty", "input"],
         ["todos.cap", "state"],
         ["todo.exists", "state"],
+        ["todo.owned", "state"],
         ["todos.order", "guarantee"],
         ["todos.unique_id", "guarantee"],
+        ["todos.scoped", "guarantee"],
       ],
     );
     assert.deepEqual(

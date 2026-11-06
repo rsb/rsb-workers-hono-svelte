@@ -2,7 +2,7 @@ import { err } from "@todo/business/result.ts";
 import { unavailable } from "@todo/fail/fail.ts";
 import { describe, expect, it, vi } from "vitest";
 import { fakeDbStore } from "../fake-db-store.ts";
-import { testApi } from "../test-api.ts";
+import { MEMBER, signedIn } from "../signed-in.ts";
 
 // The `requestId` gate (L38) binds the log to the request, so a server
 // failure is one JSON line naming the request: `{ requestId, method, path,
@@ -21,7 +21,7 @@ describe("a server failure's log line", () => {
       lines.push(line);
     });
 
-    const response = await testApi({ dbStore: failingList() }).request("/todos?completed=false");
+    const response = await signedIn(MEMBER, { dbStore: failingList() }).request("/todos?completed=false");
 
     expect(response.status).toBe(500);
     expect(lines).toHaveLength(1);
@@ -38,7 +38,7 @@ describe("a server failure's log line", () => {
     vi.spyOn(console, "error").mockImplementation((line: string) => {
       lines.push(line);
     });
-    const api = testApi({ dbStore: failingList() });
+    const api = signedIn(MEMBER, { dbStore: failingList() });
 
     await api.request("/todos");
     await api.request("/todos");

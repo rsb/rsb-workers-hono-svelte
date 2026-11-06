@@ -1,4 +1,5 @@
-import { type Page, expect, test } from "@playwright/test";
+import { type Page, expect } from "@playwright/test";
+import { test } from "./signed-in.ts";
 
 // PRD scenarios 3.1–3.5. The API's store is shared by the whole run (D19),
 // and earlier files leave todos in it. These tests were written before a

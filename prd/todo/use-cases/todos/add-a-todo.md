@@ -12,6 +12,9 @@ Append a new, active todo to the list.
 ## Input
 - A `NewTodo`: a title. Assumes `title.length`.
 - A fresh id from the id source (D13).
+- The actor's own scope, `{ ownerId }`, which the runner hands it as
+  the operation's access row says (L43). Every todo below is one of the
+  actor's.
 
 ## Given
 - `todos.cap`
@@ -33,6 +36,7 @@ The stored todo.
 ## Guarantees
 - `todos.order`
 - `todos.unique_id`
+- `todos.scoped`
 
 ## Atomic
 The count and the insert are one step: two adds at 499 cannot both

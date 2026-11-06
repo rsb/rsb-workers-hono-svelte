@@ -360,7 +360,8 @@ export type OperationLine = { name: string; builder: string };
 /**
  * The operations construct builds: exactly one
  * `export const constructOperations = (infra: Infra): Operations => ({`,
- * closed by `});`, one `  name: builder({ ... }),` per line.
+ * closed by `});`, one `  name: builder({ ... }),` per line, or
+ * `  name: builder(),` for an operation that needs no port.
  */
 export const operationLinesOf = (text: string, path: string): OperationLine[] => {
   const declared = [...text.matchAll(/^export const constructOperations = \(infra: Infra\): Operations => \(\{\n((?:.*\n)*?)\}\);$/gm)];
@@ -372,9 +373,9 @@ export const operationLinesOf = (text: string, path: string): OperationLine[] =>
     if (line === "") {
       continue;
     }
-    const built = /^ {2}(\w+): (\w+)\(\{ .* \}\),$/.exec(line);
+    const built = /^ {2}(\w+): (\w+)\((?:\{ .* \})?\),$/.exec(line);
     if (built === null) {
-      return fail(path, `an operation is written "  name: builder({ ... }),": ${line.trim()}`);
+      return fail(path, `an operation is written "  name: builder({ ... }),", or "  name: builder(),": ${line.trim()}`);
     }
     lines.push({ name: built[1] ?? "", builder: built[2] ?? "" });
   }

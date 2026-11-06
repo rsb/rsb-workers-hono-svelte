@@ -17,8 +17,8 @@ export default defineConfig(async () => {
     test: {
       include: ["test/integration/**/*.test.ts"],
       // Storage is isolated per test file, so each file starts on an empty,
-      // migrated database (DB9).
-      setupFiles: ["./test/integration/apply-migrations.ts"],
+      // migrated database (DB9), holding a member's and an admin's session.
+      setupFiles: ["./test/integration/apply-migrations.ts", "./test/integration/seed-sessions.ts"],
     },
   };
 });

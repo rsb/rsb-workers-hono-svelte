@@ -16,6 +16,12 @@ const add = (headers: Record<string, string>, body = '{"title":"buy milk"}') => 
   return api.request("/todos", { method: "POST", body, headers });
 };
 
+/** Refused by the runner, after the gates: the request passed the channel gate as anonymous. */
+const refusedAsAnonymous = async (response: Response) => {
+  expect(response.status).toBe(401);
+  expect(v.parse(Failure, await response.json()).error.kind).toBe("unauthenticated");
+};
+
 const refusedForChannel = async (response: Response, message: string) => {
   expect(response.status).toBe(403);
   expect(v.parse(Failure, await response.json()).error).toEqual({ kind: "forbidden", reason: "channel", message });
@@ -85,8 +91,9 @@ describe("a request the gate does not check", () => {
 
   it("is an unsafe one with no cookie, since there is no session to ride", async () => {
     const response = await add({ "Sec-Fetch-Site": "cross-site", "Content-Type": "text/plain" });
-    // Past the gate, the handler reads the body as JSON whatever its type.
-    expect(response.status).toBe(201);
+    // Past the gate it is anonymous, and adding requires a member: the
+    // runner's 401, not the gate's 403.
+    await refusedAsAnonymous(response);
   });
 
   it("is an unsafe one with a bearer token, which no browser sends on its own", async () => {
@@ -96,6 +103,7 @@ describe("a request the gate does not check", () => {
 
   it("is one with a cookie of another name", async () => {
     const response = await add({ Cookie: `other=${MEMBER_TOKEN}`, "Sec-Fetch-Site": "cross-site", ...JSON_TYPE });
-    expect(response.status).toBe(201);
+    // Not the session cookie, so no session: anonymous, past the gate.
+    await refusedAsAnonymous(response);
   });
 });
