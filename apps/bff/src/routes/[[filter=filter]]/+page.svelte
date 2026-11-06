@@ -53,9 +53,10 @@
 <main>
 	<h1>Todos</h1>
 
-	<!-- accounts.shell.signed_out: "Sign in" and "Create an account" come in B and C. -->
+	<!-- accounts.shell.signed_out: "Create an account" comes in C, with its page. -->
 	{#if data.state === "signed_out"}
 		<p class="lede">{SIGNED_OUT}</p>
+		<p class="actions"><a href="/sign-in" class="primary">Sign in</a></p>
 	{:else}
 		<NewTodo {failed} {hasTodos} {allDone} {markAllFailed} />
 
@@ -89,6 +90,23 @@
 		font-size: 16px;
 		line-height: 1.55;
 		color: var(--fg2);
+	}
+
+	.actions {
+		margin: 28px 0 0;
+	}
+
+	.primary {
+		display: inline-flex;
+		align-items: center;
+		height: 48px;
+		padding: 0 22px;
+		border-radius: 10px;
+		background: var(--accent);
+		color: var(--on-accent);
+		font-size: 16px;
+		font-weight: 600;
+		text-decoration: none;
 	}
 
 	@media (max-width: 480px) {

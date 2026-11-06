@@ -34,17 +34,17 @@ it.
 
 | State | The user sees | Produced by | Board |
 | --- | --- | --- | --- |
-| `accounts.shell.signed_out` | the top bar with no links; in place of the list, "Sign in to see your list. Your to-dos are kept with your account." "Sign in" and "Create an account" are added in B and C, with their pages | `bff, over the runner › unauthenticated`: authenticate › `anonymous` (no cookie, or one that names no live session, which the BFF then deletes), and the page's read, list-todos, is refused by the runner, which requires `member` | `shell.signed-out` (drawn with the two links slice A leaves out) |
+| `accounts.shell.signed_out` | the top bar with "Sign in" (not on the sign-in page itself); in place of the list, "Sign in to see your list. Your to-dos are kept with your account." and "Sign in". "Create an account" is added in C, with its page | `bff, over the runner › unauthenticated`: authenticate › `anonymous` (no cookie, or one that names no live session, which the BFF then deletes), and the page's read, list-todos, is refused by the runner, which requires `member` | `shell.signed-out` (drawn with the two links slice A leaves out) |
 | `accounts.shell.member` | the top bar with "Todos" and the account button with the person's initials; the page inside | `authenticate › member`: an actor whose role is `member` | `shell.member` |
 | `accounts.shell.admin` | as `member`; the "Users" link is added in D, with its page | `authenticate › admin`: an actor whose role is `admin` | drawn only with the menu open (`shell.menu-open`, as admin) |
 | `accounts.shell.menu_open` | the account menu open over the page: name and email, "Admin" for an admin, then Todos; Sign out from B, Users (admin only) from D, and Profile when its page exists | `bff` (no chain runs) | `shell.menu-open` |
 | `accounts.shell.signed_out_notice` | `signed_out`, with the notice "You’re signed out on this device." | `open: B (after sign-out)` | `shell.signed-out-notice` |
 
-Slice A has no sign-in page: there is no redirect, and with no cookie
-the BFF renders `signed_out` with no list and no links. The shell shows
-a link only when its page exists: "Sign in" and "Create an account"
-from B and C, "Users" from D, "Profile" when its page exists. The
-boards draw them all; slice A renders the frame without them.
+There is no redirect: with no cookie the BFF renders `signed_out` with
+no list, and "Sign in" leads to `/sign-in` (B). The shell shows a link
+only when its page exists: "Sign in" from B, "Create an account" from
+C, "Users" from D, "Profile" when its page exists. The boards draw them
+all; the frame renders those whose pages exist.
 
 The chain produces one result no board shows: authenticate › refused
 `forbidden`, reason `account_disabled`, a live session whose user is
@@ -100,7 +100,8 @@ and D write theirs.
 
 ### A Ownership without login
 1. *Given* no session cookie, *when* I open `/`, *then* I see "Sign in
-   to see your list", no list, and no links in the top bar. (21)
+   to see your list", no list, and no links in the top bar but "Sign
+   in" (from B). (21)
 2. *Given* a session cookie that names no live session, *when* I open
    `/`, *then* I see the same, and the cookie is deleted. (21; L39)
 3. *Given* the member's session, *when* I open `/`, *then* the top bar
@@ -116,7 +117,12 @@ and D write theirs.
 7. *Given* the api fails, *when* I open `/`, *then* I see "Something
    went wrong" and "Try again", in the frame. (C-accounts)
 
-Scenario 7 is not an e2e scenario, for the reason scenario 1 of the
+### B Sign in and sign out
+1. *Given* no session cookie, *when* I open `/`, *then* "Sign in" in the
+   top bar and on the page each lead to the sign-in page, whose top bar
+   has no "Sign in". (`feature-accounts-sign-in.md`)
+
+Scenario A.7 is not an e2e scenario, for the reason scenario 1 of the
 root gives for health: `test:e2e` starts both Workers. It is the BFF's
 unit test of the page load, with a fake binding that fails.
 

@@ -12,6 +12,7 @@
 
 	// "Todos" is current on the list, under any filter, and not on an error.
 	let onTodos = $derived(page.route.id === "/[[filter=filter]]" && page.error === null);
+	let onSignIn = $derived(page.route.id === "/sign-in");
 </script>
 
 <svelte:head>
@@ -24,7 +25,7 @@
 {#if data.probe}
 	{@render children()}
 {:else}
-	<TopBar account={data.account} {onTodos} />
+	<TopBar account={data.account} {onTodos} {onSignIn} />
 	<!-- The actor is a read every page needs: if it failed, so did the page. -->
 	{#if data.account.state === "failed"}
 		<ErrorView view={FAILED} />

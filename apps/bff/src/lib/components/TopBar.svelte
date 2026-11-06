@@ -6,9 +6,11 @@
 		account: Account;
 		/** Whether the page is the list, which marks "Todos" as current. */
 		onTodos: boolean;
+		/** Whether the page is the sign-in page, which has no "Sign in" link to itself. */
+		onSignIn: boolean;
 	};
 
-	let { account, onTodos }: Props = $props();
+	let { account, onTodos, onSignIn }: Props = $props();
 
 	let open = $state(false);
 	let button: HTMLButtonElement | undefined = $state();
@@ -48,7 +50,11 @@
 			Todo
 		</a>
 
-		<!-- A link only for a page that exists: "Users" is added in D, "Sign in" in B. -->
+		<!-- A link only for a page that exists: "Users" is added in D. -->
+		{#if account.state === "anonymous" && !onSignIn}
+			<a href="/sign-in" class="sign-in">Sign in</a>
+		{/if}
+
 		{#if account.state === "signed_in"}
 			{@const person = account.person}
 			<nav aria-label="Main" class="nav-main">
@@ -137,6 +143,21 @@
 		align-items: center;
 		justify-content: center;
 		flex: none;
+	}
+
+	.sign-in {
+		margin-left: auto;
+		display: inline-flex;
+		align-items: center;
+		height: 44px;
+		padding: 0 16px;
+		border: 1px solid var(--line);
+		border-radius: 10px;
+		background: var(--fill);
+		color: var(--fg);
+		font-weight: 600;
+		font-size: 15px;
+		text-decoration: none;
 	}
 
 	.nav-main {
