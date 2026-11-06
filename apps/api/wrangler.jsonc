@@ -6,6 +6,13 @@
   // Not public: reachable only through the BFF Worker's service binding.
   "workers_dev": false,
   "preview_urls": false,
+  // Configuration (src/config.ts). Not secrets: an origin and a cookie's
+  // name. Local dev serves the BFF over http, so `.dev.vars` names the
+  // cookie `sid`.
+  "vars": {
+    "BFF_ORIGIN": "http://localhost:5173",
+    "SESSION_COOKIE": "__Host-sid"
+  },
   // Local only: wrangler keeps each database under .wrangler/, so there is
   // no database_id until the api is deployed. Each schema lives with its
   // data package (DB8). Two databases (L42): the app's todos, and who the

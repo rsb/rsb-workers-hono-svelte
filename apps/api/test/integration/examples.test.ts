@@ -30,6 +30,18 @@ const notReplayed: Record<string, string> = {
 const sharedRequests: Record<string, () => Request> = {
   "a body over the limit": () =>
     new Request("https://todo-api/todos", { method: "POST", body: "x".repeat(BODY_LIMIT_BYTES + 1) }),
+  "a bearer token that names no session": () =>
+    new Request("https://todo-api/todos", { headers: { Authorization: `Bearer ${"u".repeat(43)}` } }),
+  "a change from another site, with the session cookie": () =>
+    new Request("https://todo-api/todos", {
+      method: "POST",
+      body: '{"title":"buy milk"}',
+      headers: {
+        Cookie: `${env.SESSION_COOKIE}=${"u".repeat(43)}`,
+        "Content-Type": "application/json",
+        "Sec-Fetch-Site": "cross-site",
+      },
+    }),
 };
 
 const toRequest = (request: NonNullable<Example["request"]>) => {

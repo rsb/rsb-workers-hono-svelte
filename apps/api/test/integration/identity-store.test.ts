@@ -7,9 +7,9 @@ import { describe, expect, it } from "vitest";
 /**
  * The identity store's SQL against a real D1 (`data/identity.md`): the unit
  * tests prove what is bound and how a row is read, never that the SQL and
- * the schema agree. No route reads the identity database yet; the gates do
- * from the next commit. The file shares one database (DB9), so each test
- * uses its own email and token hashes.
+ * the schema agree. The gates read it on every request with a credential;
+ * `gates.test.ts` covers that path. The file shares one database (DB9), so
+ * each test uses its own email and token hashes.
  */
 
 const NOW = Date.UTC(2026, 10, 5, 12);

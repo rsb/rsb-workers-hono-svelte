@@ -4,7 +4,7 @@
   "info": {
     "title": "Todo api",
     "version": "0.0.0",
-    "description": "- Every reply is in the envelope (PRD, Envelope): the reply below is\n  its `data`.\n- Every object is closed: a field not listed is refused.\n- Any request whose body is over `BODY_LIMIT_BYTES` (8192) is refused\n  before routing: `too_large`.\n- Any request can fail on the server: `internal`.\n- A method and path not listed here: `not_found`.\n\n\nThe errors under each endpoint are the ones it adds to these."
+    "description": "- Every reply is in the envelope (PRD, Envelope): the reply below is\n  its `data`.\n- Every object is closed: a field not listed is refused.\n- Any request whose body is over `BODY_LIMIT_BYTES` (8192) is refused\n  before routing: `too_large`.\n- Any request that carries the session cookie and changes something is\n  refused unless it comes from the BFF's own page: `Sec-Fetch-Site` is\n  `same-origin` or `none`, or, without it, `Origin` is the BFF's. Its\n  body, if it has one, is `application/json`. Otherwise: `forbidden`,\n  reason `channel` (L38).\n- Any request whose bearer token names no live session, or that gives a\n  cookie and a bearer token together: `unauthenticated`. A cookie that\n  names no live session is not refused: the request is anonymous (L39).\n- Any request whose live session is a disabled user's: `forbidden`,\n  reason `account_disabled` (L39).\n- Any request can fail on the server: `internal`.\n- A method and path not listed here: `not_found`.\n\n\nThe errors under each endpoint are the ones it adds to these."
   },
   "servers": [
     {
@@ -52,6 +52,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
           },
           "413": {
             "$ref": "#/components/responses/TooLarge"
@@ -156,6 +162,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
           },
           "413": {
             "$ref": "#/components/responses/TooLarge"
@@ -276,6 +288,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
           },
           "409": {
             "description": "`limit`",
@@ -414,6 +432,12 @@
               }
             }
           },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
           "413": {
             "$ref": "#/components/responses/TooLarge"
           },
@@ -511,6 +535,12 @@
               }
             }
           },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
           "413": {
             "$ref": "#/components/responses/TooLarge"
           },
@@ -584,6 +614,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
           },
           "413": {
             "$ref": "#/components/responses/TooLarge"
@@ -688,6 +724,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
           },
           "404": {
             "description": "`not_found`",
@@ -801,6 +843,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
           },
           "404": {
             "description": "`not_found`",
@@ -1012,6 +1060,76 @@
         ],
         "additionalProperties": false
       },
+      "UnauthenticatedFailure": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": false
+          },
+          "error": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "unauthenticated"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "message"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "ok",
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "ForbiddenFailure": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": false
+          },
+          "error": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "forbidden"
+              },
+              "message": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string",
+                "enum": [
+                  "channel",
+                  "account_disabled"
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "message",
+              "reason"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "ok",
+          "error"
+        ],
+        "additionalProperties": false
+      },
       "NotFoundFailure": {
         "type": "object",
         "properties": {
@@ -1138,6 +1256,51 @@
       }
     },
     "responses": {
+      "Unauthenticated": {
+        "description": "`unauthenticated`, which every endpoint can return.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/UnauthenticatedFailure"
+            },
+            "examples": {
+              "a-bearer-token-that-names-no-session": {
+                "summary": "a bearer token that names no session",
+                "value": {
+                  "ok": false,
+                  "error": {
+                    "kind": "unauthenticated",
+                    "message": "the bearer token names no live session"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "`forbidden`, which every endpoint can return.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ForbiddenFailure"
+            },
+            "examples": {
+              "a-change-from-another-site-with-the-session-cookie": {
+                "summary": "a change from another site, with the session cookie",
+                "value": {
+                  "ok": false,
+                  "error": {
+                    "kind": "forbidden",
+                    "message": "the request does not come from the BFF's page",
+                    "reason": "channel"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
       "TooLarge": {
         "description": "`too_large`, which every endpoint can return.",
         "content": {

@@ -1,17 +1,12 @@
 import { DeletedReply, Failure, TodoCountsReply, TodoListReply, TodoReply, envelope } from "@todo/contract-api";
 import * as v from "valibot";
 import { expect, it } from "vitest";
-import { constructApi, constructOperations, constructRoutes } from "../../src/construct.ts";
-import { serve } from "../../src/http.ts";
-import { fakeDbStore } from "./fake-db-store.ts";
+import { testApi } from "./test-api.ts";
 
-// The whole route table on a fake store, entered below `constructInfra`
-// (A10): no workerd, no database, and a fixed id so the reply is exact.
-const app = (newId = () => "id-1") => {
-  const operations = constructOperations({ dbStore: fakeDbStore(), newId });
-  const routes = constructRoutes(operations);
-  return serve(constructApi(routes));
-};
+// The whole api on fake stores, entered below `constructInfra` (A10): no
+// workerd, no database, and a fixed id so the reply is exact. No request
+// carries a credential, so each is anonymous.
+const app = (newId = () => "id-1") => testApi({ newId });
 
 it("an added todo is in the next list", async () => {
   const api = app();

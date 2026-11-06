@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Fail, invalid, limitReached, notFound, rootOf, unavailable, wrap } from "../../src/fail.ts";
+import { Fail, chainOf, forbidden, invalid, limitReached, notFound, rootOf, unavailable, wrap } from "../../src/fail.ts";
 
 describe("wrap", () => {
   it("adds context to the message and keeps the kind", () => {
@@ -16,6 +16,13 @@ describe("wrap", () => {
     const wrapped = wrap(invalid("title", "title is empty"), "validate");
 
     expect(wrapped.field).toBe("title");
+  });
+
+  it("keeps the reason a forbidden failure gives", () => {
+    const wrapped = wrap(forbidden("account_disabled", "the account is disabled"), "authenticate");
+
+    expect(wrapped.kind).toBe("forbidden");
+    expect(wrapped.reason).toBe("account_disabled");
   });
 
   it("points back to what it wraps", () => {
@@ -44,5 +51,26 @@ describe("rootOf", () => {
     const root = notFound("no such todo", down);
 
     expect(rootOf(wrap(root, "get todo"))).toBe(root);
+  });
+});
+
+describe("chainOf", () => {
+  it("lists what a failure wraps, nearest first, down to a thrown error", () => {
+    const thrown = new Error("D1_ERROR: no such table");
+    const root = unavailable("D1 is down", thrown);
+
+    const chain = chainOf(wrap(root, "list todos"));
+
+    expect(chain[0]).toBe("unavailable: D1 is down");
+    expect(chain[1]).toContain("Error: D1_ERROR: no such table");
+    expect(chain).toHaveLength(2);
+  });
+
+  it("is empty for a failure that wraps nothing", () => {
+    expect(chainOf(notFound("no todo"))).toEqual([]);
+  });
+
+  it("writes a cause that is not an error as text", () => {
+    expect(chainOf(unavailable("down", "socket closed"))).toEqual(["socket closed"]);
   });
 });

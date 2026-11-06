@@ -38,6 +38,9 @@ describe("addFailedMessage", () => {
     ["limit", LIST_FULL],
     ["validation", SOMETHING_WENT_WRONG],
     ["internal", SOMETHING_WENT_WRONG],
+    // Interim, until the shell's error view (stage 23, commit 10).
+    ["unauthenticated", SOMETHING_WENT_WRONG],
+    ["forbidden", SOMETHING_WENT_WRONG],
   ])("words %s", (kind, message) => {
     expect(addFailedMessage(kind)).toBe(message);
   });

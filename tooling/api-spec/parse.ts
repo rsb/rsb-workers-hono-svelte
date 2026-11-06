@@ -27,7 +27,13 @@ export type Shape =
   | { name: string; doc: string | undefined; kind: "object"; fields: Field[]; atLeast: AtLeast | undefined }
   | { name: string; doc: string | undefined; kind: "list"; of: string };
 
-export type ErrorKind = { name: string; status: number; withField: boolean };
+/**
+ * An error kind and its status. `carries` is the one extra member its error
+ * has beside `kind` and `message`: `field` names the input that broke a rule,
+ * `reason` says why a known caller is refused (PRD, Envelope). `reasons` is
+ * the closed list a `reason` is one of, and is empty for any other kind.
+ */
+export type ErrorKind = { name: string; status: number; carries: "field" | "reason" | undefined; reasons: string[] };
 
 /** An example's request, as the request line and body the spec writes. */
 export type Request = {
@@ -423,7 +429,7 @@ const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
 /** The reply's error kind when it is a failure envelope, true for a success, else a problem. */
-const envelopeOf = (reply: unknown): { ok: true } | { ok: false; kind: string } | string => {
+const envelopeOf = (reply: unknown): { ok: true } | { ok: false; kind: string; reason: unknown } | string => {
   if (!isObject(reply) || typeof reply.ok !== "boolean") {
     return "a reply is the whole envelope: { \"ok\": true, \"data\": … } or { \"ok\": false, \"error\": … }";
   }
@@ -433,7 +439,7 @@ const envelopeOf = (reply: unknown): { ok: true } | { ok: false; kind: string } 
   if (!isObject(reply.error) || typeof reply.error.kind !== "string") {
     return "a failure's error has a kind";
   }
-  return { ok: false, kind: reply.error.kind };
+  return { ok: false, kind: reply.error.kind, reason: reply.error.reason };
 };
 
 export const parse = (source: string): Parsed => {
@@ -481,16 +487,46 @@ export const parse = (source: string): Parsed => {
 
   // Errors.
   const kinds: ErrorKind[] = [];
+  const kindShape =
+    'an error is "- `kind`: status", "- `kind`: status, with field" or "- `kind`: status, with reason: a | b"';
   for (const entry of nonBlank(sections.get("Errors") ?? [])) {
-    const kind = new RegExp(`^- \`(${NAME})\`: (\\d{3})(, with field)?$`).exec(entry.text);
+    const kind = new RegExp(`^- \`(${NAME})\`: (\\d{3})(?:, with (field|reason)(?:: (.+))?)?$`).exec(entry.text);
     if (!kind) {
-      problem(entry.line, 'an error is "- `kind`: status" or "- `kind`: status, with field"');
+      problem(entry.line, kindShape);
       continue;
     }
-    kinds.push({ name: kind[1] as string, status: Number(kind[2]), withField: kind[3] !== undefined });
+    const name = kind[1] as string;
+    const carries = kind[3] as "field" | "reason" | undefined;
+    const list = kind[4];
+    if (carries !== "reason" && list !== undefined) {
+      problem(entry.line, kindShape);
+      continue;
+    }
+    const reasons = list === undefined ? [] : list.split(" | ");
+    if (carries === "reason") {
+      if (reasons.length === 0) {
+        problem(entry.line, `kind ${name} carries a reason, so it lists them: "with reason: a | b"`);
+      }
+      for (const reason of reasons) {
+        if (!new RegExp(`^${NAME}$`).test(reason)) {
+          problem(entry.line, `kind ${name}'s reason "${reason}" is not a name`);
+        }
+      }
+      const twice = reasons.filter((reason, index) => reasons.indexOf(reason) !== index);
+      for (const reason of new Set(twice)) {
+        problem(entry.line, `kind ${name} lists the reason ${reason} twice`);
+      }
+      // The contract's `Reason` is one list, so it is exact only while one kind carries it.
+      const earlier = kinds.find((other) => other.carries === "reason");
+      if (earlier !== undefined) {
+        problem(entry.line, `kind ${name} carries a reason, and so does ${earlier.name}; one kind carries a reason`);
+      }
+    }
+    kinds.push({ name, status: Number(kind[2]), carries, reasons });
   }
   const kindNames = new Set(kinds.map((kind) => kind.name));
   const statusOf = new Map(kinds.map((kind) => [kind.name, kind.status]));
+  const reasonsOf = new Map(kinds.filter((kind) => kind.carries === "reason").map((kind) => [kind.name, kind.reasons]));
 
   /** Checks a reply against the kinds it may have and the statuses they map to; true for a success. */
   const checkReply = (example: Example, allowed: string[], success: number | undefined) => {
@@ -514,6 +550,10 @@ export const parse = (source: string): Parsed => {
     const status = statusOf.get(envelope.kind);
     if (example.status !== status) {
       problem(example.line, `example "${example.name}" replies ${example.status}; ${envelope.kind} replies ${status}`);
+    }
+    const reasons = reasonsOf.get(envelope.kind);
+    if (reasons !== undefined && !reasons.includes(envelope.reason as string)) {
+      problem(example.line, `example "${example.name}" gives the reason ${String(envelope.reason)}, which is not among ${reasons.join(", ")}`);
     }
   };
 

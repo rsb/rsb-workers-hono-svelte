@@ -33,6 +33,29 @@ export const everyExamples: Example[] = [
     }
   },
   {
+    "name": "a bearer token that names no session",
+    "status": 401,
+    "reply": {
+      "ok": false,
+      "error": {
+        "kind": "unauthenticated",
+        "message": "the bearer token names no live session"
+      }
+    }
+  },
+  {
+    "name": "a change from another site, with the session cookie",
+    "status": 403,
+    "reply": {
+      "ok": false,
+      "error": {
+        "kind": "forbidden",
+        "message": "the request does not come from the BFF's page",
+        "reason": "channel"
+      }
+    }
+  },
+  {
     "name": "the server fails",
     "status": 500,
     "reply": {
