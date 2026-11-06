@@ -7,7 +7,7 @@ import { loadTodos } from "../../src/lib/server/todos/load-todos.ts";
 import { markAllTodos } from "../../src/lib/server/todos/mark-all-todos.ts";
 import { removeTodo } from "../../src/lib/server/todos/remove-todo.ts";
 import { toggleTodo } from "../../src/lib/server/todos/toggle-todo.ts";
-// Types only: the route module imports `cloudflare:workers`, which the unit tier has not.
+// Types only: the budgets need the actions' names, not the route module.
 import type * as page from "../../src/routes/[[filter=filter]]/+page.server.ts";
 
 type Api = Pick<Fetcher, "fetch">;

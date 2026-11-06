@@ -14,6 +14,17 @@ import { call } from "./call.ts";
 type Api = Pick<Fetcher, "fetch">;
 
 /**
+ * A call with a JSON body, saying so: the api's `channel` gate refuses a
+ * cookie-bearing body of any other type (L38), and a string body is
+ * otherwise sent as `text/plain`.
+ */
+const json = (method: "POST" | "PATCH", body: unknown): RequestInit => ({
+  method,
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(body),
+});
+
+/**
  * `GET /todos`: every todo, or with `completed` only those, in creation
  * order. An empty query sends no `?`.
  */
@@ -31,17 +42,17 @@ export const getTodoCounts = (api: Api) => call(api, "/todos/counts", {}, TodoCo
 
 /** `POST /todos`: the added todo. */
 export const postTodo = (api: Api, body: AddTodoBody) =>
-  call(api, "/todos", { method: "POST", body: JSON.stringify(body) }, TodoReply);
+  call(api, "/todos", json("POST", body), TodoReply);
 
 /** `PATCH /todos/:id`: the todo as it now is. */
 export const patchTodo = (api: Api, id: string, body: PatchTodoBody) => {
   const path = `/todos/${encodeURIComponent(id)}`;
-  return call(api, path, { method: "PATCH", body: JSON.stringify(body) }, TodoReply);
+  return call(api, path, json("PATCH", body), TodoReply);
 };
 
 /** `PATCH /todos`: every todo as it now is, in creation order. */
 export const patchTodos = (api: Api, body: PatchTodosBody) =>
-  call(api, "/todos", { method: "PATCH", body: JSON.stringify(body) }, TodoListReply);
+  call(api, "/todos", json("PATCH", body), TodoListReply);
 
 /** `DELETE /todos/:id`: the id of the todo deleted. */
 export const deleteTodo = (api: Api, id: string) => {
