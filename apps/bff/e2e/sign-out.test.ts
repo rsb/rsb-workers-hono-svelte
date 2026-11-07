@@ -1,5 +1,5 @@
 import { type Page, expect, test } from "@playwright/test";
-import { BASE, passwordOf } from "./signed-in.ts";
+import { BASE, signInThroughPage } from "./signed-in.ts";
 import { input, open } from "./todos.ts";
 
 // Scenarios B.2 and B.3 (`feature-accounts-shell.md` › B). Playwright's
@@ -8,14 +8,6 @@ import { input, open } from "./todos.ts";
 
 const NOTICE = "You’re signed out on this device.";
 const SIGNED_OUT = "Sign in to see your list. Your to-dos are kept with your account.";
-
-const signInAsMember = async (page: Page) => {
-  await open(page, "/sign-in");
-  await page.getByLabel("Email").fill("member@example.test");
-  await page.getByLabel("Password").fill(passwordOf("MEMBER_PASSWORD"));
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(input(page)).toBeVisible();
-};
 
 const signOutFromMenu = async (page: Page) => {
   await page.getByRole("button", { name: "Account: Dev Member" }).click();
@@ -27,7 +19,7 @@ const sessionCookie = async (page: Page) => (await page.context().cookies(BASE))
 test("B.2 given the member signed in, when I sign out from the account menu, then I see the notice and no list, and Back shows no list", async ({
   page,
 }) => {
-  await signInAsMember(page);
+  await signInThroughPage(page);
   // The list was drawn for a signed-in person, so no cache keeps it.
   const list = await page.request.get(`${BASE}/`);
   expect(list.headers()["cache-control"]).toBe("no-store");
@@ -54,7 +46,7 @@ test("B.2 given the member signed in, when I sign out from the account menu, the
 });
 
 test("B.3 given a session signed out, when its cookie is presented again, then it signs nobody in, and is deleted", async ({ page }) => {
-  await signInAsMember(page);
+  await signInThroughPage(page);
   const kept = await sessionCookie(page);
   expect(kept).toBeDefined();
 
@@ -70,7 +62,7 @@ test("B.3 given a session signed out, when its cookie is presented again, then i
 });
 
 test("B.2 sign-out is a POST: opening /sign-out signs nobody out and goes to the list", async ({ page }) => {
-  await signInAsMember(page);
+  await signInThroughPage(page);
 
   await open(page, "/sign-out");
 

@@ -1,6 +1,6 @@
 import type { Cookies } from "@sveltejs/kit";
 import type { ApiError } from "@todo/contract-api";
-import { deleteCurrentSession } from "../api/sessions.ts";
+import { deleteCurrentSession, deleteSessions } from "../api/sessions.ts";
 import type { SessionCookie } from "./sign-in.ts";
 
 /** Where a sign-out sends the browser: the list's page, which shows `accounts.shell.signed_out_notice`. */
@@ -44,6 +44,22 @@ const isSignedOut = (refused: ApiError): boolean => {
   }
 };
 
+/** The reply of either sign-out, as `call` reads it. */
+type SignOutReply = Awaited<ReturnType<typeof deleteCurrentSession>>;
+
+/**
+ * What both sign-outs do with the api's reply: on success, or when the
+ * cookie already names no live session, delete the session cookie with an
+ * expiring `Set-Cookie`; on any other refusal, throw, with the cookie kept.
+ */
+const forget = (reply: SignOutReply, cookies: Pick<Cookies, "delete">, cookie: SessionCookie, what: string) => {
+  if (!reply.ok && !isSignedOut(reply.error)) {
+    throw new Error(`${what} failed`, { cause: reply.error });
+  }
+  cookies.delete(cookie.name, { path: "/", httpOnly: true, secure: cookie.secure, sameSite: "lax" });
+  return { signedOut: true as const };
+};
+
 /**
  * The shell's sign-out: ask the api to end this device's session, then
  * delete the session cookie with an expiring `Set-Cookie`. Gives
@@ -51,10 +67,15 @@ const isSignedOut = (refused: ApiError): boolean => {
  * or throws, for `accounts.error.failed`, with the cookie kept.
  */
 export async function signOut(api: Pick<Fetcher, "fetch">, cookies: Pick<Cookies, "delete">, cookie: SessionCookie) {
-  const reply = await deleteCurrentSession(api);
-  if (!reply.ok && !isSignedOut(reply.error)) {
-    throw new Error("sign-out failed", { cause: reply.error });
-  }
-  cookies.delete(cookie.name, { path: "/", httpOnly: true, secure: cookie.secure, sameSite: "lax" });
-  return { signedOut: true as const };
+  return forget(await deleteCurrentSession(api), cookies, cookie, "sign-out");
+}
+
+/**
+ * The profile's "Sign out everywhere": ask the api to end every session of
+ * the actor's, this device's included (L50), then delete this device's
+ * cookie as sign-out does. Another device finds itself signed out on its
+ * next request (`sign-out-everywhere.md`).
+ */
+export async function signOutEverywhere(api: Pick<Fetcher, "fetch">, cookies: Pick<Cookies, "delete">, cookie: SessionCookie) {
+  return forget(await deleteSessions(api), cookies, cookie, "sign-out everywhere");
 }

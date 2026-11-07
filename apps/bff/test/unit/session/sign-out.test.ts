@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { SIGNED_OUT_NOTICE } from "../../../src/lib/shell/views.ts";
-import { CLEAR_SITE_DATA, SIGNED_OUT_TO, signOut } from "../../../src/lib/server/session/sign-out.ts";
+import { CLEAR_SITE_DATA, SIGNED_OUT_TO, signOut, signOutEverywhere } from "../../../src/lib/server/session/sign-out.ts";
 
 type Deleted = { name: string; options: unknown };
 
@@ -80,6 +80,44 @@ describe("signOut", () => {
     const { cookies, deleted } = jar();
 
     await expect(signOut(binding(200, "not an envelope").api, cookies, { name: "sid", secure: false })).rejects.toThrow();
+    expect(deleted).toEqual([]);
+  });
+});
+
+describe("signOutEverywhere", () => {
+  it("asks the api to end every session of the actor's, then deletes this device's cookie as sign-out does", async () => {
+    const { api, asked } = signedOut();
+    const { cookies, deleted } = jar();
+
+    const result = await signOutEverywhere(api, cookies, { name: "sid", secure: false });
+
+    expect(result).toEqual({ signedOut: true });
+    expect(asked).toHaveLength(1);
+    expect(asked[0]?.url).toBe("https://todo-api/sessions");
+    expect(asked[0]?.init?.method).toBe("DELETE");
+    expect(deleted).toEqual([{ name: "sid", options: { path: "/", httpOnly: true, secure: false, sameSite: "lax" } }]);
+  });
+
+  it("is signed out, and deletes the cookie, when the api says the cookie names no live session", async () => {
+    const { cookies, deleted } = jar();
+
+    const result = await signOutEverywhere(refused("unauthenticated", 401).api, cookies, { name: "sid", secure: false });
+
+    expect(result).toEqual({ signedOut: true });
+    expect(deleted).toHaveLength(1);
+  });
+
+  // `sign-out-everywhere.md`, Refused: whether the sessions ended is not
+  // known, so the cookie stays and running it again is safe.
+  it.each([
+    ["internal", 500],
+    ["forbidden", 403],
+  ])("throws, for accounts.error.failed, and keeps the cookie, when the api answers %s", async (kind, status) => {
+    const { cookies, deleted } = jar();
+
+    await expect(signOutEverywhere(refused(kind, status).api, cookies, { name: "sid", secure: false })).rejects.toThrow(
+      "sign-out everywhere failed",
+    );
     expect(deleted).toEqual([]);
   });
 });

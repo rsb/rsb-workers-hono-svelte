@@ -8,7 +8,12 @@ import { defineConfig, devices } from "@playwright/test";
 export default defineConfig({
   testDir: "e2e",
   workers: 1,
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  // `e2e/last/` runs after every other file: sign out everywhere ends the
+  // seeded sessions the other files sign in with.
+  projects: [
+    { name: "chromium", use: { ...devices["Desktop Chrome"] }, testIgnore: "last/**" },
+    { name: "chromium-last", use: { ...devices["Desktop Chrome"] }, testMatch: "last/**/*.test.ts", dependencies: ["chromium"] },
+  ],
   use: { baseURL: "http://localhost:5173" },
   // The JSON report is what the pillars view reads (logbook/pillars.md). It
   // sits beside the unit report, so Playwright's own output, which it empties

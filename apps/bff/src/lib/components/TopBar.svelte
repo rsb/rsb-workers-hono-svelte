@@ -8,9 +8,11 @@
 		onTodos: boolean;
 		/** Whether the page is the sign-in page, which has no "Sign in" link to itself. */
 		onSignIn: boolean;
+		/** Whether the page is the profile, which marks "Profile" as current. */
+		onProfile: boolean;
 	};
 
-	let { account, onTodos, onSignIn }: Props = $props();
+	let { account, onTodos, onSignIn, onProfile }: Props = $props();
 
 	let open = $state(false);
 	let button: HTMLButtonElement | undefined = $state();
@@ -76,7 +78,7 @@
 					<svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg>
 				</button>
 
-				<!-- Users is added in D, Profile when its page exists. -->
+				<!-- Users is added in D. -->
 				{#if open}
 					<div id="account-menu" class="menu">
 						<div class="menu-head">
@@ -91,6 +93,14 @@
 								<a href="/" class={["menu-item", { "is-current": onTodos }]} aria-current={onTodos ? "page" : undefined} onclick={() => close(false)}>
 									<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"></path><path d="M4 6h.01M4 12h.01M4 18h.01"></path></svg>
 									Todos
+								</a>
+							</li>
+						</ul>
+						<ul class="menu-list" aria-label="Account">
+							<li>
+								<a href="/profile" class={["menu-item", { "is-current": onProfile }]} aria-current={onProfile ? "page" : undefined} onclick={() => close(false)}>
+									<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 20c1.5-3.5 4.5-5 8-5s6.5 1.5 8 5"></path></svg>
+									Profile
 								</a>
 							</li>
 						</ul>

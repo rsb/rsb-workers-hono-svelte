@@ -1,4 +1,4 @@
-import { SessionReply, type SignInBody, SignedInReply, SignedOutReply } from "@todo/contract-api";
+import { DeviceSessionListReply, SessionReply, type SignInBody, SignedInReply, SignedOutReply } from "@todo/contract-api";
 import { call, json } from "./call.ts";
 
 type Api = Pick<Fetcher, "fetch">;
@@ -23,3 +23,16 @@ export const postSession = (api: Api, body: SignInBody) => call(api, "/sessions"
  * `Set-Cookie` (L40).
  */
 export const deleteCurrentSession = (api: Api) => call(api, "/sessions/current", { method: "DELETE" }, SignedOutReply);
+
+/**
+ * `GET /sessions`: the actor's live sessions, this device marked, at most
+ * `SESSIONS_LIST_MAX` of them, and whether more were left out (L51).
+ */
+export const getSessions = (api: Api) => call(api, "/sessions", {}, DeviceSessionListReply);
+
+/**
+ * `DELETE /sessions`: sign out everywhere, ending every live session of
+ * the actor's, this device's included (L50). The BFF deletes its own
+ * cookie; the api never writes `Set-Cookie` (L40).
+ */
+export const deleteSessions = (api: Api) => call(api, "/sessions", { method: "DELETE" }, SignedOutReply);

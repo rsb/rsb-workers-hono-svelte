@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { type BrowserContext, test as base } from "@playwright/test";
+import { type BrowserContext, type Page, test as base, expect } from "@playwright/test";
+import { input, open } from "./todos.ts";
 
 // Every todo operation requires a member (`prd/todo/access.md`), so a page
 // that shows the list is a signed-in person's. `dev:e2e` seeds a member and
@@ -11,6 +12,10 @@ import { type BrowserContext, test as base } from "@playwright/test";
 // in the BFF knows the seed. Its name is `sid`, local dev's `__Host-sid`.
 
 export const BASE = "http://localhost:5173";
+
+/** The shell's `signed_out` and `signed_out_notice`, as the page says them. */
+export const SIGNED_OUT_WORDS = "Sign in to see your list. Your to-dos are kept with your account.";
+export const SIGNED_OUT_NOTICE_WORDS = "You’re signed out on this device.";
 
 /** Who the seed made, by the key of their session token in `.dev.tokens`. */
 export type Seeded = "MEMBER_TOKEN" | "ADMIN_TOKEN";
@@ -40,6 +45,19 @@ export const signIn = async (context: BrowserContext, key: Seeded) => {
  * sign-in page. The seed sets it on every run (seed-dev.ts).
  */
 export const passwordOf = (key: SeededPassword) => seeded(key);
+
+/**
+ * Signs the member in through the sign-in page, as a person would, and
+ * waits for the list: a session of the page's own, which a sign-out can
+ * end without ending the seeded one the other files use.
+ */
+export const signInThroughPage = async (page: Page) => {
+  await open(page, "/sign-in");
+  await page.getByLabel("Email").fill("member@example.test");
+  await page.getByLabel("Password").fill(passwordOf("MEMBER_PASSWORD"));
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(input(page)).toBeVisible();
+};
 
 /**
  * Playwright's `test`, with every page signed in as the member. A file
