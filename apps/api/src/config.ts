@@ -1,8 +1,11 @@
 // Configuration is data the api reads at startup: plain values that vary by
-// deployment, like limits, URLs and flags. Bindings such as D1 are not
-// configuration: the platform hands them over already configured and built,
-// so they go straight to `constructInfra`. Each value is a `vars` entry in
-// `wrangler.jsonc`; local dev overrides one in `.dev.vars`.
+// deployment, like limits, URLs and flags, and the secrets. Bindings such as
+// D1 are not configuration: the platform hands them over already configured
+// and built, so they go straight to `constructInfra`. Each plain value is a
+// `vars` entry in `wrangler.jsonc`; local dev overrides one in `.dev.vars`.
+// Each secret is named in `wrangler.jsonc`'s `secrets.required` and set with
+// `wrangler secret put`; local dev's is in `.dev.vars`, which the dev seed
+// writes (rl-0012).
 //
 // `readConfig` is the schema: the api reads its config through it, and so
 // does tooling/config-check, which checks a deploy's variables before they
@@ -21,10 +24,16 @@ export type Config = {
    * Security). It is one value; no code branches on the environment.
    */
   sessionCookie: string;
+  /**
+   * The pepper secrets by id (L48): `PEPPER_1` is id 1, the current one. A
+   * rotation adds the next as its own named variable, so an old hash still
+   * checks while it waits for its rehash. No variable is found by pattern.
+   */
+  peppers: Readonly<Record<number, string>>;
 };
 
 /** Each variable the config is read from. */
-export const CONFIG_VARS = ["BFF_ORIGIN", "SESSION_COOKIE"] as const;
+export const CONFIG_VARS = ["BFF_ORIGIN", "SESSION_COOKIE", "PEPPER_1"] as const;
 export type ConfigVar = (typeof CONFIG_VARS)[number];
 
 /** One thing wrong with the variables: which one, and what. */
@@ -61,6 +70,16 @@ const originProblem = (value: string): string | null => {
   return `is ${JSON.stringify(value)}: an origin is https, or http only on localhost or 127.0.0.1`;
 };
 
+/**
+ * The shortest pepper: 32 characters. The dev seed writes 32 random bytes
+ * as base64url, 43 characters; a deploy's is set the same way.
+ */
+const PEPPER_MIN = 32;
+
+/** A pepper's problem, or null. It never repeats the value: a pepper is a secret. */
+const pepperProblem = (value: string): string | null =>
+  value.length >= PEPPER_MIN ? null : `is ${value.length} characters, and a pepper is at least ${PEPPER_MIN}`;
+
 /** `SESSION_COOKIE`'s problem on its own, or null. */
 const cookieProblem = (value: string): string | null =>
   COOKIE_NAME.test(value) ? null : `is ${JSON.stringify(value)}, which is not a cookie name`;
@@ -89,6 +108,7 @@ export const readConfig = (vars: Readonly<Partial<Record<ConfigVar, unknown>>>):
 
   const bffOrigin = read("BFF_ORIGIN", originProblem);
   const sessionCookie = read("SESSION_COOKIE", cookieProblem);
+  const pepper1 = read("PEPPER_1", pepperProblem);
   if (bffOrigin !== null && sessionCookie !== null && SECURE_PREFIX.test(sessionCookie) && !bffOrigin.startsWith("https:")) {
     problems.push({
       name: "SESSION_COOKIE",
@@ -96,10 +116,10 @@ export const readConfig = (vars: Readonly<Partial<Record<ConfigVar, unknown>>>):
     });
   }
 
-  if (bffOrigin === null || sessionCookie === null || problems.length > 0) {
+  if (bffOrigin === null || sessionCookie === null || pepper1 === null || problems.length > 0) {
     return err(problems);
   }
-  return ok({ bffOrigin, sessionCookie });
+  return ok({ bffOrigin, sessionCookie, peppers: { 1: pepper1 } });
 };
 
 /** The problems, one per line, as the log and the checker print them. */

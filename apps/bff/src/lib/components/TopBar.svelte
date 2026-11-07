@@ -6,9 +6,13 @@
 		account: Account;
 		/** Whether the page is the list, which marks "Todos" as current. */
 		onTodos: boolean;
+		/** Whether the page is the sign-in page, which has no "Sign in" link to itself. */
+		onSignIn: boolean;
+		/** Whether the page is the profile, which marks "Profile" as current. */
+		onProfile: boolean;
 	};
 
-	let { account, onTodos }: Props = $props();
+	let { account, onTodos, onSignIn, onProfile }: Props = $props();
 
 	let open = $state(false);
 	let button: HTMLButtonElement | undefined = $state();
@@ -48,7 +52,11 @@
 			Todo
 		</a>
 
-		<!-- A link only for a page that exists: "Users" is added in D, "Sign in" in B. -->
+		<!-- A link only for a page that exists: "Users" is added in D. -->
+		{#if account.state === "anonymous" && !onSignIn}
+			<a href="/sign-in" class="sign-in">Sign in</a>
+		{/if}
+
 		{#if account.state === "signed_in"}
 			{@const person = account.person}
 			<nav aria-label="Main" class="nav-main">
@@ -70,7 +78,7 @@
 					<svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg>
 				</button>
 
-				<!-- Sign out is added in B, Users in D, Profile when its page exists. -->
+				<!-- Users is added in D. -->
 				{#if open}
 					<div id="account-menu" class="menu">
 						<div class="menu-head">
@@ -88,6 +96,22 @@
 								</a>
 							</li>
 						</ul>
+						<ul class="menu-list" aria-label="Account">
+							<li>
+								<a href="/profile" class={["menu-item", { "is-current": onProfile }]} aria-current={onProfile ? "page" : undefined} onclick={() => close(false)}>
+									<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 20c1.5-3.5 4.5-5 8-5s6.5 1.5 8 5"></path></svg>
+									Profile
+								</a>
+							</li>
+						</ul>
+						<!-- A plain POST, never a GET (threats row 2), and a whole-page
+						     navigation: what the page held in memory goes with the session. -->
+						<form method="POST" action="/sign-out">
+							<button type="submit" class="menu-item">
+								<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4"></path><path d="M9 8l-4 4 4 4M5 12h10"></path></svg>
+								Sign out
+							</button>
+						</form>
 					</div>
 				{/if}
 			</div>
@@ -137,6 +161,21 @@
 		align-items: center;
 		justify-content: center;
 		flex: none;
+	}
+
+	.sign-in {
+		margin-left: auto;
+		display: inline-flex;
+		align-items: center;
+		height: 44px;
+		padding: 0 16px;
+		border: 1px solid var(--line);
+		border-radius: 10px;
+		background: var(--fill);
+		color: var(--fg);
+		font-weight: 600;
+		font-size: 15px;
+		text-decoration: none;
 	}
 
 	.nav-main {
@@ -280,6 +319,13 @@
 		text-decoration: none;
 		font-size: 15px;
 		font-weight: 500;
+	}
+
+	button.menu-item {
+		width: 100%;
+		border: 0;
+		background: none;
+		text-align: left;
 	}
 
 	.menu-item:hover,

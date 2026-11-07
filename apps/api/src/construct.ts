@@ -3,6 +3,10 @@ import { type IdentityStore, createIdentityStore } from "@todo/data-d1/identity/
 import { type DbStore, createDbStore } from "@todo/data-d1/store.ts";
 import { authenticate as authenticateUnit } from "@todo/gates/authenticate.ts";
 import { type CurrentSession, currentSession } from "@todo/operations/auth/current-session.ts";
+import { type ListSessions, listSessions } from "@todo/operations/auth/list-sessions.ts";
+import { type Hasher, type SignInOperation, signIn } from "@todo/operations/auth/sign-in.ts";
+import { type SignOutEverywhere, signOutEverywhere } from "@todo/operations/auth/sign-out-everywhere.ts";
+import { type SignOut, signOut } from "@todo/operations/auth/sign-out.ts";
 import { type AddTodo, addTodo } from "@todo/operations/todos/add-todo.ts";
 import { type CountTodos, countTodos } from "@todo/operations/todos/count-todos.ts";
 import { type DeleteCompleted, deleteCompleted } from "@todo/operations/todos/delete-completed.ts";
@@ -10,13 +14,18 @@ import { type DeleteTodo, deleteTodo } from "@todo/operations/todos/delete-todo.
 import { type ListTodos, listTodos } from "@todo/operations/todos/list-todos.ts";
 import { type SetAllCompleted, setAllCompleted } from "@todo/operations/todos/set-all-completed.ts";
 import { type UpdateTodo, updateTodo } from "@todo/operations/todos/update-todo.ts";
+import { toSignIn } from "@todo/valid/auth/sign-in.ts";
 import { toCompleted } from "@todo/valid/todos/completed.ts";
 import { toNewTodo } from "@todo/valid/todos/new-todo.ts";
 import { toTodoFilter } from "@todo/valid/todos/todo-filter.ts";
 import { toTodoPatch } from "@todo/valid/todos/todo-patch.ts";
 import { notFound, onError, tooLarge } from "./app/handlers/errors/errors.ts";
 import { getHealth } from "./app/handlers/health/health.ts";
+import { deleteCurrentSession } from "./app/handlers/sessions/delete-current-session.ts";
+import { deleteSessions } from "./app/handlers/sessions/delete-sessions.ts";
 import { getCurrentSession } from "./app/handlers/sessions/get-current-session.ts";
+import { getSessions } from "./app/handlers/sessions/get-sessions.ts";
+import { postSessions } from "./app/handlers/sessions/post-sessions.ts";
 import { deleteTodo as deleteTodoHandler } from "./app/handlers/todos/delete-todo.ts";
 import { deleteTodos } from "./app/handlers/todos/delete-todos.ts";
 import { getTodoCounts } from "./app/handlers/todos/get-todo-counts.ts";
@@ -24,6 +33,8 @@ import { getTodos } from "./app/handlers/todos/get-todos.ts";
 import { patchTodo } from "./app/handlers/todos/patch-todo.ts";
 import { patchTodos } from "./app/handlers/todos/patch-todos.ts";
 import { postTodos } from "./app/handlers/todos/post-todos.ts";
+import { argon2FromWasm, createHasher } from "./auth/hasher.ts";
+import { newToken } from "./auth/token.ts";
 import type { Config } from "./config.ts";
 import { authenticate } from "./gates/authenticate.ts";
 import { bodyLimit } from "./gates/body-limit.ts";
@@ -36,19 +47,26 @@ import { routing } from "./route.ts";
 // The app's whole dependency graph, one builder per level (A10). Each level
 // takes the one below, so a caller can enter at any level and replace a piece.
 
-/** What the platform hands over already configured and built: not config. */
-export type Bindings = { appDb: D1Database; identityDb: D1Database };
+/**
+ * What the platform hands over already configured and built: not config.
+ * `argon2Wasm` is Argon2's `.wasm`, which the Worker imports as a module and
+ * the platform compiles (L48).
+ */
+export type Bindings = { appDb: D1Database; identityDb: D1Database; argon2Wasm: WebAssembly.Module };
 
 /**
- * The concrete world: a store per database (L42), the id source, the clock
- * and the hash a session token is kept under.
+ * The concrete world: a store per database (L42), the id source, the clock,
+ * a new session token and the hash it is kept under (L40), and the hasher
+ * a password is checked with (L48).
  */
 export type Infra = {
   dbStore: DbStore;
   identityStore: IdentityStore;
   newId: () => string;
   now: () => number;
+  newToken: () => string;
   digest: (token: string) => Promise<string>;
+  hasher: Hasher;
 };
 
 /**
@@ -64,18 +82,29 @@ export type Operations = {
   deleteTodo: DeleteTodo;
   deleteCompleted: DeleteCompleted;
   currentSession: CurrentSession;
+  signIn: SignInOperation;
+  signOut: SignOut;
+  signOutEverywhere: SignOutEverywhere;
+  listSessions: ListSessions;
 };
 
 /**
  * The only builder that sees the bindings: it passes each to what uses it.
- * The running Worker always stores todos in D1 (DB4).
+ * The running Worker always stores todos in D1 (DB4). It takes the config
+ * for the peppers, which the hasher keys a password with. Argon2 is
+ * instantiated on the first sign-in, not at startup.
  */
-export const constructInfra = (bindings: Bindings): Infra => ({
+export const constructInfra = (bindings: Bindings, config: Config): Infra => ({
   dbStore: createDbStore(bindings.appDb),
   identityStore: createIdentityStore(bindings.identityDb),
   newId: () => crypto.randomUUID(),
   now: () => Date.now(),
+  newToken,
   digest: sha256Hex,
+  hasher: createHasher({
+    argon2: argon2FromWasm(bindings.argon2Wasm),
+    peppers: config.peppers,
+  }),
 });
 
 /**
@@ -96,7 +125,8 @@ export const constructGates = (infra: Infra, config: Config): Gates => [
 ];
 
 /**
- * Every operation gets the whole `DbStore`; each port lets it see only the
+ * Every todo operation gets the whole `DbStore`, and every session
+ * operation the whole `IdentityStore`; each port lets it see only the
  * methods it declares. The same store goes to all, so an add is seen by the
  * next list (D15).
  */
@@ -109,6 +139,10 @@ export const constructOperations = (infra: Infra): Operations => ({
   deleteTodo: deleteTodo({ dbStore: infra.dbStore }),
   deleteCompleted: deleteCompleted({ dbStore: infra.dbStore }),
   currentSession: currentSession(),
+  signIn: signIn({ identityStore: infra.identityStore, hasher: infra.hasher, digest: infra.digest, newId: infra.newId, newToken: infra.newToken, now: infra.now }),
+  signOut: signOut({ identityStore: infra.identityStore, now: infra.now }),
+  signOutEverywhere: signOutEverywhere({ identityStore: infra.identityStore, now: infra.now }),
+  listSessions: listSessions({ identityStore: infra.identityStore, now: infra.now }),
 });
 
 /** The route helpers, bound to these operations and their rows in `access.md`. */
@@ -124,11 +158,15 @@ const { route, probe } = routing<Operations>(access);
 export const constructRoutes = (operations: Operations): Routes => {
   // The built operations, named as the units they are. Inside this function
   // they hide the builders of the same name imported above.
-  const { addTodo, listTodos, countTodos, updateTodo, setAllCompleted, deleteTodo, deleteCompleted, currentSession } = operations;
+  const { addTodo, listTodos, countTodos, updateTodo, setAllCompleted, deleteTodo, deleteCompleted, currentSession, signIn, signOut, signOutEverywhere, listSessions } = operations;
 
   return {
     "GET /health": probe({ getHealth }),
     "GET /sessions/current": route({ getCurrentSession }, { currentSession }),
+    "POST /sessions": route({ postSessions }, { signIn }, { toSignIn }),
+    "GET /sessions": route({ getSessions }, { listSessions }),
+    "DELETE /sessions": route({ deleteSessions }, { signOutEverywhere }),
+    "DELETE /sessions/current": route({ deleteCurrentSession }, { signOut }),
     "GET /todos": route({ getTodos }, { listTodos }, { toTodoFilter }),
     "GET /todos/counts": route({ getTodoCounts }, { countTodos }),
     "POST /todos": route({ postTodos }, { addTodo }, { toNewTodo }),
@@ -149,7 +187,7 @@ export const constructApi = (gates: Gates, routes: Routes): Api => ({
 
 /** Builds the whole app from the bindings and the config, one A10 level at a time. `index.ts` calls this. */
 export const construct = (bindings: Bindings, config: Config): Api => {
-  const infra = constructInfra(bindings);
+  const infra = constructInfra(bindings, config);
   const gates = constructGates(infra, config);
   const operations = constructOperations(infra);
   const routes = constructRoutes(operations);

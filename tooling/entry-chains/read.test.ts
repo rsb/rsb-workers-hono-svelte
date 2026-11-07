@@ -117,6 +117,17 @@ describe("tableStoreOf", () => {
     assert.deepEqual(tableStoreOf(store, "todos.ts"), { name: "todoStore", methods: ["listTodos", "countTodos"] });
   });
 
+  it("reads a method whose signature spans lines, by the line that opens it", () => {
+    const text = store.replace(
+      "  countTodos: async (): Promise<R> => {",
+      "  countTodos: async (\n    scope: Own,\n    input: { now: number },\n  ): Promise<R> => {",
+    ).replace(
+      "  listTodos: async (filter: TodoFilter): Promise<R> => {",
+      "  listTodos: async (input: {\n    filter: TodoFilter;\n  }): Promise<R> => {",
+    );
+    assert.deepEqual(tableStoreOf(text, "todos.ts"), { name: "todoStore", methods: ["listTodos", "countTodos"] });
+  });
+
   it("fails on a method it cannot read, rather than skip it", () => {
     const text = store.replace("  countTodos: async (): Promise<R> => {", "  countTodos(): Promise<R> {");
     assert.throws(() => tableStoreOf(text, "todos.ts"), /todoStore has a line that is not "  method: async \("/);
@@ -132,6 +143,12 @@ describe("spreadsOf", () => {
   it("reads the table stores a DbStore spreads", () => {
     const text = "export const createDbStore = (db: D1Database) => ({\n  ...todoStore(db),\n  ...tagStore(db),\n});\n";
     assert.deepEqual(spreadsOf(text, "store.ts"), ["todoStore", "tagStore"]);
+  });
+
+  it("reads the table stores another store builder spreads, by its name", () => {
+    const text = "export const createIdentityStore = (db: D1Database) => ({\n  ...sessionStore(db),\n});\n";
+    assert.deepEqual(spreadsOf(text, "identity/store.ts", "createIdentityStore"), ["sessionStore"]);
+    assert.throws(() => spreadsOf(text, "identity/store.ts"), /exactly one "export const createDbStore/);
   });
 
   it("fails on a DbStore that spreads none", () => {

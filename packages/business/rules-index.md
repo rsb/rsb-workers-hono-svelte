@@ -11,6 +11,9 @@ and the store, which do not declare them yet.
 |------|------|------------|----------|
 | `title.length` | input | `toNewTodo`, `toTodoPatch` | Add a todo, Change a todo |
 | `patch.nonempty` | input | `toTodoPatch` | Change a todo |
+| `email.length` | input | `toSignIn` | Sign in |
+| `email.shape` | input | `toSignIn` | Sign in |
+| `password.given` | input | `toSignIn` | Sign in |
 | `todos.cap` | state | none | Add a todo |
 | `todo.exists` | state | none | Change a todo, Remove a todo |
 | `todo.owned` | state | none | Change a todo, Remove a todo |
@@ -44,6 +47,44 @@ A patch gives a title, a `completed`, or both.
   - `toTodoPatch` in [`packages/valid/src/todos/todo-patch.ts`](../valid/src/todos/todo-patch.ts), to the whole input
 - Cited by:
   - [Change a todo](../../prd/todo/use-cases/todos/change-a-todo.md), Assumes
+
+## `email.length`
+An email is 1 to `max` long, counted in UTF-16 code units.
+
+- Kind: input
+- Form: length, 1 to `max`
+- Parameters: `max` is `EMAIL_MAX`, 254
+- Violations: `empty` (below), `too_long` (above)
+- Source: L47.
+- Applied by:
+  - `toSignIn` in [`packages/valid/src/auth/sign-in.ts`](../valid/src/auth/sign-in.ts), to `email`
+- Cited by:
+  - [Sign in](../../prd/todo/use-cases/auth/sign-in.md), Assumes
+
+## `email.shape`
+An email is a WHATWG "valid email address", the definition `<input type=email>` applies, so the browser and the api never disagree. Not RFC 5322. It is ASCII only, which keeps `users.email`'s `CHECK (email = lower(email))` honest, since SQLite folds ASCII only.
+
+- Kind: input
+- Form: custom, in [`../valid/src/rules/email-shape.ts`](../valid/src/rules/email-shape.ts)
+- Violations: `malformed`
+- Source: L47.
+- Applied by:
+  - `toSignIn` in [`packages/valid/src/auth/sign-in.ts`](../valid/src/auth/sign-in.ts), to `email`
+- Cited by:
+  - [Sign in](../../prd/todo/use-cases/auth/sign-in.md), Assumes
+
+## `password.given`
+A password is 1 to `max` long, counted in UTF-16 code units. It is never trimmed and never lower-cased. Sign-in applies only this; the minimum is a set-time rule (L47).
+
+- Kind: input
+- Form: length, 1 to `max`
+- Parameters: `max` is `PASSWORD_MAX`, 128
+- Violations: `empty` (below), `too_long` (above)
+- Source: L47.
+- Applied by:
+  - `toSignIn` in [`packages/valid/src/auth/sign-in.ts`](../valid/src/auth/sign-in.ts), to `password`
+- Cited by:
+  - [Sign in](../../prd/todo/use-cases/auth/sign-in.md), Assumes
 
 ## `todos.cap`
 The owner's list holds fewer than `limit` todos when one is added.

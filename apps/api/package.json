@@ -12,6 +12,7 @@
     "types": "wrangler types --strict-vars=false"
   },
   "dependencies": {
+    "@phi-ag/argon2": "0.6.2",
     "@todo/business": "workspace:*",
     "@todo/contract-api": "workspace:*",
     "@todo/data-d1": "workspace:*",

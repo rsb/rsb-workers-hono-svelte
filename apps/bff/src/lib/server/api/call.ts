@@ -1,6 +1,17 @@
 import { type Envelope, type Failure, envelope } from "@todo/contract-api";
 import * as v from "valibot";
 
+/**
+ * A call with a JSON body, saying so: the api's `channel` gate refuses a
+ * body of any other type on a request that is not bearer (L38, L49), and a
+ * string body is otherwise sent as `text/plain`.
+ */
+export const json = (method: "POST" | "PATCH", body: unknown): RequestInit => ({
+  method,
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(body),
+});
+
 /** Any reply the BFF cannot read is, to the page, an internal error. */
 const unreadable: Failure = {
   ok: false,

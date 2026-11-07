@@ -9,20 +9,9 @@ import {
   TodoListReply,
   TodoReply,
 } from "@todo/contract-api";
-import { call } from "./call.ts";
+import { call, json } from "./call.ts";
 
 type Api = Pick<Fetcher, "fetch">;
-
-/**
- * A call with a JSON body, saying so: the api's `channel` gate refuses a
- * cookie-bearing body of any other type (L38), and a string body is
- * otherwise sent as `text/plain`.
- */
-const json = (method: "POST" | "PATCH", body: unknown): RequestInit => ({
-  method,
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify(body),
-});
 
 /**
  * `GET /todos`: every todo, or with `completed` only those, in creation

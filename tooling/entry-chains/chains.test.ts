@@ -49,7 +49,7 @@ describe("the entry chains of apps/api", () => {
   it("lists the driver once, as a shared link, and in no chain", () => {
     const driver = index.shared.filter((row) => row.label === "driver");
     assert.deepEqual(driver, [
-      { label: "driver", path: "packages/data/d1/src/driver.ts", symbols: ["execute", "queryAll", "writeThenQueryAll"] },
+      { label: "driver", path: "packages/data/d1/src/driver.ts", symbols: ["execute", "executeBatch", "queryAll", "writeThenQueryAll"] },
     ]);
     for (const chain of index.chains) {
       assert.equal(

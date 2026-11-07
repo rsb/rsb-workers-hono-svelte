@@ -35,6 +35,35 @@ describe("createUser", () => {
   });
 });
 
+describe("markVerified", () => {
+  it("binds the id and now", async () => {
+    const { db, prepared } = fakeD1({ changes: 1 });
+
+    await userStore(db).markVerified("u1", NOW);
+
+    expect(prepared).toHaveLength(1);
+    expect(prepared[0]?.bound).toEqual(["u1", NOW]);
+  });
+
+  it.each([
+    [1, true],
+    [0, false],
+  ])("reports %i changed rows as marked: %s", async (changes, marked) => {
+    const { db } = fakeD1({ changes });
+
+    expect(await userStore(db).markVerified("u1", NOW)).toEqual({ ok: true, value: marked });
+  });
+
+  it("passes a D1 failure up, named by the statement", async () => {
+    const { db } = fakeD1({ throws: new Error("D1_ERROR: Network connection lost.") });
+
+    expect(await userStore(db).markVerified("u1", NOW)).toMatchObject({
+      ok: false,
+      error: { kind: "unavailable", message: "mark user verified: D1_ERROR: Network connection lost." },
+    });
+  });
+});
+
 describe("findUserByEmail", () => {
   const row: UserRow = {
     id: "u1",

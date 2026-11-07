@@ -36,3 +36,33 @@ export type SessionRow = {
   };
   user: { role: Role; disabled: boolean; emailVerifiedAt: number | null; name: string; email: string };
 };
+
+/**
+ * Why a session ended (L40, L50). The set grows by slice (C adds
+ * `password_changed`, D an admin end), so the column has no CHECK on it:
+ * this type is the set's one home.
+ */
+export type EndedReason = "rotated" | "signed_out" | "signed_out_everywhere";
+
+/**
+ * A new session, as `identity.sign_in` stores it: the token's hash, never
+ * the token (L40). `idleUntil` is null exactly for a bearer session.
+ * `label` and `city` are what the Sessions page shows (L51), display only.
+ */
+export type NewSession = {
+  id: string;
+  tokenHash: string;
+  userId: string;
+  channel: SessionChannel;
+  createdAt: number;
+  idleUntil: number | null;
+  expiresAt: number;
+  label: string | null;
+  city: string | null;
+};
+
+/** One live session as the Sessions page lists it (`data/identity.md › sessions.list`). */
+export type ListedSession = { id: string; label: string | null; city: string | null; createdAt: number; touchedAt: number };
+
+/** The listed sessions, and whether live ones were left out by `SESSIONS_LIST_MAX` (rules.ts). */
+export type SessionList = { sessions: ListedSession[]; more: boolean };

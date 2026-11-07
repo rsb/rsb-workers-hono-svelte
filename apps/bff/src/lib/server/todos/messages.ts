@@ -23,9 +23,10 @@ export const SOMETHING_WENT_WRONG = "Something went wrong. Try again.";
  * rule; the BFF words it for the person. A title that is empty or too long
  * gets the title rule, worded from the max the problem carries. A title
  * that is not text, a `completed` that is not true or false, or an empty
- * patch did not come from the page, and the person cannot fix them. Every
- * rule must have words, so a new rule does not compile until it is given
- * some.
+ * patch did not come from the page, and the person cannot fix them. No
+ * todo form has an email or a password field, so their rules cannot reach
+ * here; the sign-in page words them. Every rule must have words, so a new
+ * rule does not compile until it is given some.
  */
 export const problemMessage = (problem: Problem): string => {
   switch (problem.rule) {
@@ -34,6 +35,9 @@ export const problemMessage = (problem: Problem): string => {
     case "not_text":
     case "not_boolean":
     case "patch.nonempty":
+    case "email.length":
+    case "email.shape":
+    case "password.given":
       return SOMETHING_WENT_WRONG;
     default: {
       const unworded: never = problem;
@@ -69,8 +73,9 @@ const forbiddenMessage = (reason: Reason): string => {
  * person can fix none of them by changing what they typed: the BFF checked
  * it first, so `validation` is skew or a bug. `unauthenticated` is a
  * session that ended since the page loaded; the reload after the action
- * renders the shell's `signed_out`. Every kind must have words, so a new
- * one does not compile until it is given some.
+ * renders the shell's `signed_out`. `invalid_credentials` is sign-in's
+ * alone, and no todo action is a sign-in. Every kind must have words, so
+ * a new one does not compile until it is given some.
  */
 export const failedMessage = (failed: ApiError): string => {
   switch (failed.kind) {
@@ -78,6 +83,7 @@ export const failedMessage = (failed: ApiError): string => {
       return forbiddenMessage(failed.reason);
     case "validation":
     case "unauthenticated":
+    case "invalid_credentials":
     case "not_found":
     case "limit":
     case "too_large":

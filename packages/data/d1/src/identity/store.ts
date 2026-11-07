@@ -1,4 +1,6 @@
+import { credentialStore } from "./credentials.ts";
 import { sessionStore } from "./sessions.ts";
+import { signInStore } from "./sign-in.ts";
 import { userStore } from "./users.ts";
 
 /**
@@ -11,7 +13,9 @@ import { userStore } from "./users.ts";
  * method the same name: the later one would replace the earlier.
  */
 export const createIdentityStore = (db: D1Database) => ({
+  ...credentialStore(db),
   ...sessionStore(db),
+  ...signInStore(db),
   ...userStore(db),
 });
 

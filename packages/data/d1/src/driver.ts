@@ -60,3 +60,25 @@ export const writeThenQueryAll = async <Row>(
     return err(classify(cause, context));
   }
 };
+
+/**
+ * Runs writes as one batch, and returns how many rows each changed, in
+ * order. D1 runs a batch as one transaction: if any statement fails, none
+ * takes effect.
+ */
+export const executeBatch = async (
+  db: D1Database,
+  statements: () => D1PreparedStatement[],
+  context: string,
+): Promise<Result<number[], AnyFail>> => {
+  try {
+    const prepared = statements();
+    const results = await db.batch(prepared);
+    if (results.length !== prepared.length) {
+      return err(serverFault(`${context}: the batch returned ${results.length} results for ${prepared.length} statements`));
+    }
+    return ok(results.map((result) => result.meta.changes));
+  } catch (cause) {
+    return err(classify(cause, context));
+  }
+};

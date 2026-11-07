@@ -134,8 +134,9 @@ export type TableStore = { name: string; methods: string[] };
 /**
  * The store a data file exports (chapter 8): exactly one
  * `export const <name>Store = (db: D1Database) => ({`, closed by `});`, whose
- * methods are written `  method: async (`. A data method carries the name of
- * the port method it serves.
+ * methods are written `  method: async (`. A signature too long for one
+ * line closes at the same depth, `  }): Result => {` or `  ): Result => {`.
+ * A data method carries the name of the port method it serves.
  */
 export const tableStoreOf = (text: string, path: string): TableStore => {
   const declared = [...text.matchAll(/^export const (\w+Store) = \(db: D1Database\) => \(\{\n((?:.*\n)*?)\}\);$/gm)];
@@ -159,6 +160,10 @@ export const tableStoreOf = (text: string, path: string): TableStore => {
     if (line === "  }," || line.startsWith("  /**") || line.startsWith("  //")) {
       continue;
     }
+    // The close of a signature that spans lines.
+    if (/^ {2}\}?\): .+ => \{$/.test(line)) {
+      continue;
+    }
     return fail(path, `${name} has a line that is not "  method: async (", "  }," or a comment: ${line.trim()}`);
   }
   if (methods.length === 0) {
@@ -168,15 +173,17 @@ export const tableStoreOf = (text: string, path: string): TableStore => {
 };
 
 /**
- * The table stores a `DbStore` spreads, by their local names: exactly one
- * `export const createDbStore = (db: D1Database) => ({`, closed by `});`,
+ * The table stores a store spreads, by their local names: exactly one
+ * `export const <builder> = (db: D1Database) => ({`, closed by `});`,
  * whose every line is `  ...<name>(db),`. Any other entry could replace a
- * table's method, so it fails.
+ * table's method, so it fails. `builder` is `createDbStore` or
+ * `createIdentityStore` (L42).
  */
-export const spreadsOf = (text: string, path: string): string[] => {
-  const declared = [...text.matchAll(/^export const createDbStore = \(db: D1Database\) => \(\{\n((?:.*\n)*?)\}\);$/gm)];
+export const spreadsOf = (text: string, path: string, builder = "createDbStore"): string[] => {
+  const pattern = new RegExp(`^export const ${builder} = \\(db: D1Database\\) => \\(\\{\n((?:.*\n)*?)\\}\\);$`, "gm");
+  const declared = [...text.matchAll(pattern)];
   if (declared.length !== 1) {
-    return fail(path, `a DbStore is built by exactly one "export const createDbStore = (db: D1Database) => ({"; found ${declared.length}`);
+    return fail(path, `a store is built by exactly one "export const ${builder} = (db: D1Database) => ({"; found ${declared.length}`);
   }
   const body = declared[0]?.[1] ?? "";
   const spread: string[] = [];
@@ -186,12 +193,12 @@ export const spreadsOf = (text: string, path: string): string[] => {
     }
     const entry = /^ {2}\.\.\.(\w+)\(db\),$/.exec(line);
     if (entry === null) {
-      return fail(path, `createDbStore has a line that is not "  ...<name>Store(db),": ${line.trim()}`);
+      return fail(path, `${builder} has a line that is not "  ...<name>Store(db),": ${line.trim()}`);
     }
     spread.push(entry[1] ?? "");
   }
   if (spread.length === 0) {
-    return fail(path, `a DbStore spreads each table's store as "  ...<name>Store(db),"; found none`);
+    return fail(path, `${builder} spreads each table's store as "  ...<name>Store(db),"; found none`);
   }
   return spread;
 };

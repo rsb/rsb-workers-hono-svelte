@@ -7,7 +7,7 @@ this file. Since stage 22 it is also the home of what the PRD root's
 API section held (L44).
 
 What a use case refuses reaches the wire as the kind of the same name:
-`limit` and `not_found`. Its `unavailable` and `server` reach the wire
+`limit`, `not_found` and `invalid_credentials`. Its `unavailable` and `server` reach the wire
 as `internal`. Use cases and features cite the use case's kinds; this
 paragraph is the one place they are mapped to the envelope's.
 
@@ -21,11 +21,12 @@ A body that is not JSON is refused as `validation`, with the field
 - Every object is closed: a field not listed is refused.
 - Any request whose body is over `BODY_LIMIT_BYTES` (8192) is refused
   before routing: `too_large`.
-- Any request that carries the session cookie and changes something is
-  refused unless it comes from the BFF's own page: `Sec-Fetch-Site` is
-  `same-origin` or `none`, or, without it, `Origin` is the BFF's. Its
-  body, if it has one, is `application/json`. Otherwise: `forbidden`,
-  reason `channel` (L38).
+- Any request that changes something and does not carry a bearer token,
+  with the session cookie or without it, is refused unless it comes from
+  the BFF's own page: `Sec-Fetch-Site` is `same-origin` or `none`, or,
+  without it, `Origin` is the BFF's. Its body, if it has one, is
+  `application/json`. Otherwise: `forbidden`, reason `channel` (L38,
+  amended by L49 so a sign-in, which has no cookie yet, is checked too).
 - Any request whose bearer token names no live session, or that gives a
   cookie and a bearer token together: `unauthenticated`. A cookie that
   names no live session is not refused: the request is anonymous (L39).
@@ -100,6 +101,7 @@ Reply: 500
 
 - `validation`: 422, with field
 - `unauthenticated`: 401
+- `invalid_credentials`: 401
 - `forbidden`: 403, with reason: channel | account_disabled | role
 - `not_found`: 404
 - `limit`: 409
@@ -125,6 +127,22 @@ The signed-in user a request acts for, with what the frame shows.
 - `emailVerified`: boolean
 - `name`: text
 - `email`: text
+
+### `SignedOutReply`
+What a sign-out answers: only that it holds. The BFF deletes its own
+cookie; the api never writes `Set-Cookie` (L40).
+- `signedOut`: literal `true`
+
+### `DeviceSessionReply`
+One live session of the actor's, as Sessions shows it (L51). `label`
+and `city` are absent when the request that started it gave neither.
+Both are display only. Times are milliseconds since the epoch.
+- `id`: text
+- `label`: text, optional
+- `city`: text, optional
+- `createdAt`: integer, min 0
+- `touchedAt`: integer, min 0
+- `thisDevice`: boolean
 
 ## Endpoints
 
@@ -203,6 +221,208 @@ Reply: 200
   "ok": true,
   "data": {
     "clearCookie": true
+  }
+}
+```
+
+### `POST /sessions`
+Serves: `use-cases/auth/sign-in.md`.
+Applies: `email.length`, `email.shape`, `password.given`
+Security: `anonymous`
+
+Body: `SignInBody`
+- `email`: text "email must be text"
+- `password`: text "password must be text"
+
+Reply: 201 `SignedInReply`
+- `token`: text
+- `expiresAt`: integer, min 0
+
+Errors: `validation`, `invalid_credentials`
+
+Examples:
+
+Example: signs in
+Request: `POST /sessions`
+```json
+{
+  "email": "ada@example.com",
+  "password": "correct horse battery staple"
+}
+```
+Reply: 201
+```json
+{
+  "ok": true,
+  "data": {
+    "token": "Yq3bS8rK2vXw0fJ7nLm4pQeTzA1uHcD9oGiR5sVyB6E",
+    "expiresAt": 1794700800000
+  }
+}
+```
+
+Example: the password is wrong
+Request: `POST /sessions`
+```json
+{
+  "email": "ada@example.com",
+  "password": "wrong horse battery staple"
+}
+```
+Reply: 401
+```json
+{
+  "ok": false,
+  "error": {
+    "kind": "invalid_credentials",
+    "message": "the email and password do not match an account"
+  }
+}
+```
+
+Example: no account has the email
+Request: `POST /sessions`
+```json
+{
+  "email": "nobody@example.com",
+  "password": "correct horse battery staple"
+}
+```
+Reply: 401
+```json
+{
+  "ok": false,
+  "error": {
+    "kind": "invalid_credentials",
+    "message": "the email and password do not match an account"
+  }
+}
+```
+
+Example: the email is not an email address
+Request: `POST /sessions`
+```json
+{
+  "email": "ada",
+  "password": "correct horse battery staple"
+}
+```
+Reply: 422
+```json
+{
+  "ok": false,
+  "error": {
+    "kind": "validation",
+    "message": "email is not a valid email address",
+    "field": "email"
+  }
+}
+```
+
+Example: the password is empty
+Request: `POST /sessions`
+```json
+{
+  "email": "ada@example.com",
+  "password": ""
+}
+```
+Reply: 422
+```json
+{
+  "ok": false,
+  "error": {
+    "kind": "validation",
+    "message": "password is empty",
+    "field": "password"
+  }
+}
+```
+
+### `GET /sessions`
+Serves: `use-cases/auth/list-sessions.md`.
+Applies: none
+Security: `member`
+
+Reply: 200 `DeviceSessionListReply`
+- `sessions`: list of `DeviceSessionReply`
+- `more`: boolean
+
+Errors: none
+
+Examples:
+
+Example: lists the member's sessions
+Request: `GET /sessions`
+Reply: 200
+```json
+{
+  "ok": true,
+  "data": {
+    "sessions": [
+      {
+        "id": "7e1f0c2a-4b6d-4e8f-9a1b-3c5d7e9f1a2b",
+        "label": "Firefox on Linux",
+        "city": "Lisbon",
+        "createdAt": 1793880000000,
+        "touchedAt": 1794052800000,
+        "thisDevice": true
+      },
+      {
+        "id": "2c4e6a8b-0d1f-4a3c-8e5b-7d9f1b3d5f7a",
+        "label": "Safari on iOS",
+        "createdAt": 1793793600000,
+        "touchedAt": 1793966400000,
+        "thisDevice": false
+      }
+    ],
+    "more": false
+  }
+}
+```
+
+### `DELETE /sessions`
+Serves: `use-cases/auth/sign-out-everywhere.md`.
+Applies: none
+Security: `member`
+
+Reply: 200 `SignedOutReply`
+
+Errors: none
+
+Examples:
+
+Example: signs out everywhere
+Request: `DELETE /sessions`
+Reply: 200
+```json
+{
+  "ok": true,
+  "data": {
+    "signedOut": true
+  }
+}
+```
+
+### `DELETE /sessions/current`
+Serves: `use-cases/auth/sign-out.md`.
+Applies: none
+Security: `member`
+
+Reply: 200 `SignedOutReply`
+
+Errors: none
+
+Examples:
+
+Example: signs out
+Request: `DELETE /sessions/current`
+Reply: 200
+```json
+{
+  "ok": true,
+  "data": {
+    "signedOut": true
   }
 }
 ```

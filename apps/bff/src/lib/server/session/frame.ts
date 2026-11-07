@@ -61,3 +61,15 @@ export async function loadFrame(
   };
   return { probe: false, account: { state: "signed_in", person } };
 }
+
+/**
+ * The headers of a page drawn for a signed-in person: `no-store`, so no
+ * cache keeps it, and Back after sign-out asks again and shows no list
+ * (L50). A page drawn for nobody shows nothing of anyone's.
+ */
+export const frameHeaders = (frame: Frame): Record<string, string> => {
+  if (!frame.probe && frame.account.state === "signed_in") {
+    return { "cache-control": "no-store" };
+  }
+  return {};
+};

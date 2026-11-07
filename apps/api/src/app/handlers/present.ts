@@ -16,6 +16,7 @@ const status = KIND_STATUS satisfies Record<ErrorKind, ContentfulStatusCode>;
 const contractKind = {
   invalid: "validation",
   unauthenticated: "unauthenticated",
+  invalid_credentials: "invalid_credentials",
   forbidden: "forbidden",
   not_found: "not_found",
   limit: "limit",
@@ -25,7 +26,7 @@ const contractKind = {
 } as const satisfies Record<FailKind, ErrorKind>;
 
 /** The failures the caller caused: the 4xx statuses. */
-type UserFail = Fail<"invalid" | "unauthenticated" | "forbidden" | "not_found" | "limit" | "too_large">;
+type UserFail = Fail<"invalid" | "unauthenticated" | "invalid_credentials" | "forbidden" | "not_found" | "limit" | "too_large">;
 
 /** The failures the server caused: the 5xx statuses. */
 type ServerFail = Fail<"unavailable" | "server">;
@@ -101,6 +102,7 @@ export const mapFailure = (c: Context, fail: AnyFail) => {
   switch (fail.kind) {
     case "invalid":
     case "unauthenticated":
+    case "invalid_credentials":
     case "forbidden":
     case "not_found":
     case "limit":

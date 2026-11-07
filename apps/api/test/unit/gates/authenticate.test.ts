@@ -7,8 +7,9 @@ import * as v from "valibot";
 import { describe, expect, it, vi } from "vitest";
 import { type Infra, constructGates } from "../../../src/construct.ts";
 import { fakeDbStore } from "../fake-db-store.ts";
+import { fakeHasher } from "../fake-hasher.ts";
 import { fakeIdentityStore } from "../fake-identity-store.ts";
-import { NOW, config, digest, testApi } from "../test-api.ts";
+import { NOW, TEST_TOKEN, config, digest, testApi } from "../test-api.ts";
 import { BEARER_TOKEN, DISABLED_TOKEN, MEMBER_TOKEN, STALE_TOKEN, UNKNOWN_TOKEN, sessionRows } from "./session-rows.ts";
 
 // The `authenticate` gate's binding (L39): what it reads, what it attaches,
@@ -34,7 +35,7 @@ const executionContext = () => {
  * in for it.
  */
 const whoami = (identity = fakeIdentityStore(sessionRows)) => {
-  const infra: Infra = { dbStore: fakeDbStore(), identityStore: identity.store, newId: () => "id-1", now: () => NOW, digest };
+  const infra: Infra = { dbStore: fakeDbStore(), identityStore: identity.store, newId: () => "id-1", now: () => NOW, newToken: () => TEST_TOKEN, digest, hasher: fakeHasher().hasher };
   const app = new Hono();
   for (const gate of constructGates(infra, config)) {
     app.use(gate);
@@ -61,7 +62,7 @@ describe("what the gate attaches", () => {
     const response = await app.request("/whoami", { headers: cookie(MEMBER_TOKEN) });
     expect(await response.json()).toEqual({
       channel: "cookie",
-      actor: { kind: "user", userId: "u1", role: "member", emailVerified: false },
+      actor: { kind: "user", userId: "u1", role: "member", emailVerified: false, sessionId: "s-member" },
       profile: { name: "Ada Lovelace", email: "ada@example.com" },
       clearCookie: false,
     });

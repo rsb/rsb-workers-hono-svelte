@@ -6,6 +6,7 @@
 export type FailKind =
   | "invalid"
   | "unauthenticated"
+  | "invalid_credentials"
   | "forbidden"
   | "not_found"
   | "limit"
@@ -53,6 +54,16 @@ export const invalid = (field: string, message: string) => {
 /** The request's credential proves no one: who the caller is is unknown (L39). */
 export const unauthenticated = (message: string, cause?: unknown) => {
   return new Fail("unauthenticated", message, { cause });
+};
+
+/**
+ * A sign-in's email and password prove no account (L49): no user has the
+ * email, the user has no password or is disabled, or the password does not
+ * match. One kind for all four, so the reply does not say which (threats
+ * row 7).
+ */
+export const invalidCredentials = (message: string, cause?: unknown) => {
+  return new Fail("invalid_credentials", message, { cause });
 };
 
 /**

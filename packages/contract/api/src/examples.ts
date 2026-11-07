@@ -145,6 +145,186 @@ export const examples: Record<EndpointKey, Example[]> = {
       }
     }
   ],
+  "POST /sessions": [
+    {
+      "name": "signs in",
+      "request": {
+        "method": "POST",
+        "path": "/sessions",
+        "params": {},
+        "query": [],
+        "body": {
+          "email": "ada@example.com",
+          "password": "correct horse battery staple"
+        }
+      },
+      "status": 201,
+      "reply": {
+        "ok": true,
+        "data": {
+          "token": "Yq3bS8rK2vXw0fJ7nLm4pQeTzA1uHcD9oGiR5sVyB6E",
+          "expiresAt": 1794700800000
+        }
+      }
+    },
+    {
+      "name": "the password is wrong",
+      "request": {
+        "method": "POST",
+        "path": "/sessions",
+        "params": {},
+        "query": [],
+        "body": {
+          "email": "ada@example.com",
+          "password": "wrong horse battery staple"
+        }
+      },
+      "status": 401,
+      "reply": {
+        "ok": false,
+        "error": {
+          "kind": "invalid_credentials",
+          "message": "the email and password do not match an account"
+        }
+      }
+    },
+    {
+      "name": "no account has the email",
+      "request": {
+        "method": "POST",
+        "path": "/sessions",
+        "params": {},
+        "query": [],
+        "body": {
+          "email": "nobody@example.com",
+          "password": "correct horse battery staple"
+        }
+      },
+      "status": 401,
+      "reply": {
+        "ok": false,
+        "error": {
+          "kind": "invalid_credentials",
+          "message": "the email and password do not match an account"
+        }
+      }
+    },
+    {
+      "name": "the email is not an email address",
+      "request": {
+        "method": "POST",
+        "path": "/sessions",
+        "params": {},
+        "query": [],
+        "body": {
+          "email": "ada",
+          "password": "correct horse battery staple"
+        }
+      },
+      "status": 422,
+      "reply": {
+        "ok": false,
+        "error": {
+          "kind": "validation",
+          "message": "email is not a valid email address",
+          "field": "email"
+        }
+      }
+    },
+    {
+      "name": "the password is empty",
+      "request": {
+        "method": "POST",
+        "path": "/sessions",
+        "params": {},
+        "query": [],
+        "body": {
+          "email": "ada@example.com",
+          "password": ""
+        }
+      },
+      "status": 422,
+      "reply": {
+        "ok": false,
+        "error": {
+          "kind": "validation",
+          "message": "password is empty",
+          "field": "password"
+        }
+      }
+    }
+  ],
+  "GET /sessions": [
+    {
+      "name": "lists the member's sessions",
+      "request": {
+        "method": "GET",
+        "path": "/sessions",
+        "params": {},
+        "query": []
+      },
+      "status": 200,
+      "reply": {
+        "ok": true,
+        "data": {
+          "sessions": [
+            {
+              "id": "7e1f0c2a-4b6d-4e8f-9a1b-3c5d7e9f1a2b",
+              "label": "Firefox on Linux",
+              "city": "Lisbon",
+              "createdAt": 1793880000000,
+              "touchedAt": 1794052800000,
+              "thisDevice": true
+            },
+            {
+              "id": "2c4e6a8b-0d1f-4a3c-8e5b-7d9f1b3d5f7a",
+              "label": "Safari on iOS",
+              "createdAt": 1793793600000,
+              "touchedAt": 1793966400000,
+              "thisDevice": false
+            }
+          ],
+          "more": false
+        }
+      }
+    }
+  ],
+  "DELETE /sessions": [
+    {
+      "name": "signs out everywhere",
+      "request": {
+        "method": "DELETE",
+        "path": "/sessions",
+        "params": {},
+        "query": []
+      },
+      "status": 200,
+      "reply": {
+        "ok": true,
+        "data": {
+          "signedOut": true
+        }
+      }
+    }
+  ],
+  "DELETE /sessions/current": [
+    {
+      "name": "signs out",
+      "request": {
+        "method": "DELETE",
+        "path": "/sessions/current",
+        "params": {},
+        "query": []
+      },
+      "status": 200,
+      "reply": {
+        "ok": true,
+        "data": {
+          "signedOut": true
+        }
+      }
+    }
+  ],
   "GET /todos": [
     {
       "name": "lists every todo",

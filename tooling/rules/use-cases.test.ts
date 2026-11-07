@@ -93,6 +93,6 @@ describe("readUseCases", () => {
     const problems: UseCaseProblem[] = [];
     const useCases = readUseCases("prd/todo/use-cases", problems);
     assert.deepEqual(problems, []);
-    assert.equal(useCases.length, 8);
+    assert.equal(useCases.length, 12);
   });
 });

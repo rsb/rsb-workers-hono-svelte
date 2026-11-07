@@ -161,6 +161,21 @@ it("a filtered list keeps only the todos asked for, and the counts cover every t
   });
 });
 
+/**
+ * An unsafe request as the BFF's page sends it, so it passes the `channel`
+ * gate (L49 checks it with no cookie too) and reaches the row.
+ */
+const fromThePage = (init?: RequestInit): RequestInit | undefined => {
+  if (init === undefined) {
+    return undefined;
+  }
+  const headers: Record<string, string> = { "Sec-Fetch-Site": "same-origin" };
+  if (init.body !== undefined) {
+    headers["Content-Type"] = "application/json";
+  }
+  return { ...init, headers };
+};
+
 it("every todo endpoint refuses an anonymous request as unauthenticated, and stores nothing", async () => {
   const dbStore = fakeDbStore();
   const anonymous = testApi({ dbStore });
@@ -175,7 +190,7 @@ it("every todo endpoint refuses an anonymous request as unauthenticated, and sto
   ];
 
   for (const [path, init] of requests) {
-    const refused = await anonymous.request(path, init);
+    const refused = await anonymous.request(path, fromThePage(init));
     expect(refused.status, `${init?.method ?? "GET"} ${path}`).toBe(401);
     expect(v.parse(Failure, await refused.json()).error.kind).toBe("unauthenticated");
   }
@@ -196,7 +211,7 @@ it("refuses an anonymous request before reading its input: unauthenticated, neve
   ];
 
   for (const [path, init] of requests) {
-    const refused = await anonymous.request(path, init);
+    const refused = await anonymous.request(path, fromThePage(init));
     expect(refused.status, `${init?.method ?? "GET"} ${path}`).toBe(401);
     expect(v.parse(Failure, await refused.json()).error.kind).toBe("unauthenticated");
   }

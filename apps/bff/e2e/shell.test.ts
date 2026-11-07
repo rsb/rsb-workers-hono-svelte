@@ -2,7 +2,7 @@ import { type Page, expect, test } from "@playwright/test";
 import { BASE, type Seeded, signIn } from "./signed-in.ts";
 import { input, open } from "./todos.ts";
 
-// Scenarios A.1 to A.6 (`feature-accounts-shell.md` › A). A.7, the api
+// Scenarios A.1 to A.6 and B.1 (`feature-accounts-shell.md` › A, B). A.7, the api
 // failing, is the BFF's unit test of the page load. Each test signs in
 // for itself, with Playwright's own `test`, so A.1 and A.2 can go without
 // a session. The seed made "Dev Member" and "Dev Admin".
@@ -12,20 +12,20 @@ const accountButton = (page: Page) => topBar(page).getByRole("button", { name: /
 const menu = (page: Page) => page.locator("#account-menu");
 
 /**
- * The top bar has no links but the product name's, which leads to `/`:
- * no "Todos", and no account button.
+ * The top bar has no links but the product name's, which leads to `/`,
+ * and "Sign in" (B): no "Todos", and no account button.
  */
 const expectSignedOut = async (page: Page) => {
   await expect(page.getByText("Sign in to see your list. Your to-dos are kept with your account.")).toBeVisible();
   await expect(input(page)).toHaveCount(0);
   await expect(page.getByRole("list")).toHaveCount(0);
-  await expect(topBar(page).getByRole("link")).toHaveText(["Todo"]);
+  await expect(topBar(page).getByRole("link")).toHaveText(["Todo", "Sign in"]);
   await expect(accountButton(page)).toHaveCount(0);
 };
 
 const signInAs = (page: Page, who: Seeded) => signIn(page.context(), who);
 
-test("A.1 given no session cookie, when I open /, then I see Sign in to see your list, no list, and no links in the top bar", async ({
+test("A.1 given no session cookie, when I open /, then I see Sign in to see your list, no list, and no links in the top bar but Sign in", async ({
   page,
 }) => {
   await open(page);
@@ -104,4 +104,18 @@ test("A.6 given any session, when I open /nowhere, then I see This page doesn’
   await expect(accountButton(page)).toHaveAccessibleName("Account: Dev Member");
   await expect(topBar(page).getByRole("link", { name: "Todos", exact: true })).not.toHaveAttribute("aria-current");
   await expect(page.getByRole("link", { name: "Go to your to-dos" })).toHaveAttribute("href", "/");
+});
+
+test("B.1 given no session cookie, when I open /, then Sign in in the top bar and on the page each lead to the sign-in page, whose top bar has no Sign in", async ({
+  page,
+}) => {
+  await open(page);
+  await topBar(page).getByRole("link", { name: "Sign in" }).click();
+  await expect(page).toHaveURL(`${BASE}/sign-in`);
+  await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
+  await expect(topBar(page).getByRole("link")).toHaveText(["Todo"]);
+
+  await open(page);
+  await page.getByRole("main").getByRole("link", { name: "Sign in" }).click();
+  await expect(page).toHaveURL(`${BASE}/sign-in`);
 });

@@ -55,7 +55,7 @@ describe("a cookie", () => {
     const { sessions, asked } = lookup(row({ user: { emailVerifiedAt: NOW - HOUR } }));
     expect(await run(sessions, TOKEN)).toEqual(
       ok({
-        actor: { kind: "user", userId: "u1", role: "member", emailVerified: true },
+        actor: { kind: "user", userId: "u1", role: "member", emailVerified: true, sessionId: "s1" },
         profile: { name: "Ada Lovelace", email: "ada@example.com" },
         clearCookie: false,
         refreshDue: undefined,
@@ -68,7 +68,7 @@ describe("a cookie", () => {
   test("of an admin carries the role", async () => {
     const { sessions } = lookup(row({ user: { role: "admin" } }));
     const result = await run(sessions, TOKEN);
-    expect(result.ok && result.value.actor).toEqual({ kind: "user", userId: "u1", role: "admin", emailVerified: false });
+    expect(result.ok && result.value.actor).toEqual({ kind: "user", userId: "u1", role: "admin", emailVerified: false, sessionId: "s1" });
   });
 
   test.each([
@@ -96,7 +96,7 @@ describe("a bearer token", () => {
   test("naming a live session is its user, and has no idle window to refresh", async () => {
     const { sessions } = lookup(bearerRow());
     const result = await run(sessions, undefined, TOKEN);
-    expect(result.ok && result.value.actor).toEqual({ kind: "user", userId: "u1", role: "member", emailVerified: false });
+    expect(result.ok && result.value.actor).toEqual({ kind: "user", userId: "u1", role: "member", emailVerified: false, sessionId: "s1" });
     expect(result.ok && result.value.refreshDue).toBeUndefined();
   });
 

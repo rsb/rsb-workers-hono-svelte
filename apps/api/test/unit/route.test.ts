@@ -48,7 +48,7 @@ describe("a route behind its unit's row", () => {
   });
 
   it("refuses a signed-in actor below the row as forbidden, reason role, before the handler", async () => {
-    const { hono, ran } = app({ kind: "user", userId: "u1", role: "member", emailVerified: true });
+    const { hono, ran } = app({ kind: "user", userId: "u1", role: "member", emailVerified: true, sessionId: "s1" });
 
     const response = await hono.request("/ping");
 
@@ -62,7 +62,7 @@ describe("a route behind its unit's row", () => {
   });
 
   it("runs the handler for an actor the row lets through", async () => {
-    const { hono, ran } = app({ kind: "user", userId: "u-admin", role: "admin", emailVerified: true });
+    const { hono, ran } = app({ kind: "user", userId: "u-admin", role: "admin", emailVerified: true, sessionId: "s-admin" });
 
     const response = await hono.request("/ping");
 

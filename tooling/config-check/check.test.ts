@@ -28,8 +28,8 @@ const files = (name: string, contents: Record<string, string>) => {
   return { dir, paths };
 };
 
-/** The seed's overlay, as apps/api/scripts/seed-dev.ts writes it. */
-const SEEDED = "SESSION_COOKIE=sid\n";
+/** The seed's overlay, as apps/api/scripts/seed-dev.ts writes it, with a pepper that is not a secret. */
+const SEEDED = `SESSION_COOKIE=sid\nPEPPER_1=${"p".repeat(43)}\n`;
 
 describe("config check", () => {
   it("passes the committed vars with the seed's overlay: local dev's config", () => {
@@ -37,6 +37,13 @@ describe("config check", () => {
     const result = run([WRANGLER, paths[".dev.vars"] as string]);
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /read as the api's config/);
+  });
+
+  it("refuses an overlay without the pepper: a secret is never in the committed vars", () => {
+    const { paths } = files("no-pepper", { ".dev.vars": "SESSION_COOKIE=sid\n" });
+    const result = run([WRANGLER, paths[".dev.vars"] as string]);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /^ {2}PEPPER_1 is not set$/m);
   });
 
   it("refuses the committed vars alone: a __Host- cookie under an http BFF", () => {

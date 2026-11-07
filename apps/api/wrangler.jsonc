@@ -14,6 +14,14 @@
     "BFF_ORIGIN": "http://localhost:5173",
     "SESSION_COOKIE": "__Host-sid"
   },
+  // The secrets the api reads (src/config.ts), by name only: the values are
+  // set with `wrangler secret put`, and local dev's are in .dev.vars, which
+  // the dev seed writes. Declaring them here makes `wrangler types` read
+  // this list, not .dev.vars, so the generated types are the same with or
+  // without that file (P68). PEPPER_1 keys the password hashes (L48).
+  "secrets": {
+    "required": ["PEPPER_1"]
+  },
   // Local only: wrangler keeps each database under .wrangler/, so there is
   // no database_id until the api is deployed. Each schema lives with its
   // data package (DB8). Two databases (L42): the app's todos, and who the

@@ -25,10 +25,12 @@ There is no bundled test run. Each tier runs on its own, and
 With `pnpm dev` running, http://localhost:5173/health shows whether
 the BFF reaches the API through the binding.
 
-`pnpm seed:dev` writes `SESSION_COOKIE=sid` to `apps/api/.dev.vars`
+`pnpm seed:dev` writes `SESSION_COOKIE=sid` and a random `PEPPER_1`
+(the secret password hashes are keyed with) to `apps/api/.dev.vars`,
 and the two raw session tokens to `apps/api/.dev.tokens`, each only
-when missing; both files are gitignored. `test:e2e` seeds its own fresh
-database with the same tokens.
+when missing; both files are gitignored. The api does not start without
+`PEPPER_1`, so run the seed once before `pnpm dev`. `test:e2e` seeds its
+own fresh database with the same tokens.
 
 ## Layout
 

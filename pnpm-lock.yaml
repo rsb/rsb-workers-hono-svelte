@@ -186,6 +186,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@phi-ag/argon2':
+        specifier: 0.6.2
+        version: 0.6.2
       '@todo/business':
         specifier: workspace:*
         version: link:../../packages/business
@@ -788,6 +791,9 @@ packages:
 
   '@oxc-project/types@0.156.0':
     resolution: {integrity: sha512-1Duyg48TdJNdyhEB8Xn1L36bT9Pv6GUtlKjHxOys8xkaF/rQq3XJE+bAurSK/AgIz5mGFsb77cn9Pb20+WCScw==}
+
+  '@phi-ag/argon2@0.6.2':
+    resolution: {integrity: sha512-ThdTbXfwpI+ON+bcwA+SXQF0Q3CwLN+G4HX7V3IhlPMb5DutRe/r8L28A7UFPm5EDEbwo8MVMnwJycgLusf6YQ==}
 
   '@playwright/test@1.64.1':
     resolution: {integrity: sha512-IaYGml/nSOiZWROfPtuIL7neuu9qDOZ3TNvNljUIrhDMxiGTgPjzj/g9p9RxpS2tSepPDRY+UwAaEeiKtUvIAg==}
@@ -1715,6 +1721,8 @@ snapshots:
       '@jridgewell/sourcemap-codec': 1.6.0
 
   '@oxc-project/types@0.156.0': {}
+
+  '@phi-ag/argon2@0.6.2': {}
 
   '@playwright/test@1.64.1':
     dependencies:

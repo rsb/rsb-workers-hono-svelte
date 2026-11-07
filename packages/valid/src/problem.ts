@@ -18,10 +18,13 @@ export type Problem =
   | { field: Field; rule: "not_text" }
   | { field: Field; rule: "not_boolean" }
   | { field: "title"; rule: "title.length"; violation: "empty" | "too_long"; max: number }
-  | { rule: "patch.nonempty"; violation: "empty" };
+  | { rule: "patch.nonempty"; violation: "empty" }
+  | { field: "email"; rule: "email.length"; violation: "empty" | "too_long"; max: number }
+  | { field: "email"; rule: "email.shape"; violation: "malformed" }
+  | { field: "password"; rule: "password.given"; violation: "empty" | "too_long"; max: number };
 
 /** A field a candidate can carry. */
-export type Field = "title" | "completed";
+export type Field = "title" | "completed" | "email" | "password";
 
 /** Every problem a candidate has, in the order its rules ran. Never empty. */
 export type Problems = [Problem, ...Problem[]];

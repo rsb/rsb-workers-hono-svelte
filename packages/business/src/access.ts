@@ -19,6 +19,10 @@ export const access = {
   deleteTodo: { useCase: "use-cases/todos/remove-a-todo.md", requires: "member", scope: "own" },
   deleteCompleted: { useCase: "use-cases/todos/clear-completed.md", requires: "member", scope: "own" },
   currentSession: { useCase: "use-cases/auth/current-session.md", requires: "anonymous", scope: "n/a" },
+  signIn: { useCase: "use-cases/auth/sign-in.md", requires: "anonymous", scope: "n/a" },
+  signOut: { useCase: "use-cases/auth/sign-out.md", requires: "member", scope: "own" },
+  signOutEverywhere: { useCase: "use-cases/auth/sign-out-everywhere.md", requires: "member", scope: "own" },
+  listSessions: { useCase: "use-cases/auth/list-sessions.md", requires: "member", scope: "own" },
 } as const satisfies Record<string, AccessRow>;
 
 /** An operation that has a row. */

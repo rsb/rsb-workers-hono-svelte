@@ -30,16 +30,20 @@ const startSession = async (token: string, userId: string, disabled = false) => 
   if (disabled) {
     await env.IDENTITY_DB.prepare("UPDATE users SET disabled = 1 WHERE id = ?1").bind(userId).run();
   }
-  const started = await store.startSession({
-    id: `s-${userId}`,
-    tokenHash: await sha256(token),
-    userId,
-    channel: "cookie",
-    createdAt: now,
-    idleUntil: now + SESSION_IDLE_MS,
-    expiresAt: now + 30 * SESSION_IDLE_MS,
+  const started = await store.recordSignIn({
+    session: {
+      id: `s-${userId}`,
+      tokenHash: await sha256(token),
+      userId,
+      channel: "cookie",
+      createdAt: now,
+      idleUntil: now + SESSION_IDLE_MS,
+      expiresAt: now + 30 * SESSION_IDLE_MS,
+      label: null,
+      city: null,
+    },
   });
-  expect(started).toEqual({ ok: true, value: true });
+  expect(started).toEqual({ ok: true, value: { started: true } });
 };
 
 const counts = (headers: Record<string, string>) => exports.default.fetch("https://todo-api/todos/counts", { headers });

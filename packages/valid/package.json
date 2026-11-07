@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     "./problem.ts": "./src/problem.ts",
+    "./auth/*": "./src/auth/*",
     "./todos/*": "./src/todos/*"
   },
   "scripts": {

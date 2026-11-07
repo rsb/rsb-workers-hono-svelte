@@ -38,6 +38,7 @@ const refusal = (refused: ApiError): "signed_out" | "failed" => {
         }
       }
     case "validation":
+    case "invalid_credentials":
     case "not_found":
     case "limit":
     case "too_large":
